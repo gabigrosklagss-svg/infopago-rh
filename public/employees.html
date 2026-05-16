@@ -1,0 +1,590 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Funcionários — InfoPago RH</title>
+<link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<div class="app">
+  <div id="sidebar"></div>
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <h1>Funcionários</h1>
+        <p class="subtitle">Clique no nome do funcionário para abrir a ficha completa</p>
+      </div>
+      <a href="/employee-form.html" class="btn btn-primary">+ Novo funcionário</a>
+    </div>
+
+    <div class="filter-bar">
+      <div class="field">
+        <label>Buscar</label>
+        <input id="f-search" placeholder="Nome, CPF ou matrícula" oninput="debounceSearch()">
+      </div>
+      <div class="field">
+        <label>Status</label>
+        <select id="f-status" onchange="loadList()">
+          <option value="ativo">Ativos</option>
+          <option value="">Todos</option>
+          <option value="afastado">Afastados</option>
+          <option value="ferias">Em férias</option>
+          <option value="demitido">Demitidos</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Departamento</label>
+        <select id="f-dept" onchange="loadList()">
+          <option value="">Todos</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th></th>
+            <th>Matrícula</th>
+            <th>Nome</th>
+            <th>CPF</th>
+            <th>Departamento / Cargo</th>
+            <th>Admissão</th>
+            <th>Salário</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<!-- ── Modal: Ficha completa do funcionário ──────────────── -->
+<div id="modal" class="modal-overlay hidden" onclick="if(event.target===this) closeModal()">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h2 id="modal-title">Ficha do funcionário</h2>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal()">Fechar</button>
+      <a id="btn-editar" href="#" class="btn btn-primary">✎ Editar funcionário</a>
+    </div>
+  </div>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+  requireAuth();
+  mountShell('employees');
+
+  let searchTimer;
+  function debounceSearch() {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(loadList, 300);
+  }
+
+  async function loadDepts() {
+    const ds = await api('/departments?active=true');
+    document.getElementById('f-dept').innerHTML = '<option value="">Todos</option>' +
+      ds.map(d => `<option value="${d.id}">${d.nome}</option>`).join('');
+  }
+
+  async function loadList() {
+    const q = new URLSearchParams();
+    const status = document.getElementById('f-status').value;
+    const dept = document.getElementById('f-dept').value;
+    const search = document.getElementById('f-search').value;
+    if (status) q.set('status', status);
+    if (dept) q.set('department_id', dept);
+    if (search) q.set('search', search);
+
+    showLoading();
+    try {
+      const r = await api(`/employees?${q}`);
+      const tbody = document.getElementById('tbody');
+      if (!r.data?.length) {
+        tbody.innerHTML = '<tr><td colspan="9" class="table-empty">Nenhum funcionário encontrado.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = r.data.map(e => {
+        const initials = (e.nome_completo || '?').split(' ').slice(0, 2).map(s => s[0]).join('').toUpperCase();
+        return `
+          <tr>
+            <td>${e.foto_url ? `<img src="${e.foto_url}" class="avatar-sm">` : `<div class="avatar-sm">${initials}</div>`}</td>
+            <td><strong>${fmt.matricula(e.matricula)}</strong></td>
+            <td><span class="clickable" onclick="openFicha('${e.id}')">${e.nome_completo}</span></td>
+            <td>${fmt.cpf(e.cpf)}</td>
+            <td>${e.departments?.nome || '—'}<br><small class="text-muted">${e.positions?.titulo || ''}</small></td>
+            <td>${fmt.data(e.data_admissao)}</td>
+            <td>${fmt.brl(e.salario_base)}</td>
+            <td><span class="badge ${e.status}">${e.status}</span></td>
+            <td><a href="/employee-form.html?id=${e.id}" class="btn btn-sm">Editar</a></td>
+          </tr>`;
+      }).join('');
+    } catch (err) { toast(err.message, 'error'); }
+    finally { hideLoading(); }
+  }
+
+  /* ── Ficha completa (pop-up) ──────────────────────────── */
+  let currentFichaTab = 'dados';
+
+  async function openFicha(id) {
+    showLoading();
+    try {
+      const d = await api(`/employees/${id}/ficha-completa`);
+      const e = d.employee;
+      document.getElementById('modal-title').textContent = `${e.nome_completo} · ${fmt.matricula(e.matricula)}`;
+      document.getElementById('btn-editar').href = `/employee-form.html?id=${id}`;
+
+      const initials = (e.nome_completo || '?').split(' ').slice(0, 2).map(s => s[0]).join('').toUpperCase();
+
+      document.getElementById('modal-body').innerHTML = `
+        <!-- Cabeçalho compacto -->
+        <div class="flex gap-4 items-center mb-4" style="padding-bottom:16px;border-bottom:1px solid var(--border)">
+          ${e.foto_url ? `<img src="${e.foto_url}" class="avatar-md">` : `<div class="avatar-md">${initials}</div>`}
+          <div class="flex-1">
+            <h3 style="margin:0">${e.nome_completo}</h3>
+            <p class="text-muted text-sm" style="margin:4px 0">${e.positions?.titulo || ''} · ${e.departments?.nome || ''}</p>
+            <p class="text-sm" style="margin:0">
+              <span class="badge ${e.status}">${e.status}</span>
+              · Admitido em ${fmt.data(e.data_admissao)} (${fmt.tempo(e.data_admissao)})
+              · ${fmt.brl(e.salario_base)}
+            </p>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+          <button class="tab-btn active" onclick="setTab('dados')">📋 Dados</button>
+          <button class="tab-btn" onclick="setTab('documentos')">📎 Documentos (${d.documentos.length})</button>
+          <button class="tab-btn" onclick="setTab('holerites')">📄 Holerites (${d.holerites.length})</button>
+          <button class="tab-btn" onclick="setTab('faltas')">📅 Faltas/Atestados (${d.faltas_atestados.length})</button>
+          <button class="tab-btn" onclick="setTab('advertencias')">⚠ Advertências (${d.advertencias.length})</button>
+          <button class="tab-btn" onclick="setTab('salario')">💰 Histórico Salarial (${d.historico_salarial.length})</button>
+          <button class="tab-btn" onclick="setTab('ferias')">🏖 Férias (${d.ferias.length})</button>
+          <button class="tab-btn" onclick="setTab('processos')">📋 Admissão/Demissão (${d.checklists.length})</button>
+        </div>
+
+        <!-- Conteúdo: Dados -->
+        <div id="tab-dados" class="tab-content active">
+          <div class="grid-2">
+            <div class="card">
+              <h4 style="margin-top:0">Pessoal</h4>
+              <div class="info-row"><div class="label">CPF</div><div class="value">${fmt.cpf(e.cpf)}</div></div>
+              <div class="info-row"><div class="label">RG</div><div class="value">${e.rg || '—'} ${e.rg_orgao_emissor || ''}</div></div>
+              <div class="info-row"><div class="label">PIS/PASEP</div><div class="value">${e.pis_pasep || '—'}</div></div>
+              <div class="info-row"><div class="label">Nascimento</div><div class="value">${fmt.data(e.data_nascimento)} (${fmt.idade(e.data_nascimento)} anos)</div></div>
+              <div class="info-row"><div class="label">Sexo</div><div class="value">${e.sexo === 'M' ? 'Masculino' : e.sexo === 'F' ? 'Feminino' : '—'}</div></div>
+              <div class="info-row"><div class="label">Est. Civil</div><div class="value">${e.estado_civil || '—'}</div></div>
+              <div class="info-row"><div class="label">Dependentes</div><div class="value">${e.num_dependentes || 0}</div></div>
+            </div>
+            <div class="card">
+              <h4 style="margin-top:0">Contato</h4>
+              <div class="info-row"><div class="label">E-mail pessoal</div><div class="value">${e.email_pessoal || '—'}</div></div>
+              <div class="info-row"><div class="label">E-mail corp.</div><div class="value">${e.email_corporativo || '—'}</div></div>
+              <div class="info-row"><div class="label">Celular</div><div class="value">${e.celular ? fmt.telefone(e.celular) : '—'}</div></div>
+              <div class="info-row"><div class="label">Endereço</div><div class="value">${[e.logradouro, e.numero, e.bairro, e.cidade, e.uf].filter(Boolean).join(', ') || '—'}</div></div>
+              <div class="info-row"><div class="label">CEP</div><div class="value">${e.cep ? fmt.cep(e.cep) : '—'}</div></div>
+            </div>
+          </div>
+          <div class="grid-2 mt-4">
+            <div class="card">
+              <h4 style="margin-top:0">Trabalho</h4>
+              <div class="info-row"><div class="label">Cargo</div><div class="value">${e.positions?.titulo || '—'}</div></div>
+              <div class="info-row"><div class="label">CBO</div><div class="value">${e.positions?.cbo || '—'}</div></div>
+              <div class="info-row"><div class="label">Departamento</div><div class="value">${e.departments?.nome || '—'}</div></div>
+              <div class="info-row"><div class="label">Setor / Seção</div><div class="value">${[e.setor, e.secao].filter(Boolean).join(' / ') || '—'}</div></div>
+              <div class="info-row"><div class="label">Tipo contrato</div><div class="value">${e.tipo_contrato}</div></div>
+              <div class="info-row"><div class="label">Carga semanal</div><div class="value">${e.carga_horaria_semanal}h</div></div>
+              <div class="info-row"><div class="label">Salário</div><div class="value">${fmt.brl(e.salario_base)}</div></div>
+            </div>
+            <div class="card">
+              <h4 style="margin-top:0">Benefícios</h4>
+              <div class="info-row"><div class="label">VT</div><div class="value">${e.tem_vt ? fmt.brl(e.vt_valor_dia) + '/dia × ' + e.vt_dias_uteis : '—'}</div></div>
+              <div class="info-row"><div class="label">VR</div><div class="value">${e.tem_vr ? fmt.brl(e.vr_valor_dia) + '/dia × ' + e.vr_dias_uteis : '—'}</div></div>
+              <div class="info-row"><div class="label">VA</div><div class="value">${e.tem_va ? fmt.brl(e.va_valor_mes) + '/mês' : '—'}</div></div>
+              <div class="info-row"><div class="label">Plano saúde</div><div class="value">${e.tem_plano_saude ? fmt.brl(e.plano_saude_valor) : '—'}</div></div>
+              <div class="info-row"><div class="label">Plano odonto</div><div class="value">${e.tem_plano_odonto ? fmt.brl(e.plano_odonto_valor) : '—'}</div></div>
+              <div class="info-row"><div class="label">Seguro de vida</div><div class="value">${e.tem_seguro_vida ? fmt.brl(e.seguro_vida_valor) : '—'}</div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Holerites -->
+        <div id="tab-holerites" class="tab-content">
+          ${d.holerites.length ? `<table class="table">
+            <thead><tr><th>Competência</th><th>Líquido</th><th>Status</th><th>Data pagamento</th><th></th></tr></thead>
+            <tbody>${d.holerites.map(h => `
+              <tr>
+                <td><strong>${fmt.competencia(h.competencia_mes, h.competencia_ano)}</strong></td>
+                <td>${fmt.brl(h.salario_liquido)}</td>
+                <td><span class="badge ${h.status}">${h.status}</span></td>
+                <td>${fmt.data(h.data_pagamento)}</td>
+                <td>${h.pdf_path ? `<button class="btn btn-sm" onclick="downloadAuth('/api/payslips/${h.id}/download', 'Holerite_${h.competencia_mes}_${h.competencia_ano}.pdf')">📄 PDF</button>` : ''}</td>
+              </tr>`).join('')}</tbody></table>` : '<p class="text-muted">Nenhum holerite gerado.</p>'}
+        </div>
+
+        <!-- Faltas/Atestados -->
+        <div id="tab-faltas" class="tab-content">
+          <button class="btn btn-primary btn-sm mb-3" onclick="abrirFormAbsence('${id}')">+ Registrar falta/atestado</button>
+          ${d.faltas_atestados.length ? `<table class="table">
+            <thead><tr><th>Tipo</th><th>Início</th><th>Fim</th><th>Dias</th><th>CID</th><th>Justif.</th><th>Obs</th></tr></thead>
+            <tbody>${d.faltas_atestados.map(f => `
+              <tr><td><span class="badge ${f.tipo === 'falta' ? 'erro' : 'pendente'}">${f.tipo}</span></td>
+              <td>${fmt.data(f.data_inicio)}</td><td>${fmt.data(f.data_fim)}</td>
+              <td>${f.dias || '—'}</td><td>${f.cid || '—'}</td>
+              <td>${f.justificado ? '✓' : '✕'}</td><td>${f.observacoes || ''}</td></tr>`).join('')}</tbody></table>`
+            : '<p class="text-muted">Sem registros.</p>'}
+        </div>
+
+        <!-- Advertências -->
+        <div id="tab-advertencias" class="tab-content">
+          <button class="btn btn-primary btn-sm mb-3" onclick="abrirFormWarning('${id}')">+ Aplicar advertência</button>
+          ${d.advertencias.length ? `<table class="table">
+            <thead><tr><th>Tipo</th><th>Data</th><th>Motivo</th><th>Dias susp.</th><th>Ciente</th></tr></thead>
+            <tbody>${d.advertencias.map(a => `
+              <tr><td><span class="badge ${a.tipo}">${a.tipo.replace('_', ' ')}</span></td>
+              <td>${fmt.data(a.data_ocorrencia)}</td>
+              <td>${a.motivo}</td>
+              <td>${a.dias_suspensao || 0}</td>
+              <td>${a.funcionario_ciente ? '✓ Sim' : '✕ Não'}</td></tr>`).join('')}</tbody></table>`
+            : '<p class="text-muted">Sem advertências registradas.</p>'}
+        </div>
+
+        <!-- Histórico salarial -->
+        <div id="tab-salario" class="tab-content">
+          ${d.historico_salarial.length ? `<table class="table">
+            <thead><tr><th>Data</th><th>Anterior</th><th>Novo</th><th>Variação</th><th>Motivo</th></tr></thead>
+            <tbody>${d.historico_salarial.map(s => `
+              <tr><td>${fmt.data(s.data_reajuste)}</td>
+              <td>${fmt.brl(s.salario_anterior)}</td>
+              <td><strong>${fmt.brl(s.salario_novo)}</strong></td>
+              <td>${s.percentual_reajuste > 0 ? '+' : ''}${s.percentual_reajuste}%</td>
+              <td>${s.motivo || ''}</td></tr>`).join('')}</tbody></table>`
+            : '<p class="text-muted">Sem alterações salariais.</p>'}
+        </div>
+
+        <!-- Férias -->
+        <div id="tab-ferias" class="tab-content">
+          <div class="flex gap-2 mb-3">
+            <button class="btn btn-primary btn-sm" onclick="abrirFormSolicitarFerias('${id}')">+ Solicitar férias</button>
+          </div>
+
+          ${d.solicitacoes_ferias?.length ? `<h4 style="margin-top:0">Solicitações</h4><table class="table mb-4">
+            <thead><tr><th>Período</th><th>Dias</th><th>Vendidos</th><th>13º</th><th>Status</th><th>Observação</th></tr></thead>
+            <tbody>${d.solicitacoes_ferias.map(s => `
+              <tr><td>${fmt.data(s.data_inicio_pretendida)} → ${fmt.data(s.data_fim_pretendida)}</td>
+              <td>${s.dias_solicitados}</td><td>${s.dias_vendidos || 0}</td>
+              <td>${s.adiantar_13 ? '✓' : '—'}</td>
+              <td><span class="badge ${s.status}">${s.status}</span></td>
+              <td><small class="text-muted">${s.observacao_gestor || s.observacao_funcionario || ''}</small></td></tr>`).join('')}</tbody></table>` : ''}
+
+          <h4 style="margin-top:16px">Períodos aquisitivos</h4>
+          ${d.ferias.length ? `<table class="table">
+            <thead><tr><th>Período aquisitivo</th><th>Gozados</th><th>Vendidos</th><th>Período de gozo</th><th>Status</th></tr></thead>
+            <tbody>${d.ferias.map(f => `
+              <tr><td>${fmt.data(f.periodo_aquisitivo_inicio)} a ${fmt.data(f.periodo_aquisitivo_fim)}</td>
+              <td>${f.dias_gozados}</td><td>${f.dias_vendidos}</td>
+              <td>${f.data_gozo_inicio ? fmt.data(f.data_gozo_inicio) + ' a ' + fmt.data(f.data_gozo_fim) : '—'}</td>
+              <td><span class="badge ${f.status}">${f.status.replace('_',' ')}</span></td></tr>`).join('')}</tbody></table>`
+            : '<p class="text-muted">Sem registros de férias.</p>'}
+        </div>
+
+        <!-- Documentos -->
+        <div id="tab-documentos" class="tab-content">
+          <button class="btn btn-primary btn-sm mb-3" onclick="abrirFormUpload('${id}')">+ Adicionar documento</button>
+          ${d.documentos.length ? `<table class="table">
+            <thead><tr><th>Tipo</th><th>Descrição</th><th>Emissão</th><th>Validade</th><th>Tamanho</th><th>Enviado em</th><th></th></tr></thead>
+            <tbody>${d.documentos.map(doc => {
+              const vencido = doc.data_validade && new Date(doc.data_validade) < new Date();
+              return `<tr ${vencido ? 'style="background:var(--danger-bg)"' : ''}>
+                <td><strong>${formatTipoDoc(doc.tipo)}</strong></td>
+                <td>${doc.descricao || '—'}</td>
+                <td>${fmt.data(doc.data_emissao)}</td>
+                <td>${doc.data_validade ? fmt.data(doc.data_validade) + (vencido ? ' ⚠' : '') : '—'}</td>
+                <td>${(doc.tamanho_bytes/1024).toFixed(0)} KB</td>
+                <td>${fmt.data(doc.created_at)}</td>
+                <td>
+                  <button class="btn btn-sm" onclick="baixarDocumento('${doc.id}')">⬇ Baixar</button>
+                  <button class="btn btn-sm btn-danger" onclick="apagarDocumento('${doc.id}', '${id}')">✕</button>
+                </td></tr>`;
+            }).join('')}</tbody></table>`
+            : '<p class="text-muted">Nenhum documento anexado. Clique em <strong>+ Adicionar documento</strong> para fazer upload de RG, CTPS, exames, contratos, etc.</p>'}
+        </div>
+
+        <!-- Onboarding / Offboarding -->
+        <div id="tab-processos" class="tab-content">
+          <div class="flex gap-2 mb-3">
+            ${!d.checklists.some(c => c.tipo === 'onboarding' && c.status !== 'concluido') ? `<button class="btn btn-primary btn-sm" onclick="iniciarChecklist('${id}', 'onboarding')">+ Iniciar admissão</button>` : ''}
+            ${!d.checklists.some(c => c.tipo === 'offboarding' && c.status !== 'concluido') ? `<button class="btn btn-danger btn-sm" onclick="iniciarChecklist('${id}', 'offboarding')">+ Iniciar demissão</button>` : ''}
+          </div>
+          ${d.checklists.length ? d.checklists.map(c => {
+            const concluidos = c.checklist_items.filter(i => i.concluido).length;
+            const total = c.checklist_items.length;
+            const pct = total ? Math.round(concluidos/total*100) : 0;
+            return `<div class="card mb-3">
+              <h4 style="margin-top:0;display:flex;justify-content:space-between;align-items:center">
+                <span>${c.tipo === 'onboarding' ? '🟢 Admissão' : '🔴 Demissão'} · <small class="text-muted">${fmt.data(c.data_inicio)}</small></span>
+                <span class="badge ${c.status === 'concluido' ? 'ativo' : 'pendente'}">${c.status} · ${pct}%</span>
+              </h4>
+              <div style="background:var(--paper-3);border-radius:4px;height:6px;margin-bottom:14px;overflow:hidden">
+                <div style="background:${pct === 100 ? 'var(--success)' : 'var(--navy-700)'};height:100%;width:${pct}%;transition:width .3s"></div>
+              </div>
+              <ul style="list-style:none;padding:0;margin:0">
+                ${c.checklist_items.sort((a,b)=>a.ordem-b.ordem).map(i => `
+                  <li style="padding:8px 0;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:10px">
+                    <input type="checkbox" ${i.concluido ? 'checked' : ''} onchange="toggleItem('${i.id}', this.checked, '${id}')" style="margin-top:3px">
+                    <div class="flex-1">
+                      <div style="${i.concluido ? 'text-decoration:line-through;color:var(--ink-4)' : ''}">
+                        <strong>${i.titulo}</strong>
+                        ${i.obrigatorio ? '<span style="color:var(--danger);font-size:11px"> *</span>' : ''}
+                        <span class="badge ${i.responsavel === 'rh' ? 'info' : i.responsavel === 'gestor' ? 'pendente' : 'ativo'}" style="margin-left:6px">${i.responsavel}</span>
+                      </div>
+                      ${i.descricao ? `<small class="text-muted" style="display:block;margin-top:2px">${i.descricao}</small>` : ''}
+                      ${i.concluido && i.data_conclusao ? `<small style="color:var(--success);font-size:11px">✓ Concluído em ${fmt.dataHora(i.data_conclusao)}</small>` : ''}
+                    </div>
+                  </li>
+                `).join('')}
+              </ul>
+            </div>`;
+          }).join('') : '<p class="text-muted">Nenhum processo de admissão ou demissão registrado.</p>'}
+        </div>
+      `;
+
+      document.getElementById('modal').classList.remove('hidden');
+      currentFichaTab = 'dados';
+    } catch (err) { toast(err.message, 'error'); }
+    finally { hideLoading(); }
+  }
+
+  function setTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    event.target.classList.add('active');
+    document.getElementById(`tab-${tab}`).classList.add('active');
+    currentFichaTab = tab;
+  }
+
+  function closeModal() { document.getElementById('modal').classList.add('hidden'); }
+
+  /* ── Modais para criar advertência / falta ─────────── */
+  function abrirFormAbsence(empId) {
+    const html = `<form id="absForm">
+      <div class="form-grid">
+        <div class="field"><label>Tipo<span class="req">*</span></label>
+          <select name="tipo" required>
+            <option value="">Selecione</option>
+            <option value="falta">Falta</option>
+            <option value="atestado">Atestado</option>
+            <option value="ferias">Férias</option>
+            <option value="licenca_maternidade">Lic. Maternidade</option>
+            <option value="licenca_paternidade">Lic. Paternidade</option>
+            <option value="afastamento_inss">Afastamento INSS</option>
+            <option value="suspensao">Suspensão</option>
+            <option value="outros">Outros</option>
+          </select></div>
+        <div class="field"><label>Data início<span class="req">*</span></label><input type="date" name="data_inicio" required></div>
+        <div class="field"><label>Data fim</label><input type="date" name="data_fim"></div>
+        <div class="field"><label>CID</label><input name="cid" placeholder="Ex: M54.5"></div>
+        <div class="field"><label>Médico</label><input name="medico_nome"></div>
+        <div class="field"><label>CRM</label><input name="medico_crm"></div>
+      </div>
+      <div class="field mt-4"><label>Observações</label><textarea name="observacoes"></textarea></div>
+      <label class="toggle mt-4"><input type="checkbox" name="justificado"><span class="slider"></span> Justificado</label>
+      <label class="toggle"><input type="checkbox" name="descontar_salario" checked><span class="slider"></span> Descontar do salário</label>
+    </form>`;
+    showFormModal('Registrar falta / atestado', html, async () => {
+      const f = document.getElementById('absForm');
+      if (!validateForm(f)) return false;
+      const data = formToObject(f);
+      data.employee_id = empId;
+      data.justificado = !!data.justificado;
+      data.descontar_salario = !!data.descontar_salario;
+      try {
+        await api('/absences', { method: 'POST', body: data });
+        toast('Registro criado!', 'success');
+        closeFormModal();
+        openFicha(empId);
+      } catch (err) { toast(err.message, 'error'); }
+    });
+  }
+
+  function abrirFormWarning(empId) {
+    const html = `<form id="advForm">
+      <div class="form-grid">
+        <div class="field"><label>Tipo<span class="req">*</span></label>
+          <select name="tipo" required>
+            <option value="">Selecione</option>
+            <option value="verbal">Verbal</option>
+            <option value="escrita">Escrita</option>
+            <option value="suspensao">Suspensão</option>
+            <option value="justa_causa">Justa Causa</option>
+          </select></div>
+        <div class="field"><label>Data<span class="req">*</span></label><input type="date" name="data_ocorrencia" required></div>
+        <div class="field"><label>Dias de suspensão</label><input type="number" name="dias_suspensao" value="0" min="0"></div>
+      </div>
+      <div class="field mt-4"><label>Motivo<span class="req">*</span></label><input name="motivo" required placeholder="Ex: Atrasos frequentes"></div>
+      <div class="field mt-4"><label>Descrição detalhada</label><textarea name="descricao_detalhada"></textarea></div>
+      <div class="field mt-4"><label>Testemunhas</label><input name="testemunhas"></div>
+      <label class="toggle mt-4"><input type="checkbox" name="funcionario_ciente"><span class="slider"></span> Funcionário ciente / assinou</label>
+    </form>`;
+    showFormModal('Aplicar advertência', html, async () => {
+      const f = document.getElementById('advForm');
+      if (!validateForm(f)) return false;
+      const data = formToObject(f);
+      data.employee_id = empId;
+      data.funcionario_ciente = !!data.funcionario_ciente;
+      try {
+        await api('/warnings', { method: 'POST', body: data });
+        toast('Advertência registrada!', 'success');
+        closeFormModal();
+        openFicha(empId);
+      } catch (err) { toast(err.message, 'error'); }
+    });
+  }
+
+  function showFormModal(title, html, onSave) {
+    let m = document.getElementById('form-modal');
+    if (!m) {
+      m = document.createElement('div');
+      m.id = 'form-modal';
+      m.className = 'modal-overlay';
+      m.onclick = (e) => { if (e.target === m) closeFormModal(); };
+      document.body.appendChild(m);
+    }
+    m.innerHTML = `<div class="modal">
+      <div class="modal-header"><h2>${title}</h2><button class="modal-close" onclick="closeFormModal()">×</button></div>
+      <div class="modal-body">${html}</div>
+      <div class="modal-footer">
+        <button class="btn" onclick="closeFormModal()">Cancelar</button>
+        <button class="btn btn-primary" id="form-save">Salvar</button>
+      </div>
+    </div>`;
+    m.classList.remove('hidden');
+    initMasks(m);
+    document.getElementById('form-save').onclick = onSave;
+  }
+
+  function closeFormModal() {
+    const m = document.getElementById('form-modal');
+    if (m) m.remove();
+  }
+
+  /* ── Documentos ─────────────────────────────────────── */
+  const TIPOS_DOC = {
+    rg: 'RG', cpf: 'CPF', ctps: 'CTPS', titulo_eleitor: 'Título de Eleitor',
+    reservista: 'Reservista', comprovante_residencia: 'Comprovante de Residência',
+    foto_3x4: 'Foto 3x4', exame_admissional: 'Exame Admissional',
+    exame_periodico: 'Exame Periódico', exame_demissional: 'Exame Demissional',
+    contrato_trabalho: 'Contrato de Trabalho', aditivo_contrato: 'Aditivo Contratual',
+    termo_responsabilidade: 'Termo de Responsabilidade', outros: 'Outros',
+  };
+  function formatTipoDoc(t) { return TIPOS_DOC[t] || t; }
+
+  function abrirFormUpload(empId) {
+    const opts = Object.entries(TIPOS_DOC).map(([k,v]) => `<option value="${k}">${v}</option>`).join('');
+    const html = `<form id="docForm">
+      <div class="form-grid">
+        <div class="field"><label>Tipo<span class="req">*</span></label><select name="tipo" required>${opts}</select></div>
+        <div class="field"><label>Data de emissão</label><input type="date" name="data_emissao"></div>
+        <div class="field"><label>Data de validade</label><input type="date" name="data_validade"></div>
+      </div>
+      <div class="field mt-4"><label>Descrição</label><input name="descricao" placeholder="Ex: 2ª via, frente e verso, etc."></div>
+      <div class="field mt-4"><label>Arquivo<span class="req">*</span></label>
+        <input type="file" name="arquivo" required accept="application/pdf,image/jpeg,image/png,image/webp">
+        <small class="text-muted text-sm" style="margin-top:4px">PDF, JPG, PNG ou WebP · máx. 20 MB</small>
+      </div>
+    </form>`;
+    showFormModal('Anexar documento', html, async () => {
+      const f = document.getElementById('docForm');
+      if (!validateForm(f)) return;
+      const fd = new FormData(f);
+      showLoading();
+      try {
+        const r = await fetch(`/api/documents/${empId}`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${getToken()}` },
+          body: fd,
+        });
+        if (!r.ok) throw new Error((await r.json()).error || 'Falha no upload');
+        toast('Documento anexado!', 'success');
+        closeFormModal();
+        openFicha(empId);
+      } catch (err) { toast(err.message, 'error'); }
+      finally { hideLoading(); }
+    });
+  }
+
+  async function baixarDocumento(id) {
+    try {
+      const r = await api(`/documents/file/${id}`);
+      window.open(r.url, '_blank');
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function apagarDocumento(id, empId) {
+    if (!confirm('Excluir este documento permanentemente?')) return;
+    try {
+      await api(`/documents/${id}`, { method: 'DELETE' });
+      toast('Documento removido.', 'success');
+      openFicha(empId);
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  /* ── Solicitar férias ───────────────────────────────── */
+  function abrirFormSolicitarFerias(empId) {
+    const html = `<form id="fereForm">
+      <div class="form-grid">
+        <div class="field"><label>Início pretendido<span class="req">*</span></label><input type="date" name="data_inicio_pretendida" required></div>
+        <div class="field"><label>Fim pretendido<span class="req">*</span></label><input type="date" name="data_fim_pretendida" required></div>
+        <div class="field"><label>Dias vendidos (abono)</label><input type="number" name="dias_vendidos" value="0" min="0" max="10"></div>
+        <div class="field"><label>Adiantar 13º?</label>
+          <select name="adiantar_13"><option value="false">Não</option><option value="true">Sim</option></select></div>
+      </div>
+      <div class="field mt-4"><label>Observação</label><textarea name="observacao_funcionario"></textarea></div>
+    </form>`;
+    showFormModal('Solicitar férias', html, async () => {
+      const f = document.getElementById('fereForm');
+      if (!validateForm(f)) return;
+      const d = formToObject(f);
+      d.employee_id = empId;
+      d.adiantar_13 = d.adiantar_13 === 'true';
+      d.dias_vendidos = parseInt(d.dias_vendidos) || 0;
+      try {
+        await api('/vacation-requests', { method: 'POST', body: d });
+        toast('Solicitação criada! Aguarde aprovação.', 'success');
+        closeFormModal();
+        openFicha(empId);
+      } catch (err) { toast(err.message, 'error'); }
+    });
+  }
+
+  /* ── Onboarding / Offboarding ──────────────────────── */
+  async function iniciarChecklist(empId, tipo) {
+    const msg = tipo === 'onboarding'
+      ? 'Iniciar processo de admissão com checklist padrão (11 itens)?'
+      : 'Iniciar processo de demissão com checklist padrão (11 itens)?';
+    if (!confirm(msg)) return;
+    try {
+      await api('/checklists', { method: 'POST', body: { employee_id: empId, tipo } });
+      toast(`${tipo === 'onboarding' ? 'Admissão' : 'Demissão'} iniciada!`, 'success');
+      openFicha(empId);
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function toggleItem(itemId, concluido, empId) {
+    try {
+      await api(`/checklists/items/${itemId}`, { method: 'PUT', body: { concluido } });
+      openFicha(empId);
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  loadDepts(); loadList();
+</script>
+</body>
+</html>

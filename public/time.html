@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Controle de Ponto — InfoPago RH</title>
+<link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<div class="app">
+  <div id="sidebar"></div>
+  <main class="main">
+    <div class="breadcrumb">
+      <a href="/dashboard.html">Painel</a>
+      <span class="sep">›</span>
+      <span>Controle de ponto</span>
+    </div>
+
+    <div class="page-header">
+      <div>
+        <h1>Controle de ponto</h1>
+        <p class="subtitle">Espelho mensal, banco de horas e ajustes manuais</p>
+      </div>
+      <div class="page-header-actions">
+        <button class="btn btn-primary" onclick="abrirNovoLancamento()">+ Lançar dia</button>
+      </div>
+    </div>
+
+    <!-- Banco de horas geral -->
+    <div class="card mb-4">
+      <h3 class="card-title">Banco de horas <small>SALDO ATUAL POR FUNCIONÁRIO</small></h3>
+      <div id="banco-list"></div>
+    </div>
+
+    <!-- Espelho do funcionário -->
+    <div class="card">
+      <div class="filter-bar" style="margin-bottom:16px;padding:0;border:0;background:transparent">
+        <div class="field" style="flex:2">
+          <label>Funcionário</label>
+          <select id="f-employee" onchange="carregarEspelho()"></select>
+        </div>
+        <div class="field" style="max-width:140px">
+          <label>Mês</label>
+          <select id="f-mes" onchange="carregarEspelho()"></select>
+        </div>
+        <div class="field" style="max-width:140px">
+          <label>Ano</label>
+          <select id="f-ano" onchange="carregarEspelho()"></select>
+        </div>
+      </div>
+
+      <div id="espelho-totais" class="kpi-grid"></div>
+
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Dia</th>
+            <th>Entrada</th>
+            <th>Saída almoço</th>
+            <th>Volta almoço</th>
+            <th>Saída</th>
+            <th class="text-right">Trab.</th>
+            <th class="text-right">Extras</th>
+            <th class="text-right">Faltantes</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="espelho-tbody"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+  requireAuth();
+  mountShell('time');
+
+  const dias = ['DOM','SEG','TER','QUA','QUI','SEX','SAB'];
+  const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const now = new Date();
+
+  document.getElementById('f-mes').innerHTML = meses.map((m,i)=>`<option value="${i+1}" ${i+1===now.getMonth()+1?'selected':''}>${m}</option>`).join('');
+  const anosArr = []; for (let a = now.getFullYear()+1; a >= now.getFullYear()-3; a--) anosArr.push(a);
+  document.getElementById('f-ano').innerHTML = anosArr.map(a=>`<option value="${a}" ${a===now.getFullYear()?'selected':''}>${a}</option>`).join('');
+
+  async function loadEmployees() {
+    const r = await api('/employees?status=ativo&limit=300');
+    document.getElementById('f-employee').innerHTML = (r.data||[]).map((e,i) => `<option value="${e.id}" ${i===0?'selected':''}>${e.matricula} · ${e.nome_completo}</option>`).join('');
+    carregarBanco();
+    if ((r.data||[]).length) carregarEspelho();
+  }
+
+  async function carregarBanco() {
+    const ds = await api('/time/banco-horas');
+    const cont = document.getElementById('banco-list');
+    if (!ds.length) { cont.innerHTML = '<p class="text-muted">Sem registros de banco de horas ainda.</p>'; return; }
+    cont.innerHTML = `<table class="table"><thead><tr><th>Funcionário</th><th>Departamento</th><th class="text-right">Saldo (horas)</th><th class="text-right">Última atualização</th></tr></thead><tbody>${
+      ds.map(b => {
+        const s = parseFloat(b.saldo_horas || 0);
+        const cor = s > 0 ? 'var(--success)' : s < 0 ? 'var(--danger)' : 'var(--ink-3)';
+        return `<tr>
+          <td><strong>${b.employees?.nome_completo || '—'}</strong><br><small class="text-muted">${b.employees?.matricula || ''}</small></td>
+          <td>${b.employees?.departments?.nome || '—'}</td>
+          <td class="num" style="color:${cor};font-weight:700">${s > 0 ? '+' : ''}${s.toFixed(2)}h</td>
+          <td class="num">${fmt.dataHora(b.ultima_atualizacao)}</td>
+        </tr>`;
+      }).join('')
+    }</tbody></table>`;
+  }
+
+  async function carregarEspelho() {
+    const empId = document.getElementById('f-employee').value;
+    if (!empId) return;
+    const mes = document.getElementById('f-mes').value;
+    const ano = document.getElementById('f-ano').value;
+    showLoading();
+    try {
+      const r = await api(`/time/espelho/${empId}?mes=${mes}&ano=${ano}`);
+
+      // KPIs
+      document.getElementById('espelho-totais').innerHTML = `
+        <div class="kpi success">
+          <div class="kpi-label">Horas trabalhadas</div>
+          <div class="kpi-value">${r.totais.horas_trabalhadas.toFixed(2)}h</div>
+          <div class="kpi-meta">${r.totais.dias_registrados} dia(s) registrado(s)</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Horas extras</div>
+          <div class="kpi-value">+${r.totais.horas_extras.toFixed(2)}h</div>
+          <div class="kpi-meta">no período</div>
+        </div>
+        <div class="kpi danger">
+          <div class="kpi-label">Horas faltantes</div>
+          <div class="kpi-value">-${r.totais.horas_faltantes.toFixed(2)}h</div>
+          <div class="kpi-meta">no período</div>
+        </div>
+        <div class="kpi warning">
+          <div class="kpi-label">Banco de horas</div>
+          <div class="kpi-value">${r.banco_horas > 0 ? '+' : ''}${parseFloat(r.banco_horas).toFixed(2)}h</div>
+          <div class="kpi-meta">saldo acumulado</div>
+        </div>
+      `;
+
+      // Lista de dias do mês
+      const diasMes = new Date(ano, mes, 0).getDate();
+      const mapa = Object.fromEntries((r.entries||[]).map(e => [e.data, e]));
+      const rows = [];
+      for (let d = 1; d <= diasMes; d++) {
+        const dataStr = `${ano}-${String(mes).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const dt = new Date(dataStr + 'T00:00');
+        const dow = dt.getDay();
+        const e = mapa[dataStr];
+        const ehFinde = dow === 0 || dow === 6;
+        const style = ehFinde ? 'background:var(--paper-3)' : '';
+        rows.push(`<tr style="${style}">
+          <td>${String(d).padStart(2,'0')}/${String(mes).padStart(2,'0')}</td>
+          <td><strong style="color:${ehFinde ? 'var(--ink-4)' : 'var(--ink)'}">${dias[dow]}</strong></td>
+          <td class="num">${e?.entrada_1 || '—'}</td>
+          <td class="num">${e?.saida_1 || '—'}</td>
+          <td class="num">${e?.entrada_2 || '—'}</td>
+          <td class="num">${e?.saida_2 || '—'}</td>
+          <td class="num">${e?.horas_trabalhadas ? e.horas_trabalhadas.toFixed(2) + 'h' : '—'}</td>
+          <td class="num" style="color:var(--success)">${e?.horas_extras > 0 ? '+' + e.horas_extras.toFixed(2) + 'h' : '—'}</td>
+          <td class="num" style="color:var(--danger)">${e?.horas_faltantes > 0 ? '-' + e.horas_faltantes.toFixed(2) + 'h' : '—'}</td>
+          <td><button class="btn btn-sm" onclick="editarDia('${dataStr}', ${JSON.stringify(e || {}).replace(/"/g,'&quot;')})">✎</button></td>
+        </tr>`);
+      }
+      document.getElementById('espelho-tbody').innerHTML = rows.join('');
+    } catch (err) { toast(err.message, 'error'); }
+    finally { hideLoading(); }
+  }
+
+  function editarDia(data, entry) {
+    const e = typeof entry === 'string' ? JSON.parse(entry) : entry;
+    abrirModalLancamento({ data, ...e });
+  }
+
+  function abrirNovoLancamento() {
+    abrirModalLancamento({ data: new Date().toISOString().split('T')[0] });
+  }
+
+  function abrirModalLancamento(initial = {}) {
+    const empId = document.getElementById('f-employee').value;
+    const html = `<form id="ptForm">
+      <div class="form-grid">
+        <div class="field"><label>Data<span class="req">*</span></label>
+          <input type="date" name="data" required value="${initial.data || ''}"></div>
+        <div class="field"><label>Entrada manhã</label><input type="time" name="entrada_1" value="${initial.entrada_1 || ''}"></div>
+        <div class="field"><label>Saída almoço</label><input type="time" name="saida_1" value="${initial.saida_1 || ''}"></div>
+        <div class="field"><label>Volta almoço</label><input type="time" name="entrada_2" value="${initial.entrada_2 || ''}"></div>
+        <div class="field"><label>Saída fim do dia</label><input type="time" name="saida_2" value="${initial.saida_2 || ''}"></div>
+      </div>
+      <div class="field mt-4"><label>Observação</label><textarea name="observacao">${initial.observacao || ''}</textarea></div>
+    </form>`;
+    showFormModal('Lançamento de ponto', html, async () => {
+      const f = document.getElementById('ptForm');
+      if (!validateForm(f)) return;
+      const d = formToObject(f);
+      d.employee_id = empId;
+      try {
+        await api('/time', { method: 'POST', body: d });
+        toast('Lançamento salvo.', 'success');
+        closeFormModal();
+        carregarEspelho();
+        carregarBanco();
+      } catch (err) { toast(err.message, 'error'); }
+    });
+  }
+
+  function showFormModal(title, html, onSave) {
+    let m = document.getElementById('form-modal');
+    if (!m) { m = document.createElement('div'); m.id = 'form-modal'; m.className = 'modal-overlay'; m.onclick = (e) => { if (e.target === m) closeFormModal(); }; document.body.appendChild(m); }
+    m.innerHTML = `<div class="modal"><div class="modal-header"><h2>${title}</h2><button class="modal-close" onclick="closeFormModal()">×</button></div><div class="modal-body">${html}</div><div class="modal-footer"><button class="btn" onclick="closeFormModal()">Cancelar</button><button class="btn btn-primary" id="form-save">Salvar</button></div></div>`;
+    m.classList.remove('hidden');
+    document.getElementById('form-save').onclick = onSave;
+  }
+  function closeFormModal() { document.getElementById('form-modal')?.remove(); }
+
+  loadEmployees();
+</script>
+</body>
+</html>

@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Acesso — InfoPago RH</title>
+<link rel="stylesheet" href="/css/main.css">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3CradialGradient id='g' cx='30%25' cy='25%25'%3E%3Cstop offset='0%25' stop-color='%236FECA0'/%3E%3Cstop offset='40%25' stop-color='%231FAB54'/%3E%3Cstop offset='100%25' stop-color='%2307271A'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx='16' cy='16' r='15' fill='url(%23g)'/%3E%3Ctext x='50%25' y='66%25' text-anchor='middle' font-family='Inter,sans-serif' font-weight='800' font-style='italic' font-size='18' fill='%23ffffff'%3EiP%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+<div class="login-shell">
+
+  <!-- ── Painel esquerdo: brand institucional ─────────────── -->
+  <aside class="login-brand">
+    <div class="brand">
+      <div class="brand-mark"></div>
+      <div class="brand-text">
+        <span class="name">Info<em>Pago</em></span>
+        <span class="tag">Recursos Humanos · Folha</span>
+      </div>
+    </div>
+
+    <div class="login-pitch">
+      <div class="eyebrow">Gestão de RH · CLT 2026</div>
+      <h2>Folha de pagamento <em>com a precisão</em> que o seu negócio exige.</h2>
+      <p>Cálculos automatizados, conformidade fiscal verificada, emissão de holerites no padrão e auditoria completa de cada lançamento.</p>
+
+      <div class="login-features">
+        <div class="login-feature">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          <span>Tabelas INSS, IRRF, FGTS e salário-família vigência 2026</span>
+        </div>
+        <div class="login-feature">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          <span>Holerites em PDF · padrão CLT recibo de pagamento</span>
+        </div>
+        <div class="login-feature">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          <span>Envio automatizado · confirmação de recebimento</span>
+        </div>
+        <div class="login-feature">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          <span>Ficha completa: faltas, atestados, advertências, aumentos</span>
+        </div>
+        <div class="login-feature">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          <span>Multi-usuário com perfis admin · RH · gestor</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="login-foot">
+      <span>v 1.1.0</span>
+      <span>·</span>
+      <span>Build seguro · TLS 1.3</span>
+      <span>·</span>
+      <span>LGPD compatível</span>
+    </div>
+  </aside>
+
+  <!-- ── Painel direito: formulário ───────────────────────── -->
+  <section class="login-form-side">
+    <div class="login-form">
+      <div class="eyebrow">Área restrita</div>
+      <h1>Acesso ao sistema</h1>
+      <p class="subtitle">Entre com as credenciais corporativas para acessar o painel executivo.</p>
+
+      <form id="loginForm" onsubmit="entrar(event)">
+        <div class="field">
+          <label>E-mail corporativo<span class="req">*</span></label>
+          <input type="email" name="email" required placeholder="usuario@empresa.com.br" autofocus autocomplete="email">
+        </div>
+        <div class="field">
+          <label>Senha<span class="req">*</span></label>
+          <input type="password" name="password" required placeholder="••••••••" autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn btn-primary">
+          Entrar no painel
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </button>
+      </form>
+
+      <p class="extra-link">
+        Esqueceu a senha? Solicite a redefinição ao <a href="mailto:rh@infopago.local">administrador</a>.
+      </p>
+    </div>
+  </section>
+
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+  if (getToken()) location.href = '/dashboard.html';
+
+  async function entrar(e) {
+    e.preventDefault();
+    if (!validateForm('#loginForm')) return;
+    const f = e.target;
+    showLoading();
+    try {
+      const r = await api('/auth/login', { method: 'POST', body: { email: f.email.value, password: f.password.value } });
+      setToken(r.token);
+      setUser(r.user);
+      toast('Sessão iniciada com sucesso.', 'success', 'Bem-vindo de volta');
+      setTimeout(() => location.href = '/dashboard.html', 400);
+    } catch (err) {
+      toast(err.message, 'error', 'Falha na autenticação');
+    } finally { hideLoading(); }
+  }
+</script>
+</body>
+</html>

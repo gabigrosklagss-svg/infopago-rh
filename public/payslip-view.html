@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Holerite — InfoPago RH</title>
+<link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<div class="app">
+  <div id="sidebar"></div>
+  <main class="main">
+    <div class="page-header">
+      <div><h1 id="title">Holerite</h1><p class="subtitle" id="subtitle"></p></div>
+      <div class="flex gap-2">
+        <a href="/payslips.html" class="btn">← Voltar</a>
+        <button class="btn btn-primary" onclick="gerar()">📄 Gerar PDF</button>
+        <button class="btn btn-success" onclick="enviar()" id="btn-send" disabled>✉ Enviar e-mail</button>
+      </div>
+    </div>
+
+    <div id="content"></div>
+  </main>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+  requireAuth();
+  mountShell('payslips');
+  const id = new URLSearchParams(location.search).get('id');
+  let payslip;
+
+  async function load() {
+    showLoading();
+    try {
+      payslip = await api(`/payslips/${id}`);
+      const e = payslip.employees;
+      document.getElementById('title').textContent = `${fmt.competencia(payslip.competencia_mes, payslip.competencia_ano)} — ${e.nome_completo}`;
+      document.getElementById('subtitle').textContent = `Matrícula ${fmt.matricula(e.matricula)} · ${e.departments?.nome || ''} · ${e.positions?.titulo || ''}`;
+      document.getElementById('btn-send').disabled = !payslip.pdf_path;
+
+      document.getElementById('content').innerHTML = `
+        <div class="kpi-grid">
+          <div class="kpi success"><div class="kpi-label">Total Proventos</div><div class="kpi-value">${fmt.brl(payslip.total_proventos)}</div></div>
+          <div class="kpi danger"><div class="kpi-label">Total Descontos</div><div class="kpi-value">${fmt.brl(payslip.total_descontos)}</div></div>
+          <div class="kpi"><div class="kpi-label">Salário Líquido</div><div class="kpi-value">${fmt.brl(payslip.salario_liquido)}</div></div>
+          <div class="kpi warning"><div class="kpi-label">FGTS (depósito)</div><div class="kpi-value">${fmt.brl(payslip.fgts_valor)}</div></div>
+        </div>
+
+        <div class="grid-2 mt-4">
+          <div class="card">
+            <h3 class="card-title">Proventos</h3>
+            <table class="table">
+              ${linha('Salário base', payslip.salario_base, `${payslip.dias_trabalhados} dias`)}
+              ${linha('Horas extras 50%', payslip.valor_horas_extras_50, `${payslip.horas_extras_50}h`)}
+              ${linha('Horas extras 100%', payslip.valor_horas_extras_100, `${payslip.horas_extras_100}h`)}
+              ${linha('Adicional noturno', payslip.valor_adicional_noturno, `${payslip.adicional_noturno_horas}h`)}
+              ${linha('Insalubridade', payslip.adicional_insalubridade)}
+              ${linha('Periculosidade', payslip.adicional_periculosidade)}
+              ${linha('Comissões', payslip.comissoes)}
+              ${linha('Bônus', payslip.bonus)}
+              ${linha('Gratificação', payslip.gratificacao)}
+              ${linha('13º salário', payslip.decimo_terceiro)}
+              ${linha('Férias', payslip.ferias_valor)}
+              ${linha('1/3 Férias', payslip.ferias_um_terco)}
+              ${linha('Vale Refeição', payslip.vr_valor)}
+              ${linha('Vale Alimentação', payslip.va_valor)}
+              ${linha(payslip.outros_proventos_desc || 'Outros', payslip.outros_proventos)}
+            </table>
+          </div>
+          <div class="card">
+            <h3 class="card-title">Descontos</h3>
+            <table class="table">
+              ${linha('INSS', payslip.inss_valor, `Base ${fmt.brl(payslip.base_inss)}`)}
+              ${linha('IRRF', payslip.irrf_valor, `Base ${fmt.brl(payslip.base_irrf)}`)}
+              ${linha('Vale Transporte', payslip.vt_desconto)}
+              ${linha('Plano de Saúde', payslip.plano_saude_desconto)}
+              ${linha('Plano Odonto', payslip.plano_odonto_desconto)}
+              ${linha('Seguro de Vida', payslip.seguro_vida_desconto)}
+              ${linha('Pensão alimentícia', payslip.pensao_alimenticia)}
+              ${linha('Adiantamento', payslip.adiantamento)}
+              ${linha('Faltas', payslip.faltas_valor, `${payslip.faltas_dias} dias`)}
+              ${linha(payslip.outros_descontos_desc || 'Outros', payslip.outros_descontos)}
+            </table>
+          </div>
+        </div>
+      `;
+    } catch (err) { toast(err.message, 'error'); }
+    finally { hideLoading(); }
+  }
+
+  function linha(desc, valor, ref = '') {
+    if (!valor || parseFloat(valor) === 0) return '';
+    return `<tr><td>${desc}</td><td>${ref ? `<small class="text-muted">${ref}</small>` : ''}</td><td class="text-right"><strong>${fmt.brl(valor)}</strong></td></tr>`;
+  }
+
+  async function gerar() {
+    showLoading();
+    try {
+      await api(`/payslips/${id}/gerar-pdf`, { method: 'POST' });
+      toast('PDF gerado!', 'success');
+      load();
+    } catch (err) { toast(err.message, 'error'); }
+    finally { hideLoading(); }
+  }
+
+  async function enviar() {
+    if (!confirm('Enviar holerite por e-mail?')) return;
+    showLoading();
+    try {
+      await api(`/email/send/${id}`, { method: 'POST' });
+      toast('Enviado!', 'success');
+      load();
+    } catch (err) { toast(err.message, 'error'); }
+    finally { hideLoading(); }
+  }
+
+  load();
+</script>
+</body>
+</html>

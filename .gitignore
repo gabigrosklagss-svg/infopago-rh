@@ -1,0 +1,43 @@
+# ── Dependências ──
+node_modules/
+package-lock.json
+
+# ── Segredos / configuração local ──
+.env
+.env.local
+.env.*.local
+
+# ── Uploads (privados, não vão pro git) ──
+uploads/holerites/**
+uploads/fotos/**
+uploads/documents/**
+!uploads/.gitkeep
+!uploads/holerites/.gitkeep
+!uploads/fotos/.gitkeep
+
+# ── OS / Editor ──
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── Logs ──
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── PDFs gerados (caso parem fora da pasta de uploads) ──
+*.pdf
+!templates/*.pdf
+
+# ── Builds ──
+dist/
+build/
+.next/
+.cache/
+
+# ── Claude / IA ──
+.claude/launch.json

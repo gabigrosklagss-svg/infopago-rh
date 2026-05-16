@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Holerites — InfoPago RH</title>
+<link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<div class="app">
+  <div id="sidebar"></div>
+  <main class="main">
+    <div class="page-header">
+      <div><h1>Holerites</h1><p class="subtitle">Geração em lote, PDFs e envio por e-mail</p></div>
+      <div class="flex gap-2">
+        <button class="btn btn-primary" onclick="modalLote()">+ Gerar em lote</button>
+      </div>
+    </div>
+
+    <div class="filter-bar">
+      <div class="field"><label>Mês</label><select id="f-mes"></select></div>
+      <div class="field"><label>Ano</label><select id="f-ano"></select></div>
+      <div class="field"><label>Status</label>
+        <select id="f-status" onchange="carregar()">
+          <option value="">Todos</option>
+          <option value="rascunho">Rascunho</option>
+          <option value="gerado">Gerado</option>
+          <option value="enviado">Enviado</option>
+          <option value="confirmado">Confirmado</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="carregar()">🔎 Filtrar</button>
+      <button class="btn" onclick="gerarPDFsLote()">📄 PDFs (selecionados)</button>
+      <button class="btn btn-success" onclick="enviarLote()">✉ Enviar (selecionados)</button>
+    </div>
+
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th><input type="checkbox" id="check-all" onclick="toggleAll(this)"></th>
+            <th>Competência</th>
+            <th>Funcionário</th>
+            <th>Bruto</th>
+            <th>Líquido</th>
+            <th>INSS / IRRF / FGTS</th>
+            <th>Status</th>
+            <th>Pagamento</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+  requireAuth();
+  mountShell('payslips');
+
+  // Selects mes/ano
+  const now = new Date();
+  const mes = now.getMonth() + 1;
+  const ano = now.getFullYear();
+  const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  document.getElementById('f-mes').innerHTML = meses.map((m, i) => `<option value="${i+1}" ${i+1 === mes ? 'selected' : ''}>${m}</option>`).join('');
+  const anos = [];
+  for (let a = ano + 1; a >= ano - 3; a--) anos.push(a);
+  document.getElementById('f-ano').innerHTML = anos.map(a => `<option value="${a}" ${a === ano ? 'selected' : ''}>${a}</option>`).join('');
+
+  async function carregar() {
+    showLoading();
+    try {
+      const q = new URLSearchParams({
+        mes: document.getElementById('f-mes').value,
+        ano: document.getElementById('f-ano').value,
+      });
+      const status = document.getElementById('f-status').value;
+      if (status) q.set('status', status);
+      const r = await api(`/payslips?${q}`);
+
+      const tbody = document.getElementById('tbody');
+      if (!r.data?.length) {
+        tbody.innerHTML = '<tr><td colspan="9" class="table-empty">Nenhum holerite encontrado para esta competência.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = r.data.map(p => `
+        <tr>
+          <td><input type="checkbox" class="sel" value="${p.id}"></td>
+          <td><strong>${fmt.competencia(p.competencia_mes, p.competencia_ano)}</strong></td>
+          <td>
+            <strong>${p.employees?.nome_completo || ''}</strong><br>
+            <small class="text-muted">${fmt.matricula(p.employees?.matricula)} · ${p.employees?.departments?.nome || ''}</small>
+          </td>
+          <td>${fmt.brl(p.total_proventos)}</td>
+          <td><strong>${fmt.brl(p.salario_liquido)}</strong></td>
+          <td><small>${fmt.brl(p.inss_valor)} / ${fmt.brl(p.irrf_valor)} / ${fmt.brl(p.fgts_valor)}</small></td>
+          <td><span class="badge ${p.status}">${p.status}</span></td>
+          <td>${fmt.data(p.data_pagamento)}</td>
+          <td class="flex gap-2">
+            <button class="btn btn-sm" onclick="gerarPDF('${p.id}')" title="Gerar PDF">📄</button>
+            ${p.pdf_path ? `<button class="btn btn-sm" onclick="downloadAuth('/api/payslips/${p.id}/download', 'Holerite_${(p.employees?.nome_completo || '').split(' ')[0]}_${p.competencia_mes}_${p.competencia_ano}.pdf')" title="Baixar">⬇</button>` : ''}
+            ${p.pdf_path ? `<button class="btn btn-sm btn-success" onclick="enviar('${p.id}')" title="Enviar e-mail">✉</button>` : ''}
+            <a class="btn btn-sm" href="/payslip-view.html?id=${p.id}" title="Ver detalhes">👁</a>
+            <button class="btn btn-sm btn-danger" onclick="excluir('${p.id}', '${p.employees?.nome_completo}', '${fmt.competencia(p.competencia_mes, p.competencia_ano)}')" title="Excluir">🗑</button>
+          </td>
+        </tr>
+      `).join('');
+    } catch (err) { toast(err.message, 'error'); }
+    finally { hideLoading(); }
+  }
+
+  function toggleAll(c) {
+    document.querySelectorAll('.sel').forEach(s => s.checked = c.checked);
+  }
+
+  function getSelecionados() {
+    return [...document.querySelectorAll('.sel:checked')].map(s => s.value);
+  }
+
+  async function gerarPDF(id) {
+    showLoading();
+    try {
+      await api(`/payslips/${id}/gerar-pdf`, { method: 'POST' });
+      toast('PDF gerado!', 'success');
+      carregar();
+    } catch (err) { toast(err.message, 'error'); }
+    finally { hideLoading(); }
+  }
+
+  async function excluir(id, nome, competencia) {
+    if (!confirm(`Excluir o holerite de ${nome} (${competencia}) permanentemente?\n\nIsso vai apagar também o PDF e os registros de envio.`)) return;
+    showLoading();
+    try {
+      await api(`/payslips/${id}`, { method: 'DELETE' });
+      toast('Holerite excluído.', 'success');
+      carregar();
+    } catch (err) { toast(err.message, 'error'); }
+    finally { hideLoading(); }
+  }
+
+  async function enviar(id) {
+    if (!confirm('Enviar holerite por e-mail ao funcionário?')) return;
+    showLoading();
+    try {
+      const r = await api(`/email/send/${id}`, { method: 'POST' });
+      toast(`Enviado para ${r.recipient}`, 'success');
+      carregar();
+    } catch (err) { toast(err.message, 'error'); }
+    finally { hideLoading(); }
+  }
+
+  async function gerarPDFsLote() {
+    const ids = getSelecionados();
+    if (!ids.length) { toast('Selecione ao menos um holerite.', 'warning'); return; }
+    showLoading();
+    try {
+      const r = await api('/payslips/lote/gerar-pdf', { method: 'POST', body: { payslip_ids: ids } });
+      toast(`${r.gerados} PDFs gerados (${r.erros} erros)`, r.erros ? 'warning' : 'success');
+      carregar();
+    } catch (err) { toast(err.message, 'error'); }
+    finally { hideLoading(); }
+  }
+
+  async function enviarLote() {
+    const ids = getSelecionados();
+    if (!ids.length) { toast('Selecione ao menos um holerite.', 'warning'); return; }
+    if (!confirm(`Enviar ${ids.length} holerite(s) por e-mail?`)) return;
+    showLoading();
+    try {
+      const r = await api('/email/send-batch', { method: 'POST', body: { payslip_ids: ids } });
+      toast(`${r.enviados} enviado(s), ${r.erros} erro(s)`, r.erros ? 'warning' : 'success');
+      carregar();
+    } catch (err) { toast(err.message, 'error'); }
+    finally { hideLoading(); }
+  }
+
+  /* ── Modal Lote ───────────────────────────────────── */
+  async function modalLote() {
+    const depts = await api('/departments?active=true');
+    const html = `<form id="loteForm">
+      <div class="form-grid">
+        <div class="field"><label>Mês<span class="req">*</span></label>
+          <select name="competencia_mes" required>${meses.map((m,i)=>`<option value="${i+1}" ${i+1===mes?'selected':''}>${m}</option>`).join('')}</select></div>
+        <div class="field"><label>Ano<span class="req">*</span></label>
+          <select name="competencia_ano" required>${anos.map(a=>`<option value="${a}" ${a===ano?'selected':''}>${a}</option>`).join('')}</select></div>
+        <div class="field"><label>Data pagamento<span class="req">*</span></label><input type="date" name="data_pagamento" required></div>
+        <div class="field"><label>Departamento (opcional)</label>
+          <select name="department_id"><option value="">Todos os ativos</option>${depts.map(d=>`<option value="${d.id}">${d.nome}</option>`).join('')}</select></div>
+      </div>
+      <div style="background:var(--brand-50);border-left:3px solid var(--brand-500);padding:10px 14px;border-radius:var(--r-sm);margin-top:16px;font-size:12px;line-height:1.5">
+        <strong style="color:var(--brand-800)">⚡ Cálculo automático:</strong> As <strong>horas extras 50% e 100%</strong> são calculadas automaticamente a partir do <strong>controle de ponto</strong> de cada funcionário:
+        <ul style="margin:6px 0 0;padding-left:18px;color:var(--ink-2)">
+          <li>Sábado trabalhado → <strong>HE 50%</strong></li>
+          <li>Domingo / feriado trabalhado → <strong>HE 100%</strong></li>
+          <li>Horas que excedem a carga diária em dias úteis → <strong>HE 50%</strong></li>
+        </ul>
+      </div>
+
+      <h4 class="mt-4">Lançamentos padrão (aplicados a todos)</h4>
+      <div class="form-grid">
+        <div class="field"><label>Dias trab.</label><input type="number" name="dias_trabalhados" value="30"></div>
+        <div class="field"><label>Adic. Noturno (h)</label><input type="number" name="adicional_noturno_horas" value="0" step="0.5"></div>
+        <div class="field"><label>Bônus (R$)</label><input type="number" name="bonus" value="0" step="0.01"></div>
+        <div class="field"><label>Faltas (dias)</label><input type="number" name="faltas_dias" value="0"></div>
+      </div>
+    </form>`;
+    showFormModal('Gerar holerites em lote', html, async () => {
+      const f = document.getElementById('loteForm');
+      if (!validateForm(f)) return;
+      const data = formToObject(f);
+      const payload = {
+        competencia_mes: parseInt(data.competencia_mes),
+        competencia_ano: parseInt(data.competencia_ano),
+        data_pagamento: data.data_pagamento,
+        department_id: data.department_id || null,
+        lancamentos_padrao: {
+          dias_trabalhados: parseInt(data.dias_trabalhados) || 30,
+          adicional_noturno_horas: parseFloat(data.adicional_noturno_horas) || 0,
+          bonus: parseFloat(data.bonus) || 0,
+          faltas_dias: parseInt(data.faltas_dias) || 0,
+        },
+      };
+      showLoading();
+      try {
+        const r = await api('/payslips/lote', { method: 'POST', body: payload });
+        toast(`${r.criados} holerite(s) gerado(s) (${r.erros} erro(s))`, r.erros ? 'warning' : 'success');
+        closeFormModal();
+        carregar();
+      } catch (err) { toast(err.message, 'error'); }
+      finally { hideLoading(); }
+    });
+  }
+
+  function showFormModal(title, html, onSave) {
+    let m = document.getElementById('form-modal');
+    if (!m) { m = document.createElement('div'); m.id = 'form-modal'; m.className = 'modal-overlay'; m.onclick = (e) => { if (e.target === m) closeFormModal(); }; document.body.appendChild(m); }
+    m.innerHTML = `<div class="modal"><div class="modal-header"><h2>${title}</h2><button class="modal-close" onclick="closeFormModal()">×</button></div><div class="modal-body">${html}</div><div class="modal-footer"><button class="btn" onclick="closeFormModal()">Cancelar</button><button class="btn btn-primary" id="form-save">Salvar</button></div></div>`;
+    m.classList.remove('hidden');
+    document.getElementById('form-save').onclick = onSave;
+  }
+  function closeFormModal() { document.getElementById('form-modal')?.remove(); }
+
+  carregar();
+</script>
+</body>
+</html>

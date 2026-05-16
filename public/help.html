@@ -1,0 +1,705 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Central de Ajuda — InfoPago RH</title>
+<link rel="stylesheet" href="/css/main.css">
+<style>
+  /* Calendário */
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    overflow: hidden;
+  }
+  .cal-head, .cal-cell {
+    background: var(--paper);
+    padding: 8px 10px;
+    min-height: 90px;
+    font-size: 11.5px;
+  }
+  .cal-head {
+    background: var(--paper-2);
+    text-align: center;
+    font-weight: 700;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--ink-3);
+    min-height: auto;
+    padding: 6px 8px;
+  }
+  .cal-cell { display: flex; flex-direction: column; gap: 3px; }
+  .cal-cell.outside { background: var(--paper-3); color: var(--ink-5); }
+  .cal-cell.today { background: var(--brand-50); }
+  .cal-cell .day { font-weight: 700; color: var(--ink); font-size: 12px; }
+  .cal-cell.outside .day { color: var(--ink-5); font-weight: 500; }
+  .cal-event {
+    background: var(--paper-3); border-left: 2px solid var(--brand-500);
+    padding: 2px 5px; border-radius: 2px;
+    font-size: 10px; line-height: 1.25;
+    color: var(--ink-2);
+    cursor: default;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  /* FAQ */
+  .faq-item {
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    margin-bottom: 8px;
+    background: var(--paper);
+    transition: border-color var(--t-fast);
+  }
+  .faq-item:hover { border-color: var(--brand-500); }
+  .faq-q {
+    padding: 14px 18px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 13.5px;
+    display: flex; align-items: center; justify-content: space-between;
+    user-select: none;
+  }
+  .faq-q::after {
+    content: '+';
+    font-size: 20px; color: var(--brand-500);
+    transition: transform var(--t-fast);
+    line-height: 1;
+  }
+  .faq-item.open .faq-q::after { content: '−'; }
+  .faq-a {
+    padding: 0 18px;
+    max-height: 0; overflow: hidden;
+    color: var(--ink-2); font-size: 13px; line-height: 1.6;
+    transition: max-height var(--t), padding var(--t);
+  }
+  .faq-item.open .faq-a { padding: 0 18px 16px; max-height: 600px; }
+  .faq-a p { margin: 0 0 8px; }
+  .faq-a ul { margin: 4px 0 8px; padding-left: 22px; }
+  .faq-a code { background: var(--paper-3); padding: 2px 6px; border-radius: 3px; font-size: 12px; font-family: 'JetBrains Mono', monospace; }
+
+  /* Calculadora */
+  .calc-result {
+    background: var(--brand-50);
+    border: 1px solid var(--brand-100);
+    border-radius: var(--r);
+    padding: 20px;
+    margin-top: 20px;
+  }
+  .calc-result h4 { margin: 0 0 14px; color: var(--brand-800); font-size: 14px; }
+  .calc-result .row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed rgba(31, 171, 84, .2); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .calc-result .row:last-child { border: 0; padding-top: 10px; margin-top: 6px; border-top: 2px solid var(--brand-500); font-weight: 700; font-size: 15px; }
+  .calc-result .neg { color: var(--danger); }
+  .calc-result .pos { color: var(--brand-700); }
+
+  /* Cards de contatos */
+  .contato-card {
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 16px;
+    background: var(--paper);
+    transition: all var(--t-fast);
+  }
+  .contato-card:hover { border-color: var(--brand-500); }
+  .contato-card .cat-tag {
+    display: inline-block;
+    background: var(--brand-50);
+    color: var(--brand-800);
+    font-size: 9.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    padding: 2px 8px;
+    border-radius: 999px;
+    margin-bottom: 10px;
+  }
+  .contato-card h4 { margin: 0 0 4px; font-size: 14px; }
+  .contato-card .cargo { color: var(--ink-3); font-size: 12px; margin-bottom: 10px; }
+  .contato-card .row { display: flex; gap: 6px; align-items: center; font-size: 12.5px; margin: 4px 0; color: var(--ink-2); }
+  .contato-card .row span { color: var(--ink-4); width: 56px; font-size: 11px; text-transform: uppercase; font-weight: 600; }
+  .contato-card a { color: var(--brand-700); }
+
+  /* Comunicado */
+  .ann-card {
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 18px 22px;
+    background: var(--paper);
+    margin-bottom: 12px;
+    position: relative;
+  }
+  .ann-card.importante { border-left: 4px solid var(--danger); background: #FFF8F8; }
+  .ann-card.fixado { border-left: 4px solid var(--brand-500); }
+  .ann-card .ann-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .ann-card h4 { margin: 0; font-size: 15px; }
+  .ann-card .ann-meta { font-size: 11px; color: var(--ink-4); margin-top: 8px; }
+  .ann-card .ann-conteudo { font-size: 13.5px; line-height: 1.6; color: var(--ink-2); white-space: pre-wrap; }
+  .pin-icon { color: var(--brand-500); font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div id="sidebar"></div>
+  <main class="main">
+    <div class="breadcrumb">
+      <a href="/dashboard.html">Painel</a>
+      <span class="sep">›</span>
+      <span>Central de Ajuda</span>
+    </div>
+
+    <div class="page-header">
+      <div>
+        <h1>Central de Ajuda</h1>
+        <p class="subtitle">Recursos, atalhos e documentação para o time de RH</p>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="goTab(0, this)">📖 FAQ</button>
+      <button class="tab-btn" onclick="goTab(1, this)">📞 Contatos úteis</button>
+      <button class="tab-btn" onclick="goTab(2, this)">📃 Documentos da empresa</button>
+      <button class="tab-btn" onclick="goTab(3, this)">📢 Comunicados</button>
+      <button class="tab-btn" onclick="goTab(4, this)">📅 Calendário RH</button>
+      <button class="tab-btn" onclick="goTab(5, this)">🧮 Calculadora</button>
+    </div>
+
+    <!-- ── 0. FAQ ──────────────────────────────────────── -->
+    <div class="tab-content active">
+      <div class="card">
+        <input type="search" id="faq-search" placeholder="🔎 Buscar pergunta..." style="width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:var(--r-sm);font-family:inherit;font-size:13px;margin-bottom:16px" oninput="filtrarFAQ(this.value)">
+        <div id="faq-list"></div>
+      </div>
+    </div>
+
+    <!-- ── 1. Contatos ─────────────────────────────────── -->
+    <div class="tab-content card">
+      <div class="flex justify-between items-center mb-4">
+        <h3 style="margin:0">Contatos úteis</h3>
+        <button class="btn btn-primary btn-sm" onclick="abrirFormContato()">+ Novo contato</button>
+      </div>
+      <div class="filter-bar" style="padding:0;border:0;background:transparent">
+        <div class="field" style="max-width:220px"><label>Categoria</label>
+          <select id="f-cat" onchange="carregarContatos()">
+            <option value="">Todas</option>
+            <option value="rh">RH</option>
+            <option value="dp">Departamento Pessoal</option>
+            <option value="seguranca_trabalho">Segurança do Trabalho</option>
+            <option value="gestor">Gestor</option>
+            <option value="ti">TI</option>
+            <option value="financeiro">Financeiro</option>
+            <option value="medico">Médico</option>
+            <option value="sindicato">Sindicato</option>
+            <option value="contabilidade">Contabilidade</option>
+            <option value="outros">Outros</option>
+          </select>
+        </div>
+      </div>
+      <div id="contatos-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-top:14px"></div>
+    </div>
+
+    <!-- ── 2. Documentos ──────────────────────────────── -->
+    <div class="tab-content card">
+      <div class="flex justify-between items-center mb-4">
+        <h3 style="margin:0">Documentos da empresa</h3>
+        <button class="btn btn-primary btn-sm" onclick="abrirFormDoc()">+ Novo documento</button>
+      </div>
+      <table class="table">
+        <thead><tr><th>Categoria</th><th>Título</th><th>Versão</th><th>Vigência</th><th>Tamanho</th><th>Enviado em</th><th></th></tr></thead>
+        <tbody id="docs-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- ── 3. Comunicados ─────────────────────────────── -->
+    <div class="tab-content">
+      <div class="flex justify-between items-center mb-4">
+        <h3 style="margin:0">Comunicados e avisos</h3>
+        <button class="btn btn-primary btn-sm" onclick="abrirFormAnn()">+ Novo comunicado</button>
+      </div>
+      <div id="ann-list"></div>
+    </div>
+
+    <!-- ── 4. Calendário RH ───────────────────────────── -->
+    <div class="tab-content card">
+      <div class="flex justify-between items-center mb-4">
+        <h3 style="margin:0">Calendário RH</h3>
+        <div class="flex gap-2">
+          <button class="btn btn-sm" onclick="mudarMes(-1)">← Mês anterior</button>
+          <strong id="cal-titulo" style="font-size:14px;align-self:center;min-width:180px;text-align:center"></strong>
+          <button class="btn btn-sm" onclick="mudarMes(1)">Próximo mês →</button>
+        </div>
+      </div>
+      <div id="cal-container"></div>
+
+      <div style="margin-top:18px;font-size:11.5px;color:var(--ink-3);display:flex;gap:14px;flex-wrap:wrap">
+        <span>🎉 Feriado nacional</span>
+        <span>🎂 Aniversariante</span>
+        <span>🏆 Aniversário de empresa</span>
+        <span>🏖️ Férias agendadas</span>
+        <span style="color:var(--danger)">⚠️ Férias vencendo</span>
+        <span>📎 Documento vencendo</span>
+      </div>
+    </div>
+
+    <!-- ── 5. Calculadora ─────────────────────────────── -->
+    <div class="tab-content card">
+      <h3 class="card-title">Calculadora de salário líquido <small>CLT 2026</small></h3>
+      <p class="text-muted text-sm mb-4">Estimativa rápida. Não substitui o cálculo oficial do holerite.</p>
+
+      <div class="form-grid">
+        <div class="field">
+          <label>Salário bruto (R$)</label>
+          <input type="number" id="calc-bruto" step="0.01" min="0" value="3000" oninput="calcular()">
+        </div>
+        <div class="field">
+          <label>Nº de dependentes</label>
+          <input type="number" id="calc-deps" min="0" value="0" oninput="calcular()">
+        </div>
+        <div class="field">
+          <label>HE 50% (R$)</label>
+          <input type="number" id="calc-he50" step="0.01" min="0" value="0" oninput="calcular()">
+        </div>
+        <div class="field">
+          <label>HE 100% (R$)</label>
+          <input type="number" id="calc-he100" step="0.01" min="0" value="0" oninput="calcular()">
+        </div>
+        <div class="field">
+          <label>VT desconto (R$)</label>
+          <input type="number" id="calc-vt" step="0.01" min="0" value="0" oninput="calcular()">
+        </div>
+        <div class="field">
+          <label>Plano de saúde (R$)</label>
+          <input type="number" id="calc-saude" step="0.01" min="0" value="0" oninput="calcular()">
+        </div>
+      </div>
+
+      <div class="calc-result" id="calc-result"></div>
+    </div>
+  </main>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+  requireAuth();
+  mountShell('help');
+
+  function goTab(idx, btn) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.tab-content')[idx].classList.add('active');
+    if (idx === 1) carregarContatos();
+    if (idx === 2) carregarDocs();
+    if (idx === 3) carregarAnnouncements();
+    if (idx === 4) carregarCalendario();
+    if (idx === 5) calcular();
+  }
+
+  /* ════════════════ FAQ ════════════════ */
+  const FAQ = [
+    {
+      q: 'Como cadastro um novo funcionário?',
+      a: `<p>Vá em <strong>Funcionários → + Novo funcionário</strong>. Preencha as 4 abas (Pessoal, Trabalho, Benefícios, Bancário). Campos com <strong style="color:var(--danger)">*</strong> são obrigatórios.</p><p>Depois de salvar, clique novamente no funcionário e use o botão "Selecionar foto" para enviar a foto 3x4.</p>`
+    },
+    {
+      q: 'Como gerar holerites em lote?',
+      a: `<p>Em <strong>Holerites → + Gerar em lote</strong>. Escolha mês/ano, data de pagamento e opcionalmente um departamento.</p><p>As <strong>horas extras 50% e 100%</strong> são calculadas <strong>automaticamente</strong> a partir do controle de ponto:</p><ul><li>Sábado trabalhado → HE 50%</li><li>Domingo / feriado → HE 100%</li><li>Horas que excedem carga diária em dia útil → HE 50%</li></ul>`
+    },
+    {
+      q: 'O que é Senha de App do Gmail?',
+      a: `<p>É uma senha especial de 16 caracteres gerada no Google para apps externos (o Gmail não aceita mais sua senha normal). Para criar:</p><ul><li>Ative a Verificação em 2 etapas em <code>myaccount.google.com/security</code></li><li>Acesse <code>myaccount.google.com/apppasswords</code></li><li>Crie uma senha chamada "InfoPago RH"</li><li>Copie a senha SEM os espaços</li></ul>`
+    },
+    {
+      q: 'Onde os PDFs dos holerites ficam salvos?',
+      a: `<p>Localmente em <code>uploads/holerites/{ano}/{mês}/{matrícula}_{nome}.pdf</code>. Cada PDF tem 2 páginas: a primeira é o holerite tradicional CLT, a segunda é o espelho de ponto com dia-a-dia da competência.</p>`
+    },
+    {
+      q: 'Como funciona o controle de ponto?',
+      a: `<p>Em <strong>Jornada & Férias → Controle de ponto</strong>. Selecione um funcionário, mês e ano, e edite os dias clicando no ✎. Para cada dia, registre as 4 marcações: entrada, almoço (saída), volta, saída fim.</p><p>O sistema calcula automaticamente:</p><ul><li>Horas trabalhadas</li><li>Horas extras (acima da carga diária)</li><li>Horas faltantes (abaixo da carga diária)</li><li>Banco de horas (acumulado)</li></ul>`
+    },
+    {
+      q: 'Como anexar documentos do funcionário?',
+      a: `<p>Clique no nome do funcionário na lista → aba <strong>📎 Documentos</strong> → <strong>+ Adicionar documento</strong>. Escolha o tipo (RG, CTPS, exame, contrato, etc.) e faça upload de PDF, JPG, PNG ou WebP até 20 MB.</p><p>Os documentos ficam armazenados no Supabase Storage (privado) e são acessíveis via URL assinada com validade de 1 hora.</p>`
+    },
+    {
+      q: 'Como solicitar e aprovar férias?',
+      a: `<p><strong>Solicitar:</strong> No pop-up do funcionário, aba "🏖 Férias" → "+ Solicitar férias". Informe período pretendido, dias vendidos e se vai adiantar o 13º.</p><p><strong>Aprovar:</strong> Vá em <strong>Jornada & Férias → Solicitações de férias</strong> e clique em ✓ Aprovar ou ✕ Negar. Quando aprovado, o sistema atualiza o período aquisitivo automaticamente.</p>`
+    },
+    {
+      q: 'Como iniciar processo de admissão (onboarding)?',
+      a: `<p>No pop-up do funcionário, aba "📋 Admissão/Demissão" → "+ Iniciar admissão". O sistema cria automaticamente um checklist com 11 itens padrão CLT (documentos, exames, contrato, EPIs, e-mail, etc.).</p><p>Cada item tem um responsável (RH, Gestor, TI, Funcionário). Marque os itens conforme conclui. Quando todos obrigatórios são concluídos, o checklist é fechado automaticamente.</p>`
+    },
+    {
+      q: 'Como excluir um holerite?',
+      a: `<p>Na lista de holerites, clique no botão <strong>🗑</strong> vermelho da linha. Apenas usuários com perfil admin ou rh podem excluir. A exclusão é permanente e remove:</p><ul><li>O registro do banco</li><li>O PDF do disco</li><li>Os logs de envio associados</li></ul>`
+    },
+    {
+      q: 'Como adicionar feriados municipais?',
+      a: `<p>Atualmente o sistema usa feriados nacionais (14 feriados, incluindo móveis como Carnaval e Páscoa). Feriados municipais ainda não estão suportados — me solicite essa funcionalidade quando precisar.</p>`
+    },
+    {
+      q: 'Como funciona o envio automático de holerites?',
+      a: `<p>Em <strong>Envios → Agendar envio</strong>. Escolha competência, data e horário. O sistema executa o envio automaticamente nos horários 07:55 e 08:05 do dia agendado.</p><p>Cada funcionário recebe seu próprio PDF anexado + link de confirmação de recebimento.</p>`
+    },
+    {
+      q: 'Que tabelas tributárias o sistema usa?',
+      a: `<p>O sistema tem tabelas CLT 2025 e 2026 (INSS, IRRF, FGTS, salário-família, dependentes) e usa automaticamente a tabela do ano da competência do holerite.</p><p>Para atualizar quando o Governo publicar a tabela 2027, basta editar <code>src/services/payroll.js</code> e adicionar um novo bloco em <code>TABELAS_TRIBUTARIAS</code>.</p>`
+    },
+  ];
+
+  function renderFAQ(filter = '') {
+    const f = filter.toLowerCase().trim();
+    const filtered = FAQ.filter(item => !f || item.q.toLowerCase().includes(f) || item.a.toLowerCase().includes(f));
+    const cont = document.getElementById('faq-list');
+    if (!filtered.length) { cont.innerHTML = '<p class="text-muted">Nenhuma pergunta encontrada.</p>'; return; }
+    cont.innerHTML = filtered.map((item, i) => `
+      <div class="faq-item" onclick="this.classList.toggle('open')">
+        <div class="faq-q">${item.q}</div>
+        <div class="faq-a">${item.a}</div>
+      </div>`).join('');
+  }
+  function filtrarFAQ(v) { renderFAQ(v); }
+
+  /* ════════════════ Contatos ════════════════ */
+  const CAT_LABELS = {
+    rh: 'RH', dp: 'Departamento Pessoal', seguranca_trabalho: 'Segurança do Trabalho',
+    gestor: 'Gestor', ti: 'TI', financeiro: 'Financeiro', medico: 'Médico',
+    sindicato: 'Sindicato', contabilidade: 'Contabilidade', outros: 'Outros'
+  };
+
+  async function carregarContatos() {
+    const cat = document.getElementById('f-cat').value;
+    const q = new URLSearchParams();
+    if (cat) q.set('categoria', cat);
+    const lista = await api('/help/contacts' + (cat ? `?categoria=${cat}` : ''));
+    const cont = document.getElementById('contatos-list');
+    if (!lista.length) { cont.innerHTML = '<p class="text-muted">Nenhum contato cadastrado.</p>'; return; }
+    cont.innerHTML = lista.map(c => `
+      <div class="contato-card">
+        <span class="cat-tag">${CAT_LABELS[c.categoria] || c.categoria}</span>
+        <h4>${c.nome}</h4>
+        <div class="cargo">${c.cargo || ''}</div>
+        ${c.telefone ? `<div class="row"><span>Tel</span>${c.telefone}</div>` : ''}
+        ${c.celular ? `<div class="row"><span>Cel</span><a href="tel:${c.celular}">${c.celular}</a></div>` : ''}
+        ${c.email ? `<div class="row"><span>E-mail</span><a href="mailto:${c.email}">${c.email}</a></div>` : ''}
+        ${c.endereco ? `<div class="row"><span>End.</span>${c.endereco}</div>` : ''}
+        ${c.descricao ? `<div class="row" style="color:var(--ink-3);font-style:italic">${c.descricao}</div>` : ''}
+        <div class="flex gap-2" style="margin-top:10px">
+          <button class="btn btn-sm" onclick='abrirFormContato(${JSON.stringify(c)})'>✎ Editar</button>
+          <button class="btn btn-sm btn-danger" onclick="removerContato('${c.id}')">Excluir</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function abrirFormContato(c = null) {
+    const opts = Object.entries(CAT_LABELS).map(([k, v]) => `<option value="${k}" ${k === c?.categoria ? 'selected' : ''}>${v}</option>`).join('');
+    const html = `<form id="contForm">
+      <div class="form-grid">
+        <div class="field"><label>Categoria<span class="req">*</span></label><select name="categoria" required>${opts}</select></div>
+        <div class="field"><label>Nome<span class="req">*</span></label><input name="nome" required value="${c?.nome || ''}"></div>
+        <div class="field"><label>Cargo</label><input name="cargo" value="${c?.cargo || ''}"></div>
+        <div class="field"><label>Telefone</label><input name="telefone" value="${c?.telefone || ''}" data-mask="telefone"></div>
+        <div class="field"><label>Celular</label><input name="celular" value="${c?.celular || ''}" data-mask="telefone"></div>
+        <div class="field"><label>E-mail</label><input type="email" name="email" value="${c?.email || ''}"></div>
+      </div>
+      <div class="field mt-3"><label>Endereço</label><input name="endereco" value="${c?.endereco || ''}"></div>
+      <div class="field mt-3"><label>Descrição / observação</label><textarea name="descricao">${c?.descricao || ''}</textarea></div>
+    </form>`;
+    showFormModal(c ? 'Editar contato' : 'Novo contato', html, async () => {
+      const f = document.getElementById('contForm');
+      if (!validateForm(f)) return;
+      const d = formToObject(f);
+      try {
+        if (c?.id) await api(`/help/contacts/${c.id}`, { method: 'PUT', body: d });
+        else await api('/help/contacts', { method: 'POST', body: d });
+        toast('Contato salvo!', 'success');
+        closeFormModal();
+        carregarContatos();
+      } catch (err) { toast(err.message, 'error'); }
+    });
+  }
+
+  async function removerContato(id) {
+    if (!confirm('Excluir este contato?')) return;
+    try { await api(`/help/contacts/${id}`, { method: 'DELETE' }); toast('Removido.', 'success'); carregarContatos(); }
+    catch (err) { toast(err.message, 'error'); }
+  }
+
+  /* ════════════════ Documentos da empresa ════════════════ */
+  const CAT_DOC = {
+    politica: 'Política', codigo_conduta: 'Código de Conduta', manual: 'Manual',
+    procedimento: 'Procedimento', regulamento: 'Regulamento', beneficios: 'Benefícios',
+    seguranca: 'Segurança', formulario: 'Formulário', outros: 'Outros'
+  };
+
+  async function carregarDocs() {
+    const lista = await api('/help/documents');
+    const tb = document.getElementById('docs-tbody');
+    if (!lista.length) { tb.innerHTML = '<tr><td colspan="7" class="table-empty">Nenhum documento cadastrado.</td></tr>'; return; }
+    tb.innerHTML = lista.map(d => `
+      <tr>
+        <td><span class="badge ativo">${CAT_DOC[d.categoria] || d.categoria}</span></td>
+        <td><strong>${d.titulo}</strong>${d.descricao ? `<br><small class="text-muted">${d.descricao}</small>` : ''}</td>
+        <td>${d.versao || '—'}</td>
+        <td>${fmt.data(d.data_vigencia)}</td>
+        <td>${(d.tamanho_bytes / 1024).toFixed(0)} KB</td>
+        <td>${fmt.data(d.created_at)}</td>
+        <td>
+          <button class="btn btn-sm" onclick="baixarDoc('${d.id}')">⬇ Baixar</button>
+          <button class="btn btn-sm btn-danger" onclick="removerDoc('${d.id}')">🗑</button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function abrirFormDoc() {
+    const opts = Object.entries(CAT_DOC).map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
+    const html = `<form id="docForm">
+      <div class="form-grid">
+        <div class="field"><label>Categoria<span class="req">*</span></label><select name="categoria" required>${opts}</select></div>
+        <div class="field"><label>Versão</label><input name="versao" placeholder="1.0"></div>
+        <div class="field"><label>Vigência</label><input type="date" name="data_vigencia"></div>
+      </div>
+      <div class="field mt-3"><label>Título<span class="req">*</span></label><input name="titulo" required></div>
+      <div class="field mt-3"><label>Descrição</label><textarea name="descricao"></textarea></div>
+      <div class="field mt-3"><label>Arquivo<span class="req">*</span></label>
+        <input type="file" name="arquivo" required accept="application/pdf,image/jpeg,image/png,image/webp,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+      </div>
+    </form>`;
+    showFormModal('Novo documento da empresa', html, async () => {
+      const f = document.getElementById('docForm');
+      if (!validateForm(f)) return;
+      const fd = new FormData(f);
+      showLoading();
+      try {
+        const r = await fetch('/api/help/documents', {
+          method: 'POST', headers: { Authorization: `Bearer ${getToken()}` }, body: fd
+        });
+        if (!r.ok) throw new Error((await r.json()).error || 'Falha no upload');
+        toast('Documento enviado!', 'success');
+        closeFormModal();
+        carregarDocs();
+      } catch (err) { toast(err.message, 'error'); }
+      finally { hideLoading(); }
+    });
+  }
+
+  async function baixarDoc(id) {
+    try { const r = await api(`/help/documents/file/${id}`); window.open(r.url, '_blank'); }
+    catch (err) { toast(err.message, 'error'); }
+  }
+  async function removerDoc(id) {
+    if (!confirm('Excluir este documento permanentemente?')) return;
+    try { await api(`/help/documents/${id}`, { method: 'DELETE' }); toast('Removido.', 'success'); carregarDocs(); }
+    catch (err) { toast(err.message, 'error'); }
+  }
+
+  /* ════════════════ Comunicados ════════════════ */
+  const CAT_ANN = {
+    geral: 'Geral', urgente: 'Urgente', informativo: 'Informativo',
+    treinamento: 'Treinamento', beneficios: 'Benefícios', politicas: 'Políticas', eventos: 'Eventos'
+  };
+
+  async function carregarAnnouncements() {
+    const lista = await api('/help/announcements');
+    const cont = document.getElementById('ann-list');
+    if (!lista.length) { cont.innerHTML = '<p class="text-muted">Nenhum comunicado ativo.</p>'; return; }
+    cont.innerHTML = lista.map(a => `
+      <div class="ann-card ${a.importante ? 'importante' : ''} ${a.fixado ? 'fixado' : ''}">
+        <div class="ann-head">
+          <h4>${a.fixado ? '<span class="pin-icon">📌</span> ' : ''}${a.titulo}</h4>
+          <div class="flex gap-2">
+            <span class="badge ${a.importante ? 'erro' : 'ativo'}">${CAT_ANN[a.categoria] || a.categoria}</span>
+            <button class="btn btn-sm" onclick='abrirFormAnn(${JSON.stringify(a).replace(/'/g, "&#39;")})'>✎</button>
+            <button class="btn btn-sm btn-danger" onclick="removerAnn('${a.id}')">🗑</button>
+          </div>
+        </div>
+        <div class="ann-conteudo">${a.conteudo}</div>
+        <div class="ann-meta">Publicado por <strong>${a.autor_nome || '—'}</strong> em ${fmt.dataHora(a.data_publicacao)}${a.data_expiracao ? ` · expira em ${fmt.data(a.data_expiracao)}` : ''}</div>
+      </div>
+    `).join('');
+  }
+
+  function abrirFormAnn(a = null) {
+    const opts = Object.entries(CAT_ANN).map(([k, v]) => `<option value="${k}" ${k === a?.categoria ? 'selected' : ''}>${v}</option>`).join('');
+    const html = `<form id="annForm">
+      <div class="form-grid">
+        <div class="field" style="grid-column:span 2"><label>Título<span class="req">*</span></label><input name="titulo" required value="${a?.titulo || ''}"></div>
+        <div class="field"><label>Categoria</label><select name="categoria">${opts}</select></div>
+        <div class="field"><label>Expiração (opcional)</label><input type="date" name="data_expiracao" value="${a?.data_expiracao ? a.data_expiracao.split('T')[0] : ''}"></div>
+      </div>
+      <div class="field mt-3"><label>Conteúdo<span class="req">*</span></label>
+        <textarea name="conteudo" required rows="6">${a?.conteudo || ''}</textarea></div>
+      <div class="flex gap-4 mt-3">
+        <label class="toggle"><input type="checkbox" name="importante" ${a?.importante ? 'checked' : ''}><span class="slider"></span> Marcar como importante</label>
+        <label class="toggle"><input type="checkbox" name="fixado" ${a?.fixado ? 'checked' : ''}><span class="slider"></span> Fixar no topo</label>
+      </div>
+    </form>`;
+    showFormModal(a ? 'Editar comunicado' : 'Novo comunicado', html, async () => {
+      const f = document.getElementById('annForm');
+      if (!validateForm(f)) return;
+      const d = formToObject(f);
+      d.importante = !!d.importante;
+      d.fixado = !!d.fixado;
+      try {
+        if (a?.id) await api(`/help/announcements/${a.id}`, { method: 'PUT', body: d });
+        else await api('/help/announcements', { method: 'POST', body: d });
+        toast('Comunicado salvo!', 'success');
+        closeFormModal();
+        carregarAnnouncements();
+      } catch (err) { toast(err.message, 'error'); }
+    });
+  }
+
+  async function removerAnn(id) {
+    if (!confirm('Remover este comunicado?')) return;
+    try { await api(`/help/announcements/${id}`, { method: 'DELETE' }); toast('Removido.', 'success'); carregarAnnouncements(); }
+    catch (err) { toast(err.message, 'error'); }
+  }
+
+  /* ════════════════ Calendário RH ════════════════ */
+  const MESES_NOMES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  let calMes = new Date().getMonth() + 1;
+  let calAno = new Date().getFullYear();
+
+  function mudarMes(delta) {
+    calMes += delta;
+    if (calMes < 1) { calMes = 12; calAno--; }
+    else if (calMes > 12) { calMes = 1; calAno++; }
+    carregarCalendario();
+  }
+
+  async function carregarCalendario() {
+    document.getElementById('cal-titulo').textContent = `${MESES_NOMES[calMes - 1]} / ${calAno}`;
+    const r = await api(`/help/calendar?mes=${calMes}&ano=${calAno}`);
+    const eventos = r.eventos || [];
+    const eventosPorDia = {};
+    eventos.forEach(e => { (eventosPorDia[e.data] ||= []).push(e); });
+
+    // Constrói grid: começa do domingo da 1ª semana até o sábado da última
+    const primeiroDia = new Date(calAno, calMes - 1, 1);
+    const ultimoDia = new Date(calAno, calMes, 0);
+    const dowInicio = primeiroDia.getDay();
+    const totalDias = ultimoDia.getDate();
+    const hoje = new Date().toISOString().split('T')[0];
+
+    const cells = [];
+    // Dias do mês anterior (cinza)
+    const prevMes = new Date(calAno, calMes - 2, 0).getDate();
+    for (let i = dowInicio - 1; i >= 0; i--) {
+      cells.push({ outside: true, day: prevMes - i });
+    }
+    for (let d = 1; d <= totalDias; d++) {
+      const dataIso = `${calAno}-${String(calMes).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      cells.push({ outside: false, day: d, dataIso, eventos: eventosPorDia[dataIso] || [] });
+    }
+    // Completa até 42 células (6 semanas)
+    while (cells.length < 42) cells.push({ outside: true, day: cells.length - (totalDias + dowInicio - 1) });
+
+    const headers = ['DOM','SEG','TER','QUA','QUI','SEX','SÁB'].map(h => `<div class="cal-head">${h}</div>`).join('');
+    const cellsHTML = cells.map(c => {
+      const classes = ['cal-cell'];
+      if (c.outside) classes.push('outside');
+      if (c.dataIso === hoje) classes.push('today');
+      const events = (c.eventos || []).slice(0, 4).map(e =>
+        `<div class="cal-event" style="border-left-color:${e.cor}" title="${e.titulo}${e.subtitulo ? ' — ' + e.subtitulo : ''}">${e.icone || '•'} ${e.titulo.replace(/^[^\s]+ /, '')}</div>`
+      ).join('');
+      const mais = c.eventos?.length > 4 ? `<div class="cal-event" style="color:var(--ink-4)">+ ${c.eventos.length - 4} mais</div>` : '';
+      return `<div class="${classes.join(' ')}"><div class="day">${c.day}</div>${events}${mais}</div>`;
+    }).join('');
+
+    document.getElementById('cal-container').innerHTML = `<div class="cal-grid">${headers}${cellsHTML}</div>`;
+  }
+
+  /* ════════════════ Calculadora ════════════════ */
+  // Tabela 2026 embutida
+  const TABELA_2026 = {
+    inss_faixas: [
+      { ate: 1564.18, aliq: 0.075 },
+      { ate: 2879.00, aliq: 0.090 },
+      { ate: 4319.00, aliq: 0.120 },
+      { ate: 8406.21, aliq: 0.140 },
+    ],
+    inss_max: 980.72, inss_teto: 8406.21,
+    irrf_faixas: [
+      { ate: 2428.80, aliq: 0,     ded: 0      },
+      { ate: 2985.00, aliq: 0.075, ded: 182.16 },
+      { ate: 3961.00, aliq: 0.150, ded: 410.03 },
+      { ate: 4927.68, aliq: 0.225, ded: 707.20 },
+      { ate: Infinity, aliq: 0.275, ded: 953.55 },
+    ],
+    ded_dep: 200.00,
+  };
+
+  function calcINSS(bruto) {
+    const t = TABELA_2026;
+    if (bruto <= 0) return 0;
+    const base = Math.min(bruto, t.inss_teto);
+    let inss = 0, ant = 0;
+    for (const f of t.inss_faixas) {
+      if (base <= ant) break;
+      inss += (Math.min(base, f.ate) - ant) * f.aliq;
+      ant = f.ate;
+    }
+    return Math.min(parseFloat(inss.toFixed(2)), t.inss_max);
+  }
+
+  function calcIRRF(bruto, inss, deps) {
+    const t = TABELA_2026;
+    const base = bruto - inss - (deps * t.ded_dep);
+    if (base <= 0) return 0;
+    for (const f of t.irrf_faixas) {
+      if (base <= f.ate) return Math.max(0, parseFloat((base * f.aliq - f.ded).toFixed(2)));
+    }
+    return 0;
+  }
+
+  function calcular() {
+    const bruto = parseFloat(document.getElementById('calc-bruto').value) || 0;
+    const deps = parseInt(document.getElementById('calc-deps').value) || 0;
+    const he50 = parseFloat(document.getElementById('calc-he50').value) || 0;
+    const he100 = parseFloat(document.getElementById('calc-he100').value) || 0;
+    const vt = parseFloat(document.getElementById('calc-vt').value) || 0;
+    const saude = parseFloat(document.getElementById('calc-saude').value) || 0;
+
+    const totalBruto = bruto + he50 + he100;
+    const inss = calcINSS(totalBruto);
+    const irrf = calcIRRF(totalBruto, inss, deps);
+    const fgts = parseFloat((totalBruto * 0.08).toFixed(2));
+    const liquido = totalBruto - inss - irrf - vt - saude;
+
+    document.getElementById('calc-result').innerHTML = `
+      <h4>📊 Estimativa de salário líquido (CLT 2026)</h4>
+      <div class="row"><span>Salário base</span><span class="pos">${fmt.brl(bruto)}</span></div>
+      ${he50 > 0 ? `<div class="row"><span>Horas extras 50%</span><span class="pos">${fmt.brl(he50)}</span></div>` : ''}
+      ${he100 > 0 ? `<div class="row"><span>Horas extras 100%</span><span class="pos">${fmt.brl(he100)}</span></div>` : ''}
+      <div class="row"><span><strong>Total bruto</strong></span><span class="pos"><strong>${fmt.brl(totalBruto)}</strong></span></div>
+      <div class="row"><span>(−) INSS (${((inss/totalBruto)*100).toFixed(2)}%)</span><span class="neg">−${fmt.brl(inss)}</span></div>
+      <div class="row"><span>(−) IRRF</span><span class="neg">−${fmt.brl(irrf)}</span></div>
+      ${vt > 0 ? `<div class="row"><span>(−) Vale-Transporte</span><span class="neg">−${fmt.brl(vt)}</span></div>` : ''}
+      ${saude > 0 ? `<div class="row"><span>(−) Plano de saúde</span><span class="neg">−${fmt.brl(saude)}</span></div>` : ''}
+      <div class="row"><span>Salário líquido estimado</span><span class="pos">${fmt.brl(liquido)}</span></div>
+      <p class="text-muted text-sm mt-3" style="margin:14px 0 0">FGTS depositado pela empresa: <strong>${fmt.brl(fgts)}</strong> (não desconta do funcionário)</p>
+    `;
+  }
+
+  /* ════════════════ Modal helper ════════════════ */
+  function showFormModal(title, html, onSave) {
+    let m = document.getElementById('form-modal');
+    if (!m) { m = document.createElement('div'); m.id = 'form-modal'; m.className = 'modal-overlay'; m.onclick = (e) => { if (e.target === m) closeFormModal(); }; document.body.appendChild(m); }
+    m.innerHTML = `<div class="modal"><div class="modal-header"><h2>${title}</h2><button class="modal-close" onclick="closeFormModal()">×</button></div><div class="modal-body">${html}</div><div class="modal-footer"><button class="btn" onclick="closeFormModal()">Cancelar</button><button class="btn btn-primary" id="form-save">Salvar</button></div></div>`;
+    m.classList.remove('hidden');
+    initMasks(m);
+    document.getElementById('form-save').onclick = onSave;
+  }
+  function closeFormModal() { document.getElementById('form-modal')?.remove(); }
+
+  // Inicializa primeira aba
+  renderFAQ();
+</script>
+</body>
+</html>

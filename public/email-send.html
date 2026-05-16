@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Envios — InfoPago RH</title>
+<link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<div class="app">
+  <div id="sidebar"></div>
+  <main class="main">
+    <div class="page-header">
+      <div><h1>Envio de Holerites</h1><p class="subtitle">Histórico, agendamento e envio em lote</p></div>
+      <button class="btn btn-primary" onclick="modalAgendar()">⏰ Agendar envio</button>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h3 class="card-title">Agendamentos ativos</h3>
+        <div id="schedules"></div>
+      </div>
+      <div class="card">
+        <h3 class="card-title">Estatísticas</h3>
+        <div id="stats"></div>
+      </div>
+    </div>
+
+    <div class="card mt-5">
+      <h3 class="card-title">Histórico de envios</h3>
+      <div class="filter-bar">
+        <div class="field"><label>Status</label>
+          <select id="f-status" onchange="loadLogs()">
+            <option value="">Todos</option>
+            <option value="enviado">Enviados</option>
+            <option value="erro">Erros</option>
+            <option value="pendente">Pendentes</option>
+          </select>
+        </div>
+      </div>
+      <table class="table">
+        <thead><tr><th>Data</th><th>Funcionário</th><th>Competência</th><th>E-mail</th><th>Status</th><th>Confirmação</th></tr></thead>
+        <tbody id="logs"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+  requireAuth();
+  mountShell('email');
+
+  async function loadSchedules() {
+    const ds = await api('/email/schedules');
+    document.getElementById('schedules').innerHTML = ds.length
+      ? ds.map(s => `
+          <div style="padding:12px 0;border-bottom:1px solid var(--border)">
+            <strong>${fmt.competencia(s.competencia_mes, s.competencia_ano)}</strong> ·
+            ${fmt.data(s.scheduled_date)} às ${s.scheduled_time}
+            <span class="badge ${s.status}" style="margin-left:8px">${s.status}</span>
+            ${s.status === 'agendado' ? `<button class="btn btn-sm btn-danger" style="float:right" onclick="cancelar('${s.id}')">Cancelar</button>` : ''}
+            <br><small class="text-muted">${s.departments?.nome ? 'Dept: ' + s.departments.nome : 'Todos os ativos'}</small>
+            ${s.total_sent ? `<br><small>Enviados: ${s.total_sent} · Erros: ${s.total_errors}</small>` : ''}
+          </div>`).join('')
+      : '<p class="text-muted">Nenhum agendamento.</p>';
+  }
+
+  async function loadLogs() {
+    const status = document.getElementById('f-status').value;
+    const q = new URLSearchParams();
+    if (status) q.set('status', status);
+    const r = await api(`/email/logs?${q}`);
+    const logs = r.data || [];
+    document.getElementById('logs').innerHTML = logs.length
+      ? logs.map(l => `
+          <tr>
+            <td>${fmt.dataHora(l.sent_at || l.created_at)}</td>
+            <td>${l.employees?.nome_completo || '—'}</td>
+            <td>${l.payslips ? fmt.competencia(l.payslips.competencia_mes, l.payslips.competencia_ano) : '—'}</td>
+            <td>${l.recipient_email}</td>
+            <td><span class="badge ${l.status}">${l.status}</span></td>
+            <td>${l.confirmed_at ? `✓ ${fmt.dataHora(l.confirmed_at)}` : '—'}</td>
+          </tr>`).join('')
+      : '<tr><td colspan="6" class="table-empty">Nenhum registro.</td></tr>';
+
+    // Stats
+    const total = logs.length;
+    const enviados = logs.filter(l => l.status === 'enviado').length;
+    const erros = logs.filter(l => l.status === 'erro').length;
+    const confirmados = logs.filter(l => l.confirmed_at).length;
+    document.getElementById('stats').innerHTML = `
+      <div class="info-row"><div class="label">Total registros</div><div class="value">${total}</div></div>
+      <div class="info-row"><div class="label">Enviados</div><div class="value">${enviados}</div></div>
+      <div class="info-row"><div class="label">Erros</div><div class="value" style="color:var(--danger)">${erros}</div></div>
+      <div class="info-row"><div class="label">Confirmados</div><div class="value" style="color:var(--success)">${confirmados}</div></div>
+    `;
+  }
+
+  async function cancelar(id) {
+    if (!confirm('Cancelar este agendamento?')) return;
+    try {
+      await api(`/email/schedules/${id}`, { method: 'DELETE' });
+      toast('Cancelado.', 'success');
+      loadSchedules();
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function modalAgendar() {
+    const depts = await api('/departments?active=true');
+    const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    const now = new Date();
+    const html = `<form id="agForm">
+      <div class="form-grid">
+        <div class="field"><label>Mês competência<span class="req">*</span></label>
+          <select name="competencia_mes" required>${meses.map((m,i)=>`<option value="${i+1}" ${i+1===now.getMonth()+1?'selected':''}>${m}</option>`).join('')}</select></div>
+        <div class="field"><label>Ano competência<span class="req">*</span></label>
+          <input type="number" name="competencia_ano" value="${now.getFullYear()}" required></div>
+        <div class="field"><label>Data envio<span class="req">*</span></label>
+          <input type="date" name="scheduled_date" required></div>
+        <div class="field"><label>Hora</label>
+          <input type="time" name="scheduled_time" value="08:00"></div>
+        <div class="field"><label>Quem receberá</label>
+          <select name="employee_filter" onchange="document.getElementById('dpt-row').style.display=this.value==='departamento'?'block':'none'">
+            <option value="todos">Todos os ativos</option>
+            <option value="departamento">Apenas departamento</option>
+          </select></div>
+        <div class="field" id="dpt-row" style="display:none"><label>Departamento</label>
+          <select name="department_id"><option value="">—</option>${depts.map(d=>`<option value="${d.id}">${d.nome}</option>`).join('')}</select></div>
+      </div>
+    </form>`;
+    showFormModal('Agendar envio em lote', html, async () => {
+      const f = document.getElementById('agForm');
+      if (!validateForm(f)) return;
+      const data = formToObject(f);
+      data.competencia_mes = parseInt(data.competencia_mes);
+      data.competencia_ano = parseInt(data.competencia_ano);
+      if (data.employee_filter !== 'departamento') data.department_id = null;
+      try {
+        await api('/email/schedules', { method: 'POST', body: data });
+        toast('Agendamento criado!', 'success');
+        closeFormModal();
+        loadSchedules();
+      } catch (err) { toast(err.message, 'error'); }
+    });
+  }
+
+  function showFormModal(title, html, onSave) {
+    let m = document.getElementById('form-modal');
+    if (!m) { m = document.createElement('div'); m.id = 'form-modal'; m.className = 'modal-overlay'; m.onclick = (e) => { if (e.target === m) closeFormModal(); }; document.body.appendChild(m); }
+    m.innerHTML = `<div class="modal"><div class="modal-header"><h2>${title}</h2><button class="modal-close" onclick="closeFormModal()">×</button></div><div class="modal-body">${html}</div><div class="modal-footer"><button class="btn" onclick="closeFormModal()">Cancelar</button><button class="btn btn-primary" id="form-save">Agendar</button></div></div>`;
+    m.classList.remove('hidden');
+    document.getElementById('form-save').onclick = onSave;
+  }
+  function closeFormModal() { document.getElementById('form-modal')?.remove(); }
+
+  loadSchedules(); loadLogs();
+</script>
+</body>
+</html>

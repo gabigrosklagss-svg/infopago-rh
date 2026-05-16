@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard — InfoPago RH</title>
+<link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<div class="app">
+  <div id="sidebar"></div>
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <h1>Dashboard</h1>
+        <p class="subtitle" id="competencia">—</p>
+      </div>
+      <div>
+        <a href="/payslips.html" class="btn btn-primary">📄 Gerar holerites do mês</a>
+      </div>
+    </div>
+
+    <div class="kpi-grid" id="kpis"></div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h3 class="card-title">Folha — últimos 6 meses</h3>
+        <canvas id="chart" width="600" height="240"></canvas>
+      </div>
+      <div class="card">
+        <h3 class="card-title">Encargos do mês <small>INSS · IRRF · FGTS</small></h3>
+        <div id="encargos"></div>
+      </div>
+    </div>
+
+    <div class="grid-2 mt-5">
+      <div class="card">
+        <h3 class="card-title">🎂 Aniversariantes do mês</h3>
+        <div id="aniversariantes"></div>
+      </div>
+      <div class="card">
+        <h3 class="card-title">⚠ Férias a vencer</h3>
+        <div id="ferias-vencer"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+  requireAuth();
+  mountShell('dashboard');
+
+  async function load() {
+    showLoading();
+    try {
+      const d = await api('/reports/dashboard');
+      document.getElementById('competencia').textContent = `Competência: ${fmt.competencia(d.competencia.mes, d.competencia.ano)}`;
+
+      // KPIs
+      const k = d.folha_do_mes;
+      document.getElementById('kpis').innerHTML = `
+        <div class="kpi">
+          <div class="kpi-label">Funcionários ativos</div>
+          <div class="kpi-value">${d.funcionarios_ativos}</div>
+          <div class="kpi-meta">cadastrados no sistema</div>
+        </div>
+        <div class="kpi success">
+          <div class="kpi-label">Folha líquida do mês</div>
+          <div class="kpi-value">${fmt.brl(k.total_liquido)}</div>
+          <div class="kpi-meta">${k.qtd_holerites} holerite(s) gerado(s)</div>
+        </div>
+        <div class="kpi warning">
+          <div class="kpi-label">Encargos do mês</div>
+          <div class="kpi-value">${fmt.brl(k.inss + k.irrf + k.fgts)}</div>
+          <div class="kpi-meta">INSS + IRRF + FGTS</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Holerites enviados</div>
+          <div class="kpi-value">${d.holerites_enviados}</div>
+          <div class="kpi-meta">de ${k.qtd_holerites} gerados</div>
+        </div>
+      `;
+
+      // Encargos
+      document.getElementById('encargos').innerHTML = `
+        <div class="info-row"><div class="label">INSS (folha)</div><div class="value">${fmt.brl(k.inss)}</div></div>
+        <div class="info-row"><div class="label">IRRF retido</div><div class="value">${fmt.brl(k.irrf)}</div></div>
+        <div class="info-row"><div class="label">FGTS (depósito)</div><div class="value">${fmt.brl(k.fgts)}</div></div>
+        <div class="info-row"><div class="label">Proventos totais</div><div class="value">${fmt.brl(k.total_proventos)}</div></div>
+        <div class="info-row"><div class="label">Descontos totais</div><div class="value">${fmt.brl(k.total_descontos)}</div></div>
+      `;
+
+      // Aniversariantes
+      const ani = d.aniversariantes || [];
+      document.getElementById('aniversariantes').innerHTML = ani.length
+        ? '<ul class="timeline">' + ani.map(a => `
+            <li><div class="ts-date">Dia ${String(a.dia).padStart(2,'0')}</div>
+            <div class="ts-title">${a.nome_completo}</div>
+            <div class="ts-meta">${a.matricula}</div></li>`).join('') + '</ul>'
+        : '<p class="text-muted">Nenhum aniversariante este mês.</p>';
+
+      // Férias
+      const fer = d.ferias_a_vencer || [];
+      document.getElementById('ferias-vencer').innerHTML = fer.length
+        ? '<ul class="timeline">' + fer.slice(0, 6).map(f => `
+            <li><div class="ts-date">Vence ${fmt.data(f.periodo_aquisitivo_fim)}</div>
+            <div class="ts-title">${f.employees?.nome_completo || ''}</div>
+            <div class="ts-meta">${f.employees?.matricula || ''} · Período: ${fmt.data(f.periodo_aquisitivo_inicio)}</div></li>`).join('') + '</ul>'
+        : '<p class="text-muted">Nenhuma férias a vencer nos próximos 60 dias.</p>';
+
+      // Gráfico
+      drawChart(d.historico_folha);
+    } catch (err) {
+      toast(err.message, 'error');
+    } finally {
+      hideLoading();
+    }
+  }
+
+  function drawChart(data) {
+    const c = document.getElementById('chart');
+    const ctx = c.getContext('2d');
+    ctx.clearRect(0, 0, c.width, c.height);
+    if (!data?.length) return;
+    const max = Math.max(...data.map(d => d.total)) || 1;
+    const padding = 40;
+    const w = (c.width - 2 * padding) / data.length;
+
+    // Eixo
+    ctx.strokeStyle = '#e2e8f0';
+    ctx.beginPath(); ctx.moveTo(padding, 10); ctx.lineTo(padding, c.height - 30); ctx.lineTo(c.width - 10, c.height - 30); ctx.stroke();
+
+    // Barras
+    data.forEach((d, i) => {
+      const x = padding + i * w + 10;
+      const h = ((d.total / max) * (c.height - 60));
+      const y = c.height - 30 - h;
+      ctx.fillStyle = '#1f3a8a';
+      ctx.fillRect(x, y, w - 20, h);
+      ctx.fillStyle = '#4a5568';
+      ctx.font = '11px Plus Jakarta Sans, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(d.label, x + (w - 20) / 2, c.height - 12);
+      ctx.fillText(fmt.brl(d.total).replace('R$', '').trim(), x + (w - 20) / 2, y - 4);
+    });
+  }
+
+  load();
+</script>
+</body>
+</html>

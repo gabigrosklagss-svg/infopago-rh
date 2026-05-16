@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Holerite</title>
+<style>
+  @page { size: A4; margin: 8mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Courier New', Consolas, monospace;
+    font-size: 10pt;
+    color: #000;
+    margin: 0;
+    padding: 0;
+  }
+  .holerite {
+    border: 1.5px solid #000;
+    padding: 0;
+    width: 100%;
+    page-break-inside: avoid;
+  }
+
+  /* ── Cabeçalho ─────────────────────────────────── */
+  .header {
+    display: flex;
+    border-bottom: 1px solid #000;
+  }
+  .header-left {
+    flex: 1;
+    padding: 6px 10px;
+    border-right: 1px solid #000;
+  }
+  .header-right {
+    width: 240px;
+    padding: 6px 10px;
+    text-align: right;
+  }
+  .empresa-nome { font-weight: bold; font-size: 11pt; }
+  .empresa-info { font-size: 9pt; margin-top: 2px; }
+  .recibo-titulo { font-weight: bold; font-size: 11pt; }
+  .competencia { margin-top: 4px; }
+
+  /* ── Linha do funcionário ──────────────────────── */
+  .func-row {
+    display: flex;
+    border-bottom: 1px solid #000;
+    font-size: 8.5pt;
+  }
+  .func-cell {
+    padding: 4px 8px;
+    border-right: 1px solid #000;
+  }
+  .func-cell:last-child { border-right: 0; }
+  .func-label { font-size: 7pt; color: #555; text-transform: uppercase; }
+  .func-value { font-weight: bold; }
+
+  /* ── Tabela de lançamentos ─────────────────────── */
+  .lancs-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9pt;
+  }
+  .lancs-table th {
+    background: #e8e8e8;
+    border: 1px solid #000;
+    padding: 4px 6px;
+    text-align: left;
+    font-size: 8.5pt;
+  }
+  .lancs-table th.num { text-align: right; width: 100px; }
+  .lancs-table td {
+    border: 1px solid #000;
+    padding: 3px 6px;
+    height: 18px;
+  }
+  .lancs-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .lancs-table td.cod { width: 50px; }
+  .lancs-table td.ref { width: 100px; }
+
+  /* ── Wrapper com assinatura à direita ──────────── */
+  .body-wrap {
+    display: flex;
+  }
+  .lancs-area {
+    flex: 1;
+  }
+  .assinatura-area {
+    width: 32px;
+    border-left: 1px solid #000;
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    text-align: center;
+    padding: 8px 4px;
+    font-size: 7.5pt;
+    color: #444;
+    letter-spacing: 1px;
+  }
+
+  /* ── Totais ────────────────────────────────────── */
+  .totals {
+    display: flex;
+    border-top: 2px solid #000;
+    border-bottom: 1px solid #000;
+  }
+  .totals-spacer { flex: 1; }
+  .totals-cell {
+    border-left: 1px solid #000;
+    padding: 6px 12px;
+    width: 130px;
+    text-align: right;
+  }
+  .totals-cell .label { font-size: 7.5pt; color: #444; text-transform: uppercase; }
+  .totals-cell .value { font-weight: bold; font-size: 11pt; font-variant-numeric: tabular-nums; }
+  .liquido-row {
+    display: flex;
+    border-bottom: 1px solid #000;
+  }
+  .liquido-spacer { flex: 1; }
+  .liquido-arrow {
+    width: 130px;
+    text-align: center;
+    padding: 6px;
+    border-left: 1px solid #000;
+    background: #f0f0f0;
+    font-size: 9pt;
+  }
+  .liquido-value {
+    width: 130px;
+    padding: 6px 12px;
+    border-left: 1px solid #000;
+    text-align: right;
+    font-weight: bold;
+    font-size: 12pt;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── Rodapé (bases) ────────────────────────────── */
+  .footer-row {
+    display: flex;
+    font-size: 8.5pt;
+  }
+  .footer-cell {
+    flex: 1;
+    padding: 4px 8px;
+    border-right: 1px solid #000;
+  }
+  .footer-cell:last-child { border-right: 0; }
+  .footer-label { font-size: 7pt; color: #555; text-transform: uppercase; }
+  .footer-value { font-weight: bold; }
+
+  /* ── Data/Assinatura ───────────────────────────── */
+  .sign-row {
+    display: flex;
+    border-top: 1px solid #000;
+    padding: 6px 8px;
+    font-size: 8.5pt;
+  }
+  .sign-cell { flex: 1; padding: 4px; }
+  .sign-line {
+    border-top: 1px solid #000;
+    margin-top: 18px;
+    padding-top: 2px;
+    text-align: center;
+    font-size: 7.5pt;
+    color: #444;
+  }
+
+  /* ════════════ Página 2 — Espelho de Ponto ════════════ */
+  .page-break { page-break-before: always; height: 0; }
+
+  .ponto-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 8pt;
+    font-family: 'Courier New', Consolas, monospace;
+  }
+  .ponto-table th {
+    background: #d8d8d8;
+    border: 1px solid #000;
+    padding: 4px 5px;
+    text-align: left;
+    font-size: 7.5pt;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+  }
+  .ponto-table td {
+    border: 1px solid #000;
+    padding: 3px 5px;
+    height: 16px;
+  }
+  .ponto-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .ponto-table .ponto-dia { width: 28px; text-align: center; font-weight: bold; }
+  .ponto-table .ponto-dow { width: 32px; text-align: center; color: #555; font-weight: bold; }
+  .ponto-table .ponto-status { width: 86px; }
+  .ponto-table .ponto-marc { width: 52px; text-align: right; }
+  .ponto-table .ponto-h { width: 56px; text-align: right; }
+
+  .ponto-totais {
+    border: 1.5px solid #000;
+    border-top: 0;
+    background: #f5f5f5;
+    padding: 8px 12px;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .ponto-totais-grupo {
+    display: flex;
+    gap: 0;
+    border: 1px solid #aaa;
+    background: #fff;
+  }
+  .ponto-totais-cell {
+    padding: 6px 12px;
+    border-right: 1px solid #ccc;
+    text-align: center;
+    min-width: 78px;
+  }
+  .ponto-totais-cell:last-child { border-right: 0; }
+  .ponto-totais-cell .ponto-label {
+    font-size: 7pt;
+    text-transform: uppercase;
+    color: #555;
+    letter-spacing: .05em;
+    font-weight: bold;
+  }
+  .ponto-totais-cell .ponto-value {
+    font-size: 11pt;
+    font-weight: bold;
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ponto-legenda {
+    font-size: 7.5pt;
+    color: #444;
+    padding: 8px 4px;
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    border-top: 1px solid #ddd;
+    margin-top: 4px;
+  }
+  .ponto-legenda strong { color: #000; margin-right: 4px; }
+  .ponto-legenda .leg-box {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border: 1px solid #000;
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+</style>
+</head>
+<body>
+
+<div class="holerite">
+
+  <!-- ───────────── CABEÇALHO ───────────── -->
+  <div class="header">
+    <div class="header-left">
+      <div class="empresa-nome">{{empresa_nome}}</div>
+      <div class="empresa-info">CNPJ: {{empresa_cnpj}}</div>
+      <div class="empresa-info">{{empresa_endereco}}</div>
+    </div>
+    <div class="header-right">
+      <div class="recibo-titulo">Recibo de Pagamento de Salário</div>
+      <div class="competencia">{{competencia}}</div>
+    </div>
+  </div>
+
+  <!-- ───────────── DADOS FUNCIONÁRIO ───────────── -->
+  <div class="func-row">
+    <div class="func-cell" style="width:70px">
+      <div class="func-label">Código</div>
+      <div class="func-value">{{func_codigo}}</div>
+    </div>
+    <div class="func-cell" style="flex:1">
+      <div class="func-label">Nome do Funcionário</div>
+      <div class="func-value">{{func_nome}}</div>
+    </div>
+    <div class="func-cell" style="width:60px">
+      <div class="func-label">CBO</div>
+      <div class="func-value">{{func_cbo}}</div>
+    </div>
+    <div class="func-cell" style="width:200px">
+      <div class="func-label">Cargo</div>
+      <div class="func-value">{{func_cargo}}</div>
+    </div>
+  </div>
+  <div class="func-row">
+    <div class="func-cell" style="flex:1">
+      <div class="func-label">Empresa / Local</div>
+      <div class="func-value">{{func_empresa}} {{func_local}}</div>
+    </div>
+    <div class="func-cell" style="width:140px">
+      <div class="func-label">Depto</div>
+      <div class="func-value">{{func_depto}}</div>
+    </div>
+    <div class="func-cell" style="width:100px">
+      <div class="func-label">Setor</div>
+      <div class="func-value">{{func_setor}}</div>
+    </div>
+    <div class="func-cell" style="width:100px">
+      <div class="func-label">Seção</div>
+      <div class="func-value">{{func_secao}}</div>
+    </div>
+    <div class="func-cell" style="width:60px">
+      <div class="func-label">Filial</div>
+      <div class="func-value">{{func_filial}}</div>
+    </div>
+  </div>
+
+  <!-- ───────────── LANÇAMENTOS + ASSINATURA ───────────── -->
+  <div class="body-wrap">
+    <div class="lancs-area">
+      <table class="lancs-table">
+        <thead>
+          <tr>
+            <th class="cod">Cód.</th>
+            <th>Descrição</th>
+            <th class="ref">Referência</th>
+            <th class="num">Vencimentos</th>
+            <th class="num">Descontos</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each lancamentos}}
+          <tr>
+            <td class="cod">{{codigo}}</td>
+            <td>{{descricao}}</td>
+            <td class="ref">{{referencia}}</td>
+            <td class="num">{{vencimento}}</td>
+            <td class="num">{{desconto}}</td>
+          </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    </div>
+    <div class="assinatura-area">
+      DECLARO TER RECEBIDO A IMPORTÂNCIA LÍQUIDA DISCRIMINADA NESTE RECIBO
+    </div>
+  </div>
+
+  <!-- ───────────── TOTAIS ───────────── -->
+  <div class="totals">
+    <div class="totals-spacer"></div>
+    <div class="totals-cell">
+      <div class="label">Total de Vencimentos</div>
+      <div class="value">{{total_vencimentos}}</div>
+    </div>
+    <div class="totals-cell">
+      <div class="label">Total de Descontos</div>
+      <div class="value">{{total_descontos}}</div>
+    </div>
+  </div>
+
+  <!-- ───────────── LÍQUIDO ───────────── -->
+  <div class="liquido-row">
+    <div class="liquido-spacer"></div>
+    <div class="liquido-arrow">Valor Líquido →</div>
+    <div class="liquido-value">{{salario_liquido}}</div>
+  </div>
+
+  <!-- ───────────── BASES (rodapé) ───────────── -->
+  <div class="footer-row">
+    <div class="footer-cell">
+      <div class="footer-label">Salário Base</div>
+      <div class="footer-value">{{salario_base_valor}}</div>
+    </div>
+    <div class="footer-cell">
+      <div class="footer-label">Sal. Contr. INSS</div>
+      <div class="footer-value">{{base_inss}}</div>
+    </div>
+    <div class="footer-cell">
+      <div class="footer-label">Base Cálc. FGTS</div>
+      <div class="footer-value">{{base_fgts}}</div>
+    </div>
+    <div class="footer-cell">
+      <div class="footer-label">FGTS do Mês</div>
+      <div class="footer-value">{{fgts_mes}}</div>
+    </div>
+    <div class="footer-cell">
+      <div class="footer-label">Base Cálc. IRRF</div>
+      <div class="footer-value">{{base_irrf}}</div>
+    </div>
+    <div class="footer-cell">
+      <div class="footer-label">Faixa IRRF</div>
+      <div class="footer-value">{{faixa_irrf}}</div>
+    </div>
+  </div>
+
+  <!-- ───────────── DATA / ASSINATURA ───────────── -->
+  <div class="sign-row">
+    <div class="sign-cell">
+      <div class="func-label">Data</div>
+      <div class="sign-line">{{data_pagamento}}</div>
+    </div>
+    <div class="sign-cell" style="flex:2">
+      <div class="func-label">Assinatura do Funcionário</div>
+      <div class="sign-line">_________________________________________________</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════
+     PÁGINA 2 — ESPELHO DE PONTO
+     ════════════════════════════════════════════════════════════════ -->
+
+<div class="page-break"></div>
+
+<div class="holerite" style="margin-top:0">
+
+  <!-- Cabeçalho da página 2 -->
+  <div class="header">
+    <div class="header-left">
+      <div class="empresa-nome">{{empresa_nome}}</div>
+      <div class="empresa-info">CNPJ: {{empresa_cnpj}}</div>
+      <div class="empresa-info">{{empresa_endereco}}</div>
+    </div>
+    <div class="header-right">
+      <div class="recibo-titulo">Espelho de Ponto</div>
+      <div class="competencia">{{competencia}}</div>
+    </div>
+  </div>
+
+  <!-- Funcionário -->
+  <div class="func-row">
+    <div class="func-cell" style="width:70px">
+      <div class="func-label">Código</div>
+      <div class="func-value">{{func_codigo}}</div>
+    </div>
+    <div class="func-cell" style="flex:1">
+      <div class="func-label">Nome do Funcionário</div>
+      <div class="func-value">{{func_nome}}</div>
+    </div>
+    <div class="func-cell" style="width:200px">
+      <div class="func-label">Cargo</div>
+      <div class="func-value">{{func_cargo}}</div>
+    </div>
+    <div class="func-cell" style="width:100px">
+      <div class="func-label">Carga diária</div>
+      <div class="func-value">{{ponto_carga_diaria}}h</div>
+    </div>
+  </div>
+
+  <!-- Tabela de ponto: dia a dia -->
+  <table class="ponto-table">
+    <thead>
+      <tr>
+        <th class="ponto-dia">Dia</th>
+        <th class="ponto-dow">DOW</th>
+        <th class="ponto-status">Status</th>
+        <th class="ponto-marc">Entrada</th>
+        <th class="ponto-marc">Almoço</th>
+        <th class="ponto-marc">Volta</th>
+        <th class="ponto-marc">Saída</th>
+        <th class="ponto-h">Trab.</th>
+        <th class="ponto-h">Extras</th>
+        <th class="ponto-h">Faltantes</th>
+        <th>Observação</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each ponto_linhas}}
+      <tr style="{{row_style}}">
+        <td class="ponto-dia">{{dia}}</td>
+        <td class="ponto-dow">{{dow}}</td>
+        <td class="ponto-status"><strong>{{status}}</strong></td>
+        <td class="ponto-marc num">{{ent1}}</td>
+        <td class="ponto-marc num">{{sai1}}</td>
+        <td class="ponto-marc num">{{ent2}}</td>
+        <td class="ponto-marc num">{{sai2}}</td>
+        <td class="ponto-h num">{{trab}}</td>
+        <td class="ponto-h num" style="color:#1B5B3E">{{extras}}</td>
+        <td class="ponto-h num" style="color:#921818">{{falt}}</td>
+        <td>{{label}}{{observacao}}</td>
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
+
+  <!-- Totais do espelho -->
+  <div class="ponto-totais">
+    <div class="ponto-totais-grupo">
+      <div class="ponto-totais-cell">
+        <div class="ponto-label">Dias úteis</div>
+        <div class="ponto-value">{{ponto_total_uteis}}</div>
+      </div>
+      <div class="ponto-totais-cell">
+        <div class="ponto-label">Trabalhados</div>
+        <div class="ponto-value">{{ponto_total_trabalhados}}</div>
+      </div>
+      <div class="ponto-totais-cell">
+        <div class="ponto-label">DSR</div>
+        <div class="ponto-value">{{ponto_total_dsr}}</div>
+      </div>
+      <div class="ponto-totais-cell">
+        <div class="ponto-label">Feriados</div>
+        <div class="ponto-value">{{ponto_total_feriados}}</div>
+      </div>
+      <div class="ponto-totais-cell">
+        <div class="ponto-label">Faltas</div>
+        <div class="ponto-value" style="color:#921818">{{ponto_total_faltas}}</div>
+      </div>
+    </div>
+    <div class="ponto-totais-grupo">
+      <div class="ponto-totais-cell">
+        <div class="ponto-label">Horas trabalhadas</div>
+        <div class="ponto-value">{{ponto_horas_trabalhadas}}h</div>
+      </div>
+      <div class="ponto-totais-cell">
+        <div class="ponto-label">Horas extras</div>
+        <div class="ponto-value" style="color:#1B5B3E">+{{ponto_horas_extras}}h</div>
+      </div>
+      <div class="ponto-totais-cell">
+        <div class="ponto-label">Horas faltantes</div>
+        <div class="ponto-value" style="color:#921818">-{{ponto_horas_faltantes}}h</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Legenda -->
+  <div class="ponto-legenda">
+    <strong>Legenda:</strong>
+    <span><span class="leg-box" style="background:#F4F6F4"></span> DSR — Descanso Semanal Remunerado (sábado/domingo)</span>
+    <span><span class="leg-box" style="background:#FAF4E3"></span> FERIADO — Feriado nacional (descanso compensado)</span>
+    <span><span class="leg-box" style="background:#FBE9E9"></span> SEM REGISTRO — Dia útil sem marcação de ponto</span>
+  </div>
+
+  <!-- Data / Assinatura página 2 -->
+  <div class="sign-row">
+    <div class="sign-cell">
+      <div class="func-label">Data</div>
+      <div class="sign-line">{{data_pagamento}}</div>
+    </div>
+    <div class="sign-cell" style="flex:2">
+      <div class="func-label">Assinatura do Funcionário (confirma marcações)</div>
+      <div class="sign-line">_________________________________________________</div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

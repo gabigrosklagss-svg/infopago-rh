@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Solicitações de férias — InfoPago RH</title>
+<link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<div class="app">
+  <div id="sidebar"></div>
+  <main class="main">
+    <div class="breadcrumb">
+      <a href="/dashboard.html">Painel</a>
+      <span class="sep">›</span>
+      <span>Solicitações de férias</span>
+    </div>
+
+    <div class="page-header">
+      <div>
+        <h1>Solicitações de férias</h1>
+        <p class="subtitle">Aprovação · negação · histórico</p>
+      </div>
+      <div class="page-header-actions">
+        <button class="btn btn-primary" onclick="abrirNovaSolicitacao()">+ Nova solicitação</button>
+      </div>
+    </div>
+
+    <div class="filter-bar">
+      <div class="field">
+        <label>Status</label>
+        <select id="f-status" onchange="carregar()">
+          <option value="pendente">Pendentes</option>
+          <option value="">Todas</option>
+          <option value="aprovada">Aprovadas</option>
+          <option value="negada">Negadas</option>
+          <option value="cancelada">Canceladas</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <div class="table-toolbar">
+        <span class="count" id="count">0 solicitações</span>
+        <span class="spacer"></span>
+      </div>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Funcionário</th>
+            <th>Período pretendido</th>
+            <th>Dias</th>
+            <th>Vendidos</th>
+            <th>13º adiantado</th>
+            <th>Solicitação</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+  requireAuth();
+  mountShell('vacation');
+
+  async function carregar() {
+    const status = document.getElementById('f-status').value;
+    const q = new URLSearchParams();
+    if (status) q.set('status', status);
+    showLoading();
+    try {
+      const rows = await api(`/vacation-requests?${q}`);
+      document.getElementById('count').textContent = `${rows.length} solicitação(ões)`;
+      const tbody = document.getElementById('tbody');
+      if (!rows.length) { tbody.innerHTML = '<tr><td colspan="8" class="table-empty">Nenhuma solicitação encontrada.</td></tr>'; return; }
+      tbody.innerHTML = rows.map(s => `
+        <tr>
+          <td><strong>${s.employees?.nome_completo || '—'}</strong><br><small class="text-muted">${s.employees?.matricula} · ${s.employees?.departments?.nome || ''}</small></td>
+          <td>${fmt.data(s.data_inicio_pretendida)} → ${fmt.data(s.data_fim_pretendida)}</td>
+          <td class="num"><strong>${s.dias_solicitados}</strong></td>
+          <td class="num">${s.dias_vendidos || 0}</td>
+          <td>${s.adiantar_13 ? '✓ Sim' : '—'}</td>
+          <td>${fmt.data(s.data_solicitacao)}</td>
+          <td><span class="badge ${s.status}">${s.status}</span></td>
+          <td>
+            ${s.status === 'pendente' ? `
+              <button class="btn btn-sm btn-success" onclick="aprovar('${s.id}', '${s.employees?.nome_completo}')">✓ Aprovar</button>
+              <button class="btn btn-sm btn-danger" onclick="negar('${s.id}', '${s.employees?.nome_completo}')">✕ Negar</button>
+            ` : (s.observacao_gestor ? `<small class="text-muted">${s.observacao_gestor}</small>` : '')}
+          </td>
+        </tr>
+      `).join('');
+    } catch (err) { toast(err.message, 'error'); }
+    finally { hideLoading(); }
+  }
+
+  async function aprovar(id, nome) {
+    const obs = prompt(`Aprovar férias de ${nome}?\n\nObservação (opcional):`);
+    if (obs === null) return;
+    showLoading();
+    try {
+      await api(`/vacation-requests/${id}/aprovar`, { method: 'PUT', body: { observacao_gestor: obs } });
+      toast('Férias aprovadas!', 'success');
+      carregar();
+    } catch (err) { toast(err.message, 'error'); }
+    finally { hideLoading(); }
+  }
+
+  async function negar(id, nome) {
+    const motivo = prompt(`Negar férias de ${nome}?\n\nMotivo:`);
+    if (motivo === null) return;
+    if (!motivo.trim()) { toast('Motivo é obrigatório.', 'warning'); return; }
+    showLoading();
+    try {
+      await api(`/vacation-requests/${id}/negar`, { method: 'PUT', body: { observacao_gestor: motivo } });
+      toast('Solicitação negada.', 'info');
+      carregar();
+    } catch (err) { toast(err.message, 'error'); }
+    finally { hideLoading(); }
+  }
+
+  async function abrirNovaSolicitacao() {
+    const r = await api('/employees?status=ativo&limit=300');
+    const opts = (r.data || []).map(e => `<option value="${e.id}">${e.matricula} · ${e.nome_completo}</option>`).join('');
+    const html = `<form id="reqForm">
+      <div class="form-grid">
+        <div class="field" style="grid-column:span 2"><label>Funcionário<span class="req">*</span></label>
+          <select name="employee_id" required>${opts}</select></div>
+        <div class="field"><label>Início pretendido<span class="req">*</span></label><input type="date" name="data_inicio_pretendida" required></div>
+        <div class="field"><label>Fim pretendido<span class="req">*</span></label><input type="date" name="data_fim_pretendida" required></div>
+        <div class="field"><label>Dias vendidos (abono)</label><input type="number" name="dias_vendidos" value="0" min="0" max="10"></div>
+        <div class="field"><label>Adiantar 13º?</label>
+          <select name="adiantar_13"><option value="false">Não</option><option value="true">Sim</option></select></div>
+      </div>
+      <div class="field mt-4"><label>Observação</label><textarea name="observacao_funcionario"></textarea></div>
+    </form>`;
+    showFormModal('Nova solicitação de férias', html, async () => {
+      const f = document.getElementById('reqForm');
+      if (!validateForm(f)) return;
+      const d = formToObject(f);
+      d.adiantar_13 = d.adiantar_13 === 'true';
+      d.dias_vendidos = parseInt(d.dias_vendidos) || 0;
+      try {
+        await api('/vacation-requests', { method: 'POST', body: d });
+        toast('Solicitação criada!', 'success');
+        closeFormModal();
+        carregar();
+      } catch (err) { toast(err.message, 'error'); }
+    });
+  }
+
+  function showFormModal(title, html, onSave) {
+    let m = document.getElementById('form-modal');
+    if (!m) { m = document.createElement('div'); m.id = 'form-modal'; m.className = 'modal-overlay'; m.onclick = (e) => { if (e.target === m) closeFormModal(); }; document.body.appendChild(m); }
+    m.innerHTML = `<div class="modal"><div class="modal-header"><h2>${title}</h2><button class="modal-close" onclick="closeFormModal()">×</button></div><div class="modal-body">${html}</div><div class="modal-footer"><button class="btn" onclick="closeFormModal()">Cancelar</button><button class="btn btn-primary" id="form-save">Solicitar</button></div></div>`;
+    m.classList.remove('hidden');
+    document.getElementById('form-save').onclick = onSave;
+  }
+  function closeFormModal() { document.getElementById('form-modal')?.remove(); }
+
+  carregar();
+</script>
+</body>
+</html>
