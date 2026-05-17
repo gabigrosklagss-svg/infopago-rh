@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agente IA — InfoPago RH</title>
+<link rel="stylesheet" href="/css/main.css">
+<style>
+  .agent-shell {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr;
+    gap: 18px;
+    align-items: start;
+  }
+  @media (max-width: 1100px) {
+    .agent-shell { grid-template-columns: 1fr; }
+  }
+  .chat-box {
+    background: var(--paper);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 0;
+    overflow: hidden;
+  }
+  .chat-head {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    background:
+      radial-gradient(ellipse 60% 100% at 80% 50%, rgba(57, 225, 117, .12) 0%, transparent 60%),
+      var(--paper-2);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .chat-head .ai-avatar {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 25%, var(--brand-200) 0%, var(--brand-500) 50%, var(--brand-800) 100%);
+    display: grid; place-items: center;
+    color: #fff; font-weight: 800; font-size: 14px;
+    box-shadow: 0 0 12px rgba(57, 225, 117, .25);
+  }
+  .chat-head h3 { margin: 0; font-size: 14px; font-weight: 700; }
+  .chat-head small { font-size: 11px; color: var(--ink-3); display: block; margin-top: 1px; }
+
+  .chat-body { padding: 18px; min-height: 280px; }
+  .chat-input {
+    border-top: 1px solid var(--border);
+    padding: 12px 14px;
+    background: var(--paper-2);
+  }
+  .chat-input textarea {
+    width: 100%;
+    min-height: 80px;
+    padding: 10px 12px;
+    font-family: inherit;
+    font-size: 13px;
+    border: 1px solid var(--border-2);
+    border-radius: var(--r-sm);
+    background: #fff;
+    resize: vertical;
+    outline: none;
+  }
+  .chat-input textarea:focus { border-color: var(--brand-500); box-shadow: var(--sh-neon); }
+
+  .chat-file {
+    display: flex; align-items: center; gap: 10px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+  .file-label {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px;
+    border: 1px dashed var(--border-3);
+    border-radius: var(--r-sm);
+    color: var(--ink-3);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all var(--t-fast);
+  }
+  .file-label:hover { border-color: var(--brand-500); color: var(--brand-700); }
+  .file-name { font-size: 12px; color: var(--ink-2); flex: 1; }
+  .file-clear { background: transparent; border: 0; cursor: pointer; color: var(--danger); font-size: 18px; line-height: 1; }
+
+  .chat-msg {
+    padding: 12px 14px;
+    border-radius: var(--r);
+    margin-bottom: 10px;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+  .chat-msg.user {
+    background: var(--brand-50);
+    border-left: 3px solid var(--brand-500);
+  }
+  .chat-msg.ai {
+    background: var(--paper-3);
+    border-left: 3px solid var(--ink-4);
+  }
+  .chat-msg .who {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    font-weight: 700;
+    color: var(--ink-4);
+    margin-bottom: 4px;
+  }
+  .chat-msg.user .who { color: var(--brand-700); }
+
+  .preview-panel {
+    background: var(--paper);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 20px 22px;
+  }
+  .preview-panel .empty {
+    text-align: center;
+    padding: 48px 18px;
+    color: var(--ink-4);
+    font-size: 13px;
+  }
+  .preview-panel .empty svg {
+    width: 56px; height: 56px;
+    color: var(--ink-5);
+    margin-bottom: 16px;
+  }
+  .preview-section { margin-top: 20px; }
+  .preview-section h4 {
+    margin: 0 0 10px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--ink-3);
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  .preview-section .form-grid { gap: 10px; }
+  .confianca-tag {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+  }
+  .confianca-tag.alta { background: var(--success-bg); color: var(--brand-700); }
+  .confianca-tag.media { background: var(--warn-bg); color: var(--warn); }
+  .confianca-tag.baixa { background: var(--danger-bg); color: var(--danger); }
+</style>
+</head>
+<body>
+<div class="app">
+  <div id="sidebar"></div>
+  <main class="main">
+    <div class="breadcrumb">
+      <a href="/dashboard.html">Painel</a>
+      <span class="sep">›</span>
+      <a href="/employees.html">Funcionários</a>
+      <span class="sep">›</span>
+      <span>Agente IA</span>
+    </div>
+
+    <div class="page-header">
+      <div>
+        <h1>Agente IA · Cadastro inteligente</h1>
+        <p class="subtitle">Envie um currículo (PDF, JPG ou PNG) ou cole dados do candidato. A IA extrai e preenche a ficha automaticamente.</p>
+      </div>
+    </div>
+
+    <div class="agent-shell">
+
+      <!-- Esquerda: Chat -->
+      <div class="chat-box">
+        <div class="chat-head">
+          <div class="ai-avatar">IP</div>
+          <div>
+            <h3>InfoPago IA</h3>
+            <small>Powered by Claude · extrai dados em segundos</small>
+          </div>
+        </div>
+
+        <div class="chat-body" id="chat-body">
+          <div class="chat-msg ai">
+            <div class="who">🤖 Agente</div>
+            Olá! Para cadastrar um candidato, você pode:
+            <ul style="margin:8px 0 0;padding-left:18px">
+              <li><strong>Upload de currículo</strong> (PDF, JPG ou PNG)</li>
+              <li><strong>Colar texto</strong> com dados (ex: "João Silva, CPF 123.456.789-00, nascido em 15/03/1990…")</li>
+              <li><strong>Ambos juntos</strong> — anexa o PDF e adiciona observações no texto</li>
+            </ul>
+            <div style="margin-top:10px;font-size:12px;color:var(--ink-3)">Eu vou identificar nome, CPF, RG, endereço, contato, escolaridade e tudo mais que estiver no documento. Você revisa antes de salvar.</div>
+          </div>
+        </div>
+
+        <div class="chat-input">
+          <textarea id="texto" placeholder="Cole texto com dados do candidato, ou deixe vazio se for só upload..."></textarea>
+          <div class="chat-file">
+            <label class="file-label" for="file-input">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+              Anexar arquivo
+            </label>
+            <input type="file" id="file-input" accept="application/pdf,image/jpeg,image/png,image/webp" style="display:none" onchange="onFile(this.files[0])">
+            <span class="file-name" id="file-name"></span>
+            <button class="file-clear hidden" id="file-clear" onclick="limparArquivo()" title="Remover">✕</button>
+            <button class="btn btn-primary" onclick="analisar()" style="margin-left:auto">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3l14 9-14 9V3z"/></svg>
+              Analisar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Direita: Preview -->
+      <div class="preview-panel">
+        <div id="preview-content">
+          <div class="empty">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 11h-6"/><path d="M19 8v6"/></svg>
+            <div>Os dados extraídos pelo agente vão aparecer aqui para revisão antes de criar o funcionário.</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+  requireAuth();
+  mountShell('agent');
+
+  let arquivoSelecionado = null;
+  let dadosExtraidos = null;
+
+  function onFile(f) {
+    if (!f) return;
+    arquivoSelecionado = f;
+    document.getElementById('file-name').textContent = `📎 ${f.name} (${(f.size/1024).toFixed(0)} KB)`;
+    document.getElementById('file-clear').classList.remove('hidden');
+  }
+  function limparArquivo() {
+    arquivoSelecionado = null;
+    document.getElementById('file-input').value = '';
+    document.getElementById('file-name').textContent = '';
+    document.getElementById('file-clear').classList.add('hidden');
+  }
+
+  function addMsg(who, html, className = '') {
+    const cont = document.getElementById('chat-body');
+    const div = document.createElement('div');
+    div.className = `chat-msg ${className}`;
+    div.innerHTML = `<div class="who">${who}</div>${html}`;
+    cont.appendChild(div);
+    cont.scrollTop = cont.scrollHeight;
+  }
+
+  async function analisar() {
+    const texto = document.getElementById('texto').value;
+    if (!arquivoSelecionado && !texto.trim()) {
+      toast('Anexe um arquivo ou cole texto com os dados.', 'warning');
+      return;
+    }
+
+    // Adiciona mensagem do usuário no chat
+    const resumo = [];
+    if (arquivoSelecionado) resumo.push(`📎 ${arquivoSelecionado.name}`);
+    if (texto.trim()) resumo.push(`💬 "${texto.slice(0, 100)}${texto.length > 100 ? '…' : ''}"`);
+    addMsg('🧑 Você', resumo.join('<br>'), 'user');
+
+    // Loading
+    addMsg('🤖 Agente', `<span class="loading"></span> Analisando o documento...`, 'ai');
+    const loadingMsg = document.querySelector('#chat-body .chat-msg.ai:last-child');
+
+    const fd = new FormData();
+    if (arquivoSelecionado) fd.append('arquivo', arquivoSelecionado);
+    if (texto.trim()) fd.append('texto', texto.trim());
+
+    try {
+      const r = await fetch('/api/agent/parse', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${getToken()}` },
+        body: fd,
+      });
+      if (!r.ok) throw new Error((await r.json()).error || `Erro ${r.status}`);
+      const data = await r.json();
+
+      // Substitui loading pela resposta
+      loadingMsg.innerHTML = `<div class="who">🤖 Agente</div>
+        Análise concluída · <span class="confianca-tag ${data.confianca}">Confiança ${data.confianca}</span>
+        ${data.observacoes ? `<div style="margin-top:8px;font-size:12px;color:var(--ink-3)"><em>${data.observacoes}</em></div>` : ''}
+        <div style="margin-top:8px;font-size:11px;color:var(--ink-4)">${data._meta?.tokens_entrada || 0} tok. entrada · ${data._meta?.tokens_saida || 0} tok. saída</div>`;
+
+      dadosExtraidos = data.dados || {};
+      renderPreview(dadosExtraidos, data);
+      limparArquivo();
+      document.getElementById('texto').value = '';
+    } catch (err) {
+      loadingMsg.innerHTML = `<div class="who">🤖 Agente</div>
+        <div style="color:var(--danger)"><strong>Erro:</strong> ${err.message}</div>
+        ${err.message.includes('ANTHROPIC_API_KEY') ? '<div style="margin-top:8px;font-size:12px">Configure a chave no arquivo <code>.env</code> e reinicie o servidor.</div>' : ''}`;
+      toast(err.message, 'error');
+    }
+  }
+
+  function renderPreview(dados, full) {
+    const cont = document.getElementById('preview-content');
+
+    const campo = (label, name, value, type = 'text', extra = '') => `
+      <div class="field">
+        <label>${label}</label>
+        <input type="${type}" name="${name}" value="${value ?? ''}" ${extra}>
+      </div>`;
+
+    cont.innerHTML = `
+      <h3 class="card-title">Revisar dados extraídos
+        <small>${full.confianca === 'alta' ? '✅' : full.confianca === 'media' ? '⚠' : '⛔'} ${full.confianca}</small>
+      </h3>
+
+      <form id="previewForm">
+        <div class="preview-section">
+          <h4>Identificação</h4>
+          <div class="form-grid">
+            ${campo('Nome completo <span class="req">*</span>', 'nome_completo', dados.nome_completo, 'text', 'required')}
+            ${campo('CPF <span class="req">*</span>', 'cpf', dados.cpf, 'text', 'required data-mask="cpf"')}
+            ${campo('RG', 'rg', dados.rg)}
+            ${campo('Órgão emissor', 'rg_orgao_emissor', dados.rg_orgao_emissor)}
+            ${campo('UF do RG', 'rg_uf', dados.rg_uf)}
+            ${campo('PIS/PASEP', 'pis_pasep', dados.pis_pasep)}
+            ${campo('CTPS', 'ctps', dados.ctps)}
+            ${campo('Série CTPS', 'ctps_serie', dados.ctps_serie)}
+          </div>
+        </div>
+
+        <div class="preview-section">
+          <h4>Pessoal</h4>
+          <div class="form-grid">
+            ${campo('Data de nascimento <span class="req">*</span>', 'data_nascimento', dados.data_nascimento, 'date', 'required')}
+            <div class="field"><label>Sexo</label>
+              <select name="sexo">
+                <option value="">—</option>
+                <option value="M" ${dados.sexo === 'M' ? 'selected' : ''}>Masculino</option>
+                <option value="F" ${dados.sexo === 'F' ? 'selected' : ''}>Feminino</option>
+              </select></div>
+            <div class="field"><label>Est. civil</label>
+              <select name="estado_civil">
+                <option value="">—</option>
+                ${['solteiro','casado','divorciado','viuvo','uniao_estavel'].map(s => `<option value="${s}" ${dados.estado_civil === s ? 'selected' : ''}>${s}</option>`).join('')}
+              </select></div>
+            ${campo('Escolaridade', 'escolaridade', dados.escolaridade)}
+            ${campo('Naturalidade', 'naturalidade', dados.naturalidade)}
+            ${campo('Nacionalidade', 'nacionalidade', dados.nacionalidade || 'Brasileiro(a)')}
+            ${campo('Nome da mãe', 'nome_mae', dados.nome_mae)}
+            ${campo('Nome do pai', 'nome_pai', dados.nome_pai)}
+          </div>
+        </div>
+
+        <div class="preview-section">
+          <h4>Contato</h4>
+          <div class="form-grid">
+            ${campo('E-mail pessoal', 'email_pessoal', dados.email_pessoal, 'email')}
+            ${campo('Celular', 'celular', dados.celular, 'text', 'data-mask="telefone"')}
+            ${campo('Telefone', 'telefone', dados.telefone, 'text', 'data-mask="telefone"')}
+          </div>
+        </div>
+
+        <div class="preview-section">
+          <h4>Endereço</h4>
+          <div class="form-grid">
+            ${campo('CEP', 'cep', dados.cep, 'text', 'data-mask="cep"')}
+            ${campo('Logradouro', 'logradouro', dados.logradouro)}
+            ${campo('Número', 'numero', dados.numero)}
+            ${campo('Complemento', 'complemento', dados.complemento)}
+            ${campo('Bairro', 'bairro', dados.bairro)}
+            ${campo('Cidade', 'cidade', dados.cidade)}
+            ${campo('UF', 'uf', dados.uf)}
+          </div>
+        </div>
+
+        <div class="preview-section">
+          <h4>Vínculo (preencha manualmente)</h4>
+          <div class="form-grid">
+            ${campo('Admissão <span class="req">*</span>', 'data_admissao', new Date().toISOString().split('T')[0], 'date', 'required')}
+            ${campo('Salário base (R$) <span class="req">*</span>', 'salario_base', '', 'number', 'step="0.01" required')}
+            <div class="field"><label>Tipo de contrato</label>
+              <select name="tipo_contrato">
+                <option value="clt" ${(dados.tipo_contrato || 'clt') === 'clt' ? 'selected' : ''}>CLT</option>
+                <option value="pj">PJ</option>
+                <option value="estagio">Estágio</option>
+                <option value="temporario">Temporário</option>
+                <option value="aprendiz">Aprendiz</option>
+              </select></div>
+            ${campo('Carga semanal (h)', 'carga_horaria_semanal', dados.carga_horaria_semanal || 44, 'number')}
+            <div class="field"><label>Departamento</label><select name="department_id" id="sel-dept"><option value="">—</option></select></div>
+            <div class="field"><label>Cargo</label><select name="position_id" id="sel-pos"><option value="">—</option></select></div>
+          </div>
+        </div>
+
+        ${dados.experiencia_resumo || (dados.competencias && dados.competencias.length) ? `
+        <div class="preview-section">
+          <h4>Perfil profissional (informativo)</h4>
+          ${dados.cargo_pretendido ? `<div class="info-row"><div class="label">Cargo pretendido</div><div class="value">${dados.cargo_pretendido}</div></div>` : ''}
+          ${dados.experiencia_resumo ? `<div class="info-row"><div class="label">Experiência</div><div class="value">${dados.experiencia_resumo}</div></div>` : ''}
+          ${dados.competencias?.length ? `<div class="info-row"><div class="label">Competências</div><div class="value">${dados.competencias.join(' · ')}</div></div>` : ''}
+          <small class="text-muted text-sm">Esses dados não vão pro banco. Use como referência ao escolher cargo.</small>
+        </div>` : ''}
+
+        <div class="flex gap-2 justify-end mt-5" style="border-top:1px solid var(--border);padding-top:14px">
+          <button type="button" class="btn" onclick="limparPreview()">Descartar</button>
+          <button type="button" class="btn btn-primary" onclick="criarFuncionario()">✅ Criar funcionário</button>
+        </div>
+      </form>
+    `;
+
+    initMasks(cont);
+    carregarSelectsCargoDept();
+  }
+
+  function limparPreview() {
+    dadosExtraidos = null;
+    document.getElementById('preview-content').innerHTML = `<div class="empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 11h-6"/><path d="M19 8v6"/></svg>
+      <div>Os dados extraídos pelo agente vão aparecer aqui para revisão antes de criar o funcionário.</div>
+    </div>`;
+  }
+
+  async function carregarSelectsCargoDept() {
+    const [depts, pos] = await Promise.all([
+      api('/departments?active=true'),
+      api('/positions?active=true'),
+    ]);
+    const selDept = document.getElementById('sel-dept');
+    if (selDept) selDept.innerHTML = '<option value="">—</option>' + depts.map(d => `<option value="${d.id}">${d.nome}</option>`).join('');
+    const selPos = document.getElementById('sel-pos');
+    if (selPos) selPos.innerHTML = '<option value="">—</option>' + pos.map(p => `<option value="${p.id}">${p.titulo}${p.nivel ? ' · ' + p.nivel : ''}</option>`).join('');
+  }
+
+  async function criarFuncionario() {
+    const f = document.getElementById('previewForm');
+    if (!validateForm(f)) return;
+    const data = formToObject(f);
+    showLoading();
+    try {
+      const emp = await api('/agent/create-employee', { method: 'POST', body: data });
+      toast(`Funcionário ${emp.nome_completo} cadastrado!`, 'success', `Matrícula ${emp.matricula}`);
+      addMsg('🤖 Agente', `<strong>✅ Funcionário criado!</strong> Matrícula <strong>${emp.matricula}</strong>. <a href="/employees.html">Ver na lista →</a>`, 'ai');
+      limparPreview();
+    } catch (err) {
+      toast(err.message, 'error');
+    } finally { hideLoading(); }
+  }
+</script>
+</body>
+</html>

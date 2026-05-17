@@ -38,6 +38,7 @@ app.use('/api/time',        require('./src/routes/time'));
 app.use('/api/vacation-requests', require('./src/routes/vacationRequests'));
 app.use('/api/checklists',  require('./src/routes/checklists'));
 app.use('/api/help',        require('./src/routes/help'));
+app.use('/api/agent',       require('./src/routes/agent'));
 
 // Endpoint público para confirmação de recebimento de holerite
 app.get('/confirmar/:token', async (req, res) => {
