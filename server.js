@@ -1,5 +1,17 @@
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '.env') });
+const fs = require('fs');
+
+// Carrega segredos da pasta protegida (secrets/.env), com fallback pro .env raiz
+const secretsPath = path.join(__dirname, 'secrets', '.env');
+const fallbackPath = path.join(__dirname, '.env');
+if (fs.existsSync(secretsPath)) {
+  require('dotenv').config({ path: secretsPath });
+} else if (fs.existsSync(fallbackPath)) {
+  require('dotenv').config({ path: fallbackPath });
+  console.warn('⚠ .env na raiz — mova para secrets/.env para mais segurança');
+} else {
+  console.error('❌ Nenhum arquivo .env encontrado (procurei em secrets/.env e .env)');
+}
 
 const express = require('express');
 const cors = require('cors');

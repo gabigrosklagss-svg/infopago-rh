@@ -6,6 +6,9 @@ package-lock.json
 .env
 .env.local
 .env.*.local
+secrets/.env
+secrets/*.key
+secrets/*.pem
 
 # ── Uploads (privados, não vão pro git) ──
 uploads/holerites/**

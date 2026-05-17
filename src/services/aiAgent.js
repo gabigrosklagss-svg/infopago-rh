@@ -174,4 +174,107 @@ async function extrairDadosCurriculo({ fileBuffer, mimeType, text }) {
   };
 }
 
-module.exports = { extrairDadosCurriculo };
+/**
+ * Chat multi-turn com tool use — o agente pode chamar funções do sistema.
+ *
+ * @param {Array} messages - histórico (formato Anthropic)
+ * @param {Function} executeTool - executor de tool: (name, input, ctx) => result
+ * @param {Array} tools - definições das tools
+ * @param {Object} ctx - contexto do usuário (passado pras tools)
+ * @returns {Object} { finalMessage, fullTrace }
+ */
+async function chatComTools(messages, executeTool, tools, ctx) {
+  const c = getClient();
+
+  const systemPrompt = `Você é o assistente IA do InfoPago RH, sistema de gestão de RH e folha de pagamento CLT brasileiro.
+
+Você pode chamar funções para CONSULTAR e MODIFICAR o sistema (cadastrar funcionários, gerar holerites, lançar pontos, advertências, comunicados, etc.).
+
+Diretrizes:
+- Antes de criar/modificar dados, CONFIRME com o usuário se algo crítico estiver implícito (ex: salário, datas).
+- Para datas, use formato YYYY-MM-DD.
+- Para CPFs use formato 000.000.000-00.
+- Se precisar de um funcionário e o usuário só falar o primeiro nome, use a ferramenta de busca antes de modificar nada.
+- Se uma ação puder ter consequências irreversíveis (excluir, demitir), pergunte ao usuário antes.
+- Responda sempre em português brasileiro, tom profissional mas amigável.
+- Se o usuário pedir algo que precisa de várias operações, encadeie as tools sem pedir confirmação a cada passo (mas resuma no fim).
+- Você tem acesso ao usuário atual: ${ctx.userName} (${ctx.userRole}).
+- Data de hoje: ${new Date().toLocaleDateString('pt-BR')}.`;
+
+  const trace = [];
+  let iterations = 0;
+  const MAX_ITERATIONS = 10;
+
+  let convo = [...messages];
+
+  while (iterations < MAX_ITERATIONS) {
+    iterations++;
+
+    const response = await c.messages.create({
+      model: 'claude-sonnet-4-5',
+      max_tokens: 2048,
+      system: systemPrompt,
+      tools,
+      messages: convo,
+    });
+
+    trace.push({
+      iteration: iterations,
+      stop_reason: response.stop_reason,
+      usage: response.usage,
+    });
+
+    // Adiciona resposta do assistant à conversa
+    convo.push({ role: 'assistant', content: response.content });
+
+    // Se não pediu tools, terminou
+    if (response.stop_reason !== 'tool_use') {
+      const finalText = response.content
+        .filter(b => b.type === 'text')
+        .map(b => b.text)
+        .join('\n')
+        .trim();
+      return {
+        message: finalText,
+        messages: convo,
+        trace,
+        usage_total: trace.reduce((acc, t) => ({
+          input: acc.input + (t.usage?.input_tokens || 0),
+          output: acc.output + (t.usage?.output_tokens || 0),
+        }), { input: 0, output: 0 }),
+      };
+    }
+
+    // Executa todas as tools pedidas e adiciona resultados
+    const toolUseBlocks = response.content.filter(b => b.type === 'tool_use');
+    const toolResults = [];
+
+    for (const block of toolUseBlocks) {
+      const result = await executeTool(block.name, block.input, ctx);
+      trace.push({
+        iteration: iterations,
+        tool: block.name,
+        input: block.input,
+        result_summary: result.success
+          ? (result.message || 'OK')
+          : `Erro: ${result.error}`,
+      });
+      toolResults.push({
+        type: 'tool_result',
+        tool_use_id: block.id,
+        content: JSON.stringify(result),
+        is_error: !result.success,
+      });
+    }
+
+    convo.push({ role: 'user', content: toolResults });
+  }
+
+  return {
+    message: '⚠ Limite de 10 iterações atingido. Tarefa pode estar incompleta.',
+    messages: convo,
+    trace,
+  };
+}
+
+module.exports = { extrairDadosCurriculo, chatComTools };

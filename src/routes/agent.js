@@ -1,7 +1,8 @@
 const router = require('express').Router();
 const { supabase } = require('../config/supabase');
 const { requireAuth, requireRole } = require('../middleware/auth');
-const { extrairDadosCurriculo } = require('../services/aiAgent');
+const { extrairDadosCurriculo, chatComTools } = require('../services/aiAgent');
+const { executeTool, getToolsForAnthropic } = require('../services/agentTools');
 const multer = require('multer');
 
 const upload = multer({
@@ -93,6 +94,34 @@ router.post('/create-employee', requireAuth, requireRole('admin', 'rh'), async (
     res.status(201).json(data);
   } catch (err) {
     console.error('[agent/create-employee]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* POST /api/agent/chat — chat livre com tool use */
+router.post('/chat', requireAuth, requireRole('admin', 'rh'), async (req, res) => {
+  try {
+    const { messages } = req.body;
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ error: 'Histórico de mensagens é obrigatório (array de {role, content}).' });
+    }
+
+    const ctx = {
+      userId: req.user.id,
+      userName: req.user.full_name,
+      userRole: req.user.role,
+    };
+
+    const result = await chatComTools(
+      messages,
+      executeTool,
+      getToolsForAnthropic(),
+      ctx
+    );
+
+    res.json(result);
+  } catch (err) {
+    console.error('[agent/chat]', err);
     res.status(500).json({ error: err.message });
   }
 });
