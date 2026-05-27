@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Avaliação de desempenho — InfoPago RH</title>
+<link rel="stylesheet" href="/css/main.css">
+<style>
+  .cycle-card { padding:16px 18px; border:1px solid var(--border); border-radius:var(--r); margin-bottom:10px; cursor:pointer; transition:.15s; background:#fff; }
+  .cycle-card:hover { border-color:var(--brand-500); box-shadow:var(--sh-1); }
+  .cycle-card.active { border-color:var(--brand-500); background:var(--paper-2); }
+  .cycle-card .head { display:flex; justify-content:space-between; align-items:flex-start; }
+  .cycle-card h4 { margin:0 0 4px; font-size:14px; }
+  .cycle-card small { color: var(--ink-3); font-size:11px; }
+  .nota-input { width:60px; text-align:center; font-family:'JetBrains Mono', monospace; font-weight:600; }
+  .criteria-row { display:grid; grid-template-columns: 1fr 90px; gap:10px; align-items:center; padding:8px 0; border-bottom:1px dashed var(--border); }
+  .nota-final-badge { display:inline-block; padding:4px 14px; border-radius:99px; font-weight:700; font-family:'JetBrains Mono', monospace; font-size:14px; }
+  .nota-final-badge.alto { background:#dcfce7; color:#15803d; }
+  .nota-final-badge.medio { background:#fef3c7; color:#a16207; }
+  .nota-final-badge.baixo { background:#fee2e2; color:#b91c1c; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div id="sidebar"></div>
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <h1>Avaliação de desempenho</h1>
+        <p class="subtitle">Ciclos de avaliação, notas por critério e plano de ação</p>
+      </div>
+      <div><button class="btn btn-primary" onclick="novoCiclo()">+ Novo ciclo</button></div>
+    </div>
+
+    <div class="grid" style="grid-template-columns: 320px 1fr; gap:24px; align-items:start">
+      <!-- Ciclos -->
+      <div>
+        <h3 style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-4);margin:0 0 10px">Ciclos</h3>
+        <div id="cyclesList"></div>
+      </div>
+
+      <!-- Avaliações -->
+      <div>
+        <div id="cycleHeader" style="margin-bottom:14px"></div>
+        <div class="table-wrap">
+          <div class="table-toolbar">
+            <span class="count" id="cnt">0 avaliações</span>
+            <span class="spacer"></span>
+            <button class="btn btn-sm" onclick="popularCiclo()" id="btnSeed" style="display:none">Gerar lista de funcionários</button>
+          </div>
+          <table class="table">
+            <thead><tr>
+              <th>Funcionário</th><th>Cargo</th><th>Nota final</th><th>Avaliado em</th><th>Status</th><th></th>
+            </tr></thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+  requireAuth();
+  mountShell('reports');
+
+  let _cycles = [], _activeCycleId = null, _evals = [];
+
+  async function carregar() {
+    _cycles = await api('/performance/cycles');
+    renderCycles();
+    if (!_activeCycleId && _cycles.length) selecionarCiclo(_cycles[0].id);
+    else if (_activeCycleId) carregarEvals();
+  }
+
+  function renderCycles() {
+    if (!_cycles.length) {
+      document.getElementById('cyclesList').innerHTML = '<p class="text-muted text-sm">Nenhum ciclo cadastrado.</p>';
+      return;
+    }
+    document.getElementById('cyclesList').innerHTML = _cycles.map(c => `
+      <div class="cycle-card ${c.id === _activeCycleId ? 'active' : ''}" onclick="selecionarCiclo('${c.id}')">
+        <div class="head">
+          <div>
+            <h4>${c.nome}</h4>
+            <small>${fmt.data(c.periodo_inicio)} → ${fmt.data(c.periodo_fim)}</small>
+          </div>
+          <span class="badge ${c.status === 'aberto' ? 'pendente' : c.status === 'finalizado' ? 'ativo' : 'inativo'}">${c.status}</span>
+        </div>
+        ${c.descricao ? `<p class="text-sm" style="margin:6px 0 0;color:var(--ink-3)">${c.descricao.slice(0,80)}</p>` : ''}
+        <div class="text-right mt-2">
+          <button class="btn btn-sm" onclick="event.stopPropagation();editarCiclo('${c.id}')">Editar</button>
+          <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();excluirCiclo('${c.id}')">×</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  async function selecionarCiclo(id) {
+    _activeCycleId = id;
+    renderCycles();
+    carregarEvals();
+  }
+
+  async function carregarEvals() {
+    const c = _cycles.find(x => x.id === _activeCycleId);
+    if (!c) return;
+    document.getElementById('cycleHeader').innerHTML = `
+      <div class="card" style="padding:14px 18px">
+        <strong>${c.nome}</strong> · ${fmt.data(c.periodo_inicio)} → ${fmt.data(c.periodo_fim)}
+        ${c.descricao ? `<p class="text-sm text-muted" style="margin:6px 0 0">${c.descricao}</p>` : ''}
+        <div class="text-sm text-muted" style="margin-top:4px"><strong>Critérios:</strong> ${(c.criterios || []).join(' · ') || '—'}</div>
+      </div>`;
+    _evals = await api(`/performance/evaluations?cycle_id=${_activeCycleId}`);
+    document.getElementById('cnt').textContent = `${_evals.length} avaliação(ões)`;
+    document.getElementById('btnSeed').style.display = _evals.length === 0 ? 'inline-flex' : 'none';
+    const tb = document.getElementById('tbody');
+    if (!_evals.length) { tb.innerHTML = '<tr><td colspan="6" class="table-empty">Nenhuma avaliação. Clique em "Gerar lista" pra começar.</td></tr>'; return; }
+    tb.innerHTML = _evals.map(e => {
+      const nf = e.nota_final;
+      const cls = nf == null ? '' : (nf >= 4 ? 'alto' : nf >= 2.5 ? 'medio' : 'baixo');
+      return `<tr>
+        <td><strong>${e.employees?.nome_completo}</strong><br><small class="text-muted">${fmt.matricula(e.employees?.matricula)}</small></td>
+        <td>${e.employees?.positions?.titulo || '—'}<br><small class="text-muted">${e.employees?.departments?.nome || ''}</small></td>
+        <td>${nf != null ? `<span class="nota-final-badge ${cls}">${nf.toFixed(1)}</span>` : '<small class="text-muted">—</small>'}</td>
+        <td>${e.data_avaliacao ? fmt.data(e.data_avaliacao) : '—'}</td>
+        <td><span class="badge ${e.status === 'concluida' ? 'ativo' : 'pendente'}">${e.status}</span></td>
+        <td><button class="btn btn-sm btn-primary" onclick="avaliar('${e.id}')">${e.status === 'concluida' ? 'Ver' : 'Avaliar'}</button></td>
+      </tr>`;
+    }).join('');
+  }
+
+  async function novoCiclo(existente) {
+    const html = `<form id="cycForm">
+      <div class="form-grid">
+        <div class="field" style="grid-column:span 2"><label>Nome do ciclo<span class="req">*</span></label>
+          <input name="nome" required placeholder="Ex: Avaliação 1º semestre 2026"></div>
+        <div class="field"><label>Início<span class="req">*</span></label><input type="date" name="periodo_inicio" required></div>
+        <div class="field"><label>Fim<span class="req">*</span></label><input type="date" name="periodo_fim" required></div>
+        <div class="field"><label>Status</label>
+          <select name="status">
+            <option value="aberto">Aberto</option>
+            <option value="em_andamento">Em andamento</option>
+            <option value="finalizado">Finalizado</option>
+          </select></div>
+      </div>
+      <div class="field mt-3"><label>Descrição</label><textarea name="descricao" placeholder="Objetivos e contexto do ciclo"></textarea></div>
+      <div class="field mt-3"><label>Critérios de avaliação (um por linha)</label>
+        <textarea name="_criterios" rows="5" placeholder="Produtividade&#10;Qualidade do trabalho&#10;Trabalho em equipe&#10;Pontualidade&#10;Iniciativa"></textarea></div>
+    </form>`;
+    showFormModal(existente ? 'Editar ciclo' : 'Novo ciclo de avaliação', html, async () => {
+      const f = document.getElementById('cycForm');
+      if (!validateForm(f)) return;
+      const d = formToObject(f);
+      d.criterios = (d._criterios || '').split('\n').map(s => s.trim()).filter(Boolean);
+      delete d._criterios;
+      try {
+        if (existente?.id) await api(`/performance/cycles/${existente.id}`, { method: 'PUT', body: d });
+        else await api('/performance/cycles', { method: 'POST', body: d });
+        toast('Ciclo salvo!', 'success');
+        closeFormModal();
+        await carregar();
+      } catch (err) { toast(err.message, 'error'); }
+    });
+    if (existente) {
+      setTimeout(() => {
+        fillForm(document.getElementById('cycForm'), existente);
+        document.querySelector('[name="_criterios"]').value = (existente.criterios || []).join('\n');
+      }, 50);
+    }
+  }
+
+  async function editarCiclo(id) {
+    const c = _cycles.find(x => x.id === id);
+    if (c) novoCiclo(c);
+  }
+
+  async function excluirCiclo(id) {
+    if (!confirm('Excluir este ciclo e TODAS as avaliações? Esta ação não pode ser desfeita.')) return;
+    try {
+      await api(`/performance/cycles/${id}`, { method: 'DELETE' });
+      toast('Excluído.', 'info');
+      if (_activeCycleId === id) _activeCycleId = null;
+      await carregar();
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function popularCiclo() {
+    if (!confirm('Gerar avaliações pendentes pra todos funcionários ativos?')) return;
+    try {
+      const r = await api(`/performance/cycles/${_activeCycleId}/seed`, { method: 'POST' });
+      toast(`${r.inserted} avaliação(ões) criada(s).`, 'success');
+      carregarEvals();
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function avaliar(id) {
+    const e = await api(`/performance/evaluations/${id}`);
+    const criterios = e.performance_cycles?.criterios || [];
+    const notasAtuais = e.notas || {};
+    const linhas = criterios.map(crit => `
+      <div class="criteria-row">
+        <label>${crit}</label>
+        <input class="nota-input" type="number" step="0.5" min="0" max="5" name="nota_${crit.replace(/[^a-z0-9]/gi,'_')}" data-crit="${crit}" value="${notasAtuais[crit] || ''}" placeholder="0–5">
+      </div>`).join('');
+
+    const html = `<form id="avForm">
+      <div style="background:var(--paper-2);padding:12px 16px;border-radius:var(--r-sm);margin-bottom:14px">
+        <strong>${e.employees?.nome_completo}</strong>
+        <div class="text-sm text-muted">${e.employees?.positions?.titulo || '—'} · ${e.employees?.departments?.nome || ''}</div>
+      </div>
+
+      <h3 style="margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-4)">Notas (escala 0 a 5)</h3>
+      ${linhas || '<p class="text-muted text-sm">Este ciclo não tem critérios definidos. Edite o ciclo pra adicionar.</p>'}
+
+      <div class="form-grid mt-3">
+        <div class="field" style="grid-column:span 2"><label>Pontos fortes</label><textarea name="pontos_fortes" rows="2">${e.pontos_fortes || ''}</textarea></div>
+        <div class="field" style="grid-column:span 2"><label>Pontos a melhorar</label><textarea name="pontos_melhoria" rows="2">${e.pontos_melhoria || ''}</textarea></div>
+        <div class="field" style="grid-column:span 2"><label>Plano de ação</label><textarea name="plano_acao" rows="2">${e.plano_acao || ''}</textarea></div>
+        <div class="field"><label>Status</label>
+          <select name="status">
+            <option value="pendente" ${e.status==='pendente'?'selected':''}>Pendente</option>
+            <option value="concluida" ${e.status==='concluida'?'selected':''}>Concluída</option>
+          </select></div>
+        <div class="field"><label>Data da avaliação</label><input type="date" name="data_avaliacao" value="${e.data_avaliacao || new Date().toISOString().slice(0,10)}"></div>
+      </div>
+    </form>`;
+    showFormModal('Avaliar funcionário', html, async () => {
+      const f = document.getElementById('avForm');
+      const notas = {};
+      f.querySelectorAll('input.nota-input').forEach(i => {
+        const v = parseFloat(i.value);
+        if (!isNaN(v)) notas[i.dataset.crit] = v;
+      });
+      const d = formToObject(f);
+      d.notas = notas;
+      // remove campos auxiliares dos inputs de nota
+      Object.keys(d).forEach(k => { if (k.startsWith('nota_')) delete d[k]; });
+      try {
+        await api(`/performance/evaluations/${id}`, { method: 'PUT', body: d });
+        toast('Avaliação salva!', 'success');
+        closeFormModal();
+        carregarEvals();
+      } catch (err) { toast(err.message, 'error'); }
+    });
+  }
+
+  function showFormModal(title, html, onSave) {
+    let m = document.getElementById('form-modal');
+    if (!m) { m = document.createElement('div'); m.id = 'form-modal'; m.className = 'modal-overlay'; m.onclick = (ev) => { if (ev.target === m) closeFormModal(); }; document.body.appendChild(m); }
+    m.innerHTML = `<div class="modal" style="max-width:680px"><div class="modal-header"><h2>${title}</h2><button class="modal-close" onclick="closeFormModal()">×</button></div><div class="modal-body">${html}</div><div class="modal-footer"><button class="btn" onclick="closeFormModal()">Cancelar</button><button class="btn btn-primary" id="form-save">Salvar</button></div></div>`;
+    m.classList.remove('hidden');
+    document.getElementById('form-save').onclick = onSave;
+  }
+  function closeFormModal() { document.getElementById('form-modal')?.remove(); }
+
+  carregar();
+</script>
+</body>
+</html>

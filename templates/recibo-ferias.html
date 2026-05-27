@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Recibo de Férias</title>
+<style>
+  @page { size: A4; margin: 15mm; }
+  body { font-family: 'Courier New', Consolas, monospace; font-size: 10pt; color: #000; margin: 0; }
+  .doc { border: 1.5px solid #000; }
+  .titulo { background: #e0e0e0; padding: 10px 14px; text-align: center; font-weight: bold; font-size: 12pt; border-bottom: 1px solid #000; }
+  .secao { border-bottom: 1px solid #000; padding: 8px 12px; }
+  .lbl { font-size: 7.5pt; color: #555; text-transform: uppercase; letter-spacing: .03em; }
+  .val { font-weight: bold; margin-top: 2px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 9.5pt; }
+  table th { background: #d8d8d8; border: 1px solid #000; padding: 5px 8px; text-align: left; font-size: 8.5pt; }
+  table th.num { text-align: right; }
+  table td { border: 1px solid #000; padding: 5px 8px; }
+  table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .total-bar { display: flex; border-top: 2px solid #000; background: #f0f0f0; }
+  .total-cell { flex: 1; padding: 10px 14px; border-right: 1px solid #aaa; }
+  .total-cell:last-child { border-right: 0; }
+  .total-cell .lbl { font-size: 7.5pt; }
+  .total-cell .val { font-size: 14pt; font-weight: bold; }
+  .liquido { background: #d4f4dd; }
+  .sign-row { display: flex; gap: 24px; padding: 18px 14px; }
+  .sign-cell { flex: 1; }
+  .sign-line { border-top: 1px solid #000; margin-top: 28px; padding-top: 4px; text-align: center; font-size: 8pt; color: #444; }
+</style>
+</head>
+<body>
+
+<div class="doc">
+  <div class="titulo">RECIBO DE PAGAMENTO DE FÉRIAS</div>
+
+  <div class="secao">
+    <div class="grid-2">
+      <div><div class="lbl">Empregador</div><div class="val">{{empresa_nome}}</div></div>
+      <div><div class="lbl">CNPJ</div><div class="val">{{empresa_cnpj}}</div></div>
+    </div>
+  </div>
+
+  <div class="secao">
+    <div class="grid-3">
+      <div><div class="lbl">Empregado</div><div class="val">{{func_nome}}</div></div>
+      <div><div class="lbl">CPF</div><div class="val">{{func_cpf}}</div></div>
+      <div><div class="lbl">Matrícula</div><div class="val">{{func_matricula}}</div></div>
+    </div>
+    <div class="grid-4" style="margin-top:8px">
+      <div><div class="lbl">Cargo</div><div class="val">{{func_cargo}}</div></div>
+      <div><div class="lbl">Admissão</div><div class="val">{{data_admissao}}</div></div>
+      <div><div class="lbl">Período Aquisitivo</div><div class="val">{{periodo_aquisitivo}}</div></div>
+      <div><div class="lbl">Período de Gozo</div><div class="val">{{periodo_gozo}}</div></div>
+    </div>
+  </div>
+
+  <div class="secao">
+    <div class="grid-3">
+      <div><div class="lbl">Dias de Férias</div><div class="val">{{dias_ferias}} dias</div></div>
+      <div><div class="lbl">Abono Pecuniário</div><div class="val">{{dias_abono}} dias</div></div>
+      <div><div class="lbl">Base de Cálculo</div><div class="val">R$ {{base_calculo}}</div></div>
+    </div>
+  </div>
+
+  <div class="secao">
+    <table>
+      <thead>
+        <tr>
+          <th>Descrição</th>
+          <th>Referência</th>
+          <th class="num">Vencimentos</th>
+          <th class="num">Descontos</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Férias</td>
+          <td>{{dias_ferias}} dias</td>
+          <td class="num">R$ {{valor_ferias}}</td>
+          <td class="num">—</td>
+        </tr>
+        <tr>
+          <td>1/3 Constitucional sobre férias</td>
+          <td>art. 7º, XVII CF</td>
+          <td class="num">R$ {{um_terco_ferias}}</td>
+          <td class="num">—</td>
+        </tr>
+        {{#each linhas_abono}}
+        <tr>
+          <td>{{descricao}}</td>
+          <td>{{referencia}}</td>
+          <td class="num">R$ {{valor}}</td>
+          <td class="num">—</td>
+        </tr>
+        {{/each}}
+        {{#each linhas_descontos}}
+        <tr>
+          <td>{{descricao}}</td>
+          <td>{{referencia}}</td>
+          <td class="num">—</td>
+          <td class="num">R$ {{valor}}</td>
+        </tr>
+        {{/each}}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="total-bar">
+    <div class="total-cell"><div class="lbl">Total Vencimentos</div><div class="val">R$ {{total_proventos}}</div></div>
+    <div class="total-cell"><div class="lbl">Total Descontos</div><div class="val" style="color:#921818">R$ {{total_descontos}}</div></div>
+    <div class="total-cell liquido"><div class="lbl">Líquido a Receber</div><div class="val" style="color:#1B5B3E">R$ {{total_liquido}}</div></div>
+  </div>
+
+  <div class="sign-row">
+    <div class="sign-cell">
+      <div class="lbl">Data de pagamento</div>
+      <div class="sign-line">{{data_pagamento}}</div>
+    </div>
+    <div class="sign-cell" style="flex:2">
+      <div class="lbl">Assinatura do Empregado · "Recebi a importância acima"</div>
+      <div class="sign-line">_________________________________________________</div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

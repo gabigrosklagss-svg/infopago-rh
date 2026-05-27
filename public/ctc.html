@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Custo Total de Contratação — InfoPago RH</title>
+<link rel="stylesheet" href="/css/main.css">
+<style>
+  .ctc-grid { display:grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items:start; }
+  @media (max-width: 1100px) { .ctc-grid { grid-template-columns: 1fr; } }
+  .ctc-result { position: sticky; top: 24px; }
+  .ctc-result .total-card {
+    background: linear-gradient(135deg, var(--brand-800), var(--brand-500));
+    color: #fff; border-radius: var(--r); padding: 24px 22px;
+  }
+  .ctc-result .total-card h2 { color:#fff; margin:0 0 4px; font-size:13px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; opacity:.85 }
+  .ctc-result .total-card .value { font-size: 36px; font-weight: 700; font-family: 'JetBrains Mono', monospace; letter-spacing:-.02em; }
+  .ctc-result .total-card .sub { opacity:.85; font-size:13px; margin-top:6px; }
+  .breakdown-row { display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px dashed var(--border); font-size:13px; }
+  .breakdown-row:last-child { border-bottom:0; }
+  .breakdown-row .lbl { color: var(--ink-3); }
+  .breakdown-row .val { font-family:'JetBrains Mono', monospace; font-weight:600; color: var(--ink); }
+  .breakdown-section { margin-top: 16px; }
+  .breakdown-section h3 { font-size:11px; text-transform:uppercase; letter-spacing:.1em; color:var(--ink-4); margin:0 0 6px; font-weight:600; }
+  .pct-badge { font-size:10px; background:var(--paper-3); padding:2px 7px; border-radius:99px; color:var(--ink-3); margin-left:6px; }
+  .stat-pair { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px; }
+  .stat-mini { background:rgba(255,255,255,.12); padding:10px 14px; border-radius:8px; }
+  .stat-mini .l { font-size:10px; opacity:.8; text-transform:uppercase; letter-spacing:.08em; }
+  .stat-mini .v { font-family:'JetBrains Mono',monospace; font-size:18px; font-weight:600; margin-top:2px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div id="sidebar"></div>
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <h1>Custo Total de Contratação</h1>
+        <p class="subtitle">Simule o custo mensal e anual antes de abrir uma vaga · CLT 2026</p>
+      </div>
+    </div>
+
+    <div class="ctc-grid">
+      <!-- ── Form ───────────────────────────────────────── -->
+      <div class="card">
+        <form id="ctcForm">
+          <h3 style="margin-top:0;font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-4)">Dados básicos</h3>
+          <div class="form-grid">
+            <div class="field"><label>Cargo (referência)</label><input name="cargo" placeholder="Ex: Analista Financeiro Pleno"></div>
+            <div class="field"><label>Tipo de contrato</label>
+              <select name="tipo_contrato" onchange="calcular()">
+                <option value="clt">CLT</option>
+                <option value="pj">PJ</option>
+                <option value="estagio">Estágio</option>
+                <option value="aprendiz">Jovem Aprendiz</option>
+              </select>
+            </div>
+            <div class="field"><label>Salário bruto mensal (R$)<span class="req">*</span></label>
+              <input type="number" step="0.01" name="salario" value="3500" required oninput="calcular()">
+            </div>
+            <div class="field"><label>Alíquota RAT (%)</label>
+              <input type="number" step="0.1" name="rat" value="2" oninput="calcular()">
+              <small style="font-size:11px;color:var(--ink-4)">1% (leve) · 2% (médio) · 3% (alto)</small>
+            </div>
+          </div>
+
+          <h3 style="margin-top:20px;font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-4)">Benefícios mensais (R$)</h3>
+          <div class="form-grid">
+            <div class="field"><label>Vale Transporte</label><input type="number" step="0.01" name="vt" value="220" oninput="calcular()"></div>
+            <div class="field"><label>Desconto de VT (6% do salário, máx)</label>
+              <select name="vt_desconto" onchange="calcular()">
+                <option value="1">Aplicar desconto de 6%</option>
+                <option value="0">Empresa arca 100%</option>
+              </select>
+            </div>
+            <div class="field"><label>Vale Refeição / Alimentação</label><input type="number" step="0.01" name="vr" value="600" oninput="calcular()"></div>
+            <div class="field"><label>Plano de saúde</label><input type="number" step="0.01" name="saude" value="400" oninput="calcular()"></div>
+            <div class="field"><label>Plano odontológico</label><input type="number" step="0.01" name="odonto" value="35" oninput="calcular()"></div>
+            <div class="field"><label>Seguro de vida</label><input type="number" step="0.01" name="seguro" value="0" oninput="calcular()"></div>
+            <div class="field"><label>Outros (auxílio creche, home office...)</label><input type="number" step="0.01" name="outros" value="0" oninput="calcular()"></div>
+          </div>
+
+          <h3 style="margin-top:20px;font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-4)">Provisões e adicionais</h3>
+          <div class="form-grid">
+            <div class="field"><label>Adicionais (insalubridade, periculosidade, noturno)</label>
+              <input type="number" step="0.01" name="adicionais" value="0" oninput="calcular()">
+            </div>
+            <div class="field"><label>Bônus / PLR mensal (provisão)</label>
+              <input type="number" step="0.01" name="bonus" value="0" oninput="calcular()">
+            </div>
+            <div class="field"><label>Custo de equipamentos (rateado/mês)</label>
+              <input type="number" step="0.01" name="equipamento" value="0" oninput="calcular()">
+            </div>
+            <div class="field"><label>Treinamento / certificações (mês)</label>
+              <input type="number" step="0.01" name="treinamento" value="0" oninput="calcular()">
+            </div>
+          </div>
+
+          <div class="text-right mt-4">
+            <button type="button" class="btn" onclick="zerar()">Zerar</button>
+            <button type="button" class="btn btn-primary" onclick="calcular()">Recalcular</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- ── Resultado ──────────────────────────────────── -->
+      <div class="ctc-result">
+        <div class="total-card">
+          <h2>Custo total mensal</h2>
+          <div class="value" id="rTotalMes">R$ 0,00</div>
+          <div class="sub" id="rResumo">—</div>
+
+          <div class="stat-pair">
+            <div class="stat-mini">
+              <div class="l">Custo anual</div>
+              <div class="v" id="rTotalAno">R$ 0,00</div>
+            </div>
+            <div class="stat-mini">
+              <div class="l">Multiplicador</div>
+              <div class="v" id="rMultiplicador">—</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card mt-4">
+          <h3 style="margin-top:0">Detalhamento</h3>
+          <div id="breakdown"></div>
+        </div>
+
+        <div class="card mt-4">
+          <p style="font-size:12px;color:var(--ink-3);margin:0;line-height:1.6">
+            <strong>Observação:</strong> simulação baseada em alíquotas CLT 2026 (INSS patronal 20%,
+            FGTS 8%, Sistema S ~5,8%, RAT 1–3%). Bases reais podem variar conforme convenção coletiva,
+            insalubridade, simples nacional ou regime tributário da empresa. Use como referência de planejamento.
+          </p>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+  requireAuth();
+  mountShell('reports');
+
+  function n(name) { return parseFloat(document.querySelector(`[name="${name}"]`)?.value || 0) || 0; }
+  function s(name) { return document.querySelector(`[name="${name}"]`)?.value || ''; }
+  const BRL = v => Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+
+  function calcular() {
+    const tipo = s('tipo_contrato');
+    const salario = n('salario');
+    const adicionais = n('adicionais');
+    const bonus = n('bonus');
+    const remBruta = salario + adicionais;
+
+    const rat = n('rat') / 100;
+    const vt = n('vt');
+    const vtDesconto = s('vt_desconto') === '1';
+    const vr = n('vr');
+    const saude = n('saude');
+    const odonto = n('odonto');
+    const seguro = n('seguro');
+    const outros = n('outros');
+    const equipamento = n('equipamento');
+    const treinamento = n('treinamento');
+
+    let inssPat = 0, fgts = 0, sistemaS = 0, ratV = 0;
+    let prov13 = 0, provFerias = 0, multaFGTS = 0;
+
+    if (tipo === 'clt') {
+      inssPat   = remBruta * 0.20;
+      sistemaS  = remBruta * 0.058;
+      ratV      = remBruta * rat;
+      fgts      = remBruta * 0.08;
+      prov13    = remBruta / 12;
+      provFerias= (remBruta * 1.3333) / 12; // férias + 1/3
+      multaFGTS = fgts * 0.40; // provisão da multa
+    } else if (tipo === 'aprendiz') {
+      inssPat   = remBruta * 0.20;
+      sistemaS  = 0; // isento
+      ratV      = remBruta * rat;
+      fgts      = remBruta * 0.02; // 2% para aprendiz
+      prov13    = remBruta / 12;
+      provFerias= (remBruta * 1.3333) / 12;
+      multaFGTS = fgts * 0.40;
+    } else if (tipo === 'estagio') {
+      // sem encargos
+      inssPat = 0; fgts = 0; sistemaS = 0; ratV = 0;
+      prov13 = 0; provFerias = remBruta / 12; multaFGTS = 0;
+    } else if (tipo === 'pj') {
+      // PJ — empresa só paga o valor + impostos opcionais
+      inssPat = 0; fgts = 0; sistemaS = 0; ratV = 0;
+      prov13 = 0; provFerias = 0; multaFGTS = 0;
+    }
+
+    const descVT = vtDesconto ? Math.min(vt, salario * 0.06) : 0;
+    const vtEmpresa = vt - descVT;
+
+    const totalBeneficios = vtEmpresa + vr + saude + odonto + seguro + outros + equipamento + treinamento;
+    const totalEncargos = inssPat + fgts + sistemaS + ratV + multaFGTS;
+    const totalProvisoes = prov13 + provFerias;
+    const bonusMes = bonus;
+
+    const totalMes = remBruta + totalEncargos + totalProvisoes + totalBeneficios + bonusMes;
+    const totalAno = totalMes * 12;
+    const mult = remBruta ? (totalMes / remBruta) : 0;
+
+    document.getElementById('rTotalMes').textContent = BRL(totalMes);
+    document.getElementById('rTotalAno').textContent = BRL(totalAno);
+    document.getElementById('rMultiplicador').textContent = mult.toFixed(2) + 'x salário';
+    document.getElementById('rResumo').textContent =
+      `${s('cargo') || '—'} · ${tipo.toUpperCase()} · Salário ${BRL(remBruta)}`;
+
+    const row = (l, v, pct) => `<div class="breakdown-row">
+      <span class="lbl">${l}${pct ? `<span class="pct-badge">${pct}</span>` : ''}</span>
+      <span class="val">${BRL(v)}</span></div>`;
+
+    let html = `
+      <div class="breakdown-section"><h3>Remuneração bruta</h3>
+        ${row('Salário base', salario)}
+        ${adicionais ? row('Adicionais', adicionais) : ''}
+        ${bonus ? row('Bônus/PLR (mensal)', bonus) : ''}
+      </div>`;
+
+    if (totalEncargos > 0) html += `
+      <div class="breakdown-section"><h3>Encargos trabalhistas</h3>
+        ${inssPat ? row('INSS patronal', inssPat, '20%') : ''}
+        ${fgts ? row('FGTS', fgts, tipo === 'aprendiz' ? '2%' : '8%') : ''}
+        ${multaFGTS ? row('Provisão multa FGTS', multaFGTS, '40% do FGTS') : ''}
+        ${sistemaS ? row('Sistema S (SESC/SENAI/etc)', sistemaS, '5,8%') : ''}
+        ${ratV ? row('RAT', ratV, (rat*100).toFixed(1)+'%') : ''}
+      </div>`;
+
+    if (totalProvisoes > 0) html += `
+      <div class="breakdown-section"><h3>Provisões</h3>
+        ${prov13 ? row('13º salário (1/12)', prov13) : ''}
+        ${provFerias ? row('Férias + 1/3 (1/12)', provFerias) : ''}
+      </div>`;
+
+    if (totalBeneficios > 0) html += `
+      <div class="breakdown-section"><h3>Benefícios e infraestrutura</h3>
+        ${vtEmpresa ? row(`Vale Transporte (empresa)${descVT ? ` — desconto de ${BRL(descVT)}` : ''}`, vtEmpresa) : ''}
+        ${vr ? row('Vale Refeição/Alimentação', vr) : ''}
+        ${saude ? row('Plano de saúde', saude) : ''}
+        ${odonto ? row('Plano odontológico', odonto) : ''}
+        ${seguro ? row('Seguro de vida', seguro) : ''}
+        ${equipamento ? row('Equipamento (rateado)', equipamento) : ''}
+        ${treinamento ? row('Treinamento/certificações', treinamento) : ''}
+        ${outros ? row('Outros benefícios', outros) : ''}
+      </div>`;
+
+    html += `
+      <div class="breakdown-section" style="border-top:2px solid var(--brand-500);margin-top:14px;padding-top:10px">
+        ${row('TOTAL MENSAL', totalMes)}
+        ${row('TOTAL ANUAL (12 meses)', totalAno)}
+      </div>`;
+
+    document.getElementById('breakdown').innerHTML = html;
+  }
+
+  function zerar() {
+    document.getElementById('ctcForm').reset();
+    document.querySelector('[name="salario"]').value = 0;
+    calcular();
+  }
+
+  calcular();
+</script>
+</body>
+</html>

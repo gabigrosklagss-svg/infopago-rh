@@ -19,7 +19,10 @@ function fmtData(s) {
 }
 
 /**
- * Lê o template HTML e substitui as variáveis {{var}} e blocos {{#each lista}}...{{/each}}
+ * Lê o template HTML e substitui:
+ *  - {{var}}                — variável simples (suporta var.aninhada)
+ *  - {{#each lista}}...{{/each}}  — loop em array
+ *  - {{#if var}}...{{/if}}  — bloco condicional (renderiza se truthy)
  */
 function renderTemplate(html, data) {
   // {{#each items}}...{{/each}}
@@ -32,6 +35,11 @@ function renderTemplate(html, data) {
       });
       return row;
     }).join('');
+  });
+  // {{#if var}}...{{/if}}
+  html = html.replace(/\{\{#if ([\w_.]+)\}\}([\s\S]*?)\{\{\/if\}\}/g, (_, key, block) => {
+    const val = key.split('.').reduce((o, k) => (o ? o[k] : ''), data);
+    return val ? block : '';
   });
   // {{var}}
   html = html.replace(/\{\{([\w_.]+)\}\}/g, (_, key) => {
@@ -275,4 +283,88 @@ async function gerarPDFEmLote(payslips, getEmployee, company) {
   return resultados;
 }
 
-module.exports = { gerarPDF, gerarPDFEmLote };
+/* ════════════════════════════════════════════════════════
+   ADVERTÊNCIA DISCIPLINAR — PDF
+   ════════════════════════════════════════════════════════ */
+
+const ADV_UPLOADS_DIR = path.join(__dirname, '../../uploads/advertencias');
+
+const MESES_EXTENSO = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+
+function dataExtenso(s) {
+  if (!s) return '';
+  const d = new Date(s + 'T12:00:00');
+  return `${d.getDate()} de ${MESES_EXTENSO[d.getMonth()]} de ${d.getFullYear()}`;
+}
+
+function montarCtps(emp) {
+  if (!emp.ctps) return '—';
+  const partes = [emp.ctps];
+  if (emp.ctps_serie) partes.push(emp.ctps_serie);
+  let s = partes.join('/');
+  if (emp.ctps_uf) s += `-${emp.ctps_uf}`;
+  return s;
+}
+
+const TIPO_TEXTO = {
+  verbal: 'VERBALMENTE',
+  escrita: 'POR ESCRITO',
+  suspensao: 'COM SUSPENSÃO',
+  justa_causa: 'COM RESCISÃO POR JUSTA CAUSA',
+};
+
+async function gerarAdvertenciaPDF(warning, employee, company) {
+  if (!fs.existsSync(ADV_UPLOADS_DIR)) fs.mkdirSync(ADV_UPLOADS_DIR, { recursive: true });
+
+  const ano = new Date(warning.data_ocorrencia + 'T12:00:00').getFullYear();
+  const dir = path.join(ADV_UPLOADS_DIR, String(ano));
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+  const filename = `${employee.matricula}_${(employee.nome_completo || '').replace(/[^a-zA-Z0-9]/g, '_')}_${warning.id.slice(0, 8)}.pdf`;
+  const filePath = path.join(dir, filename);
+  const relPath = `uploads/advertencias/${ano}/${filename}`;
+
+  const tplPath = path.join(__dirname, '../../templates/advertencia.html');
+  const tplHTML = fs.readFileSync(tplPath, 'utf8');
+
+  // Texto adicional se houver suspensão
+  let textoSuspensao = '';
+  if (warning.tipo === 'suspensao' && warning.dias_suspensao > 0) {
+    textoSuspensao = `, ficando ciente de que sua suspensão pelo período de ${warning.dias_suspensao} dia(s) será aplicada nos termos da lei`;
+  }
+
+  const data = {
+    cidade: company.cidade || 'Não informada',
+    data_extenso: dataExtenso(new Date().toISOString().split('T')[0]),
+    func_nome: (employee.nome_completo || '').toUpperCase(),
+    func_ctps: montarCtps(employee),
+    motivo: (warning.motivo || 'CONDUTA INADEQUADA').toUpperCase(),
+    motivo_minusculo: (warning.motivo || 'conduta inadequada').toLowerCase(),
+    descricao: warning.descricao_detalhada ? warning.descricao_detalhada.toUpperCase() : '',
+    data_ocorrencia_fmt: warning.data_ocorrencia ? fmtData(warning.data_ocorrencia) : '',
+    tipo_advertencia: TIPO_TEXTO[warning.tipo] || 'POR ESCRITO',
+    texto_suspensao: textoSuspensao,
+    empresa_nome: (company.razao_social || 'EMPRESA').toUpperCase(),
+    empresa_cnpj: company.cnpj || '',
+  };
+
+  const html = renderTemplate(tplHTML, data);
+
+  const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+  try {
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+    await page.pdf({
+      path: filePath,
+      format: 'A4',
+      printBackground: true,
+      margin: { top: '25mm', right: '30mm', bottom: '25mm', left: '30mm' },
+    });
+  } finally {
+    await browser.close();
+  }
+
+  return relPath;
+}
+
+module.exports = { gerarPDF, gerarPDFEmLote, gerarAdvertenciaPDF };

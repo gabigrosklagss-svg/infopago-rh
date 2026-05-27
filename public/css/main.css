@@ -77,7 +77,7 @@ body {
   -webkit-font-smoothing: antialiased;
   font-feature-settings: 'cv11', 'ss01';
 }
-.serif { font-family: 'Source Serif 4', Georgia, serif; }
+.serif { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
 .mono  { font-family: 'JetBrains Mono', 'SF Mono', Consolas, monospace; font-feature-settings: 'tnum'; }
 .mono-num { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
 
@@ -211,30 +211,110 @@ a:hover { color: var(--brand-800); text-decoration: underline; }
 /* Sidebar footer */
 .sidebar-footer {
   margin-top: auto;
-  padding: 14px 18px 0;
+  padding: 12px;
   border-top: 1px solid rgba(255,255,255,.06);
 }
+
+/* User card sutil no rodapé da sidebar */
+.sidebar-user-card {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  margin-bottom: 6px;
+  transition: background var(--t-fast);
+}
+.sidebar-user-card:hover { background: rgba(255,255,255,.04); }
+.sidebar-user-card .avatar {
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 25%, var(--brand-200) 0%, var(--brand-500) 60%, var(--brand-700) 100%);
+  display: grid; place-items: center;
+  color: #fff;
+  font-weight: 800; font-size: 11px;
+  letter-spacing: .02em;
+  flex-shrink: 0;
+  box-shadow: inset 0 1px 1px rgba(255,255,255,.15);
+  position: relative;
+  overflow: hidden;
+}
+.sidebar-user-card .avatar img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.sidebar-user-card .info { line-height: 1.2; min-width: 0; flex: 1; }
+.sidebar-user-card .info strong {
+  display: block;
+  color: rgba(255,255,255,.92);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sidebar-user-card .info small {
+  display: block;
+  color: rgba(255,255,255,.45);
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  font-weight: 600;
+  margin-top: 1px;
+}
+
+/* Botão sair sutil */
+.btn-sair {
+  display: flex; align-items: center; gap: 9px;
+  width: 100%;
+  padding: 7px 10px;
+  background: transparent;
+  border: 0;
+  border-radius: var(--r-sm);
+  color: rgba(255,255,255,.55);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: all var(--t-fast);
+}
+.btn-sair:hover {
+  background: rgba(220, 60, 60, .12);
+  color: #ff9a9a;
+}
+.btn-sair svg { width: 13px; height: 13px; stroke-width: 1.7; flex-shrink: 0; }
+
+.sidebar-meta {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255,255,255,.04);
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 9.5px;
+  color: rgba(255,255,255,.35);
+  font-family: 'JetBrains Mono', monospace;
+  padding-left: 10px; padding-right: 10px;
+}
+
 .env-badge {
-  display: inline-flex; align-items: center; gap: 6px;
-  font-size: 10px;
-  color: rgba(255,255,255,.6);
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 9px;
+  color: rgba(255,255,255,.5);
   text-transform: uppercase;
   letter-spacing: .12em;
   font-weight: 600;
 }
 .env-badge::before {
   content: '';
-  width: 6px; height: 6px;
+  width: 5px; height: 5px;
   border-radius: 50%;
   background: var(--brand-300);
-  box-shadow: 0 0 8px var(--brand-300), 0 0 0 2px rgba(57, 225, 117, .2);
+  box-shadow: 0 0 4px var(--brand-300);
   animation: pulse 2s infinite;
 }
 @keyframes pulse {
-  0%, 100% { box-shadow: 0 0 8px var(--brand-300), 0 0 0 2px rgba(57, 225, 117, .2); }
-  50% { box-shadow: 0 0 4px var(--brand-300), 0 0 0 5px rgba(57, 225, 117, .08); }
+  0%, 100% { box-shadow: 0 0 4px var(--brand-300); }
+  50% { box-shadow: 0 0 2px var(--brand-300); }
 }
-.sidebar-version { font-size: 10px; color: rgba(255,255,255,.4); margin-top: 8px; font-family: 'JetBrains Mono', monospace; }
+.sidebar-version { font-size: 9.5px; color: rgba(255,255,255,.35); font-family: 'JetBrains Mono', monospace; }
 
 /* ── TOP NAVBAR ─────────────────────────────────────── */
 .topbar {
@@ -359,7 +439,7 @@ a:hover { color: var(--brand-800); text-decoration: underline; }
 }
 .page-header h1 {
   margin: 0;
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   font-weight: 600;
   font-size: 26px;
   letter-spacing: -.015em;
@@ -417,7 +497,7 @@ a:hover { color: var(--brand-800); text-decoration: underline; }
   letter-spacing: .12em;
 }
 .kpi-value {
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   font-weight: 600;
   font-size: 26px;
   letter-spacing: -.02em;
@@ -726,7 +806,7 @@ a:hover { color: var(--brand-800); text-decoration: underline; }
 }
 .modal-header h2 {
   margin: 0; font-size: 18px;
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   font-weight: 600;
   letter-spacing: -.01em;
 }
@@ -851,7 +931,7 @@ a:hover { color: var(--brand-800); text-decoration: underline; }
   margin-bottom: 16px;
 }
 .login-pitch h2 {
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   font-weight: 500;
   font-size: 42px;
   line-height: 1.1;
@@ -902,7 +982,7 @@ a:hover { color: var(--brand-800); text-decoration: underline; }
   margin-bottom: 8px;
 }
 .login-form h1 {
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   font-weight: 600;
   font-size: 32px;
   letter-spacing: -.02em;
@@ -991,13 +1071,23 @@ a:hover { color: var(--brand-800); text-decoration: underline; }
 .avatar-md {
   width: 56px; height: 56px;
   border-radius: 50%;
-  object-fit: cover;
   background: radial-gradient(circle at 30% 25%, var(--brand-200) 0%, var(--brand-500) 50%, var(--brand-700) 90%);
   display: grid; place-items: center;
   font-weight: 800; color: #fff;
   font-size: 19px;
   letter-spacing: -.02em;
   box-shadow: inset 0 1px 2px rgba(255,255,255,.2), 0 0 0 1px var(--brand-700);
+  position: relative;
+  overflow: hidden;
+}
+.avatar-md img,
+.avatar-sm img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 /* ── Info rows ──────────────────────────────────────── */

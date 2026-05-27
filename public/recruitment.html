@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recrutamento &amp; Seleção — InfoPago RH</title>
+<link rel="stylesheet" href="/css/main.css">
+<style>
+  .pipeline { display:grid; grid-template-columns: repeat(6, 1fr); gap:10px; min-height:420px; overflow-x:auto; }
+  @media (max-width: 1280px) { .pipeline { grid-template-columns: repeat(3, minmax(220px, 1fr)); } }
+  .pipe-col { background:var(--paper-2); border-radius:var(--r-sm); padding:10px; min-width:200px; }
+  .pipe-col h4 { margin:0 0 10px; font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-3); display:flex; justify-content:space-between; }
+  .pipe-col .count-pill { background:#fff; padding:1px 8px; border-radius:99px; font-family:'JetBrains Mono', monospace; font-weight:600; color:var(--ink); }
+  .cand-card { background:#fff; padding:10px 12px; border-radius:8px; box-shadow:var(--sh-1); margin-bottom:8px; cursor:grab; border-left:3px solid var(--brand-500); }
+  .cand-card.dragging { opacity:.4; }
+  .cand-card strong { font-size:13px; display:block; }
+  .cand-card small { font-size:11px; color:var(--ink-3); display:block; margin-top:2px; }
+  .cand-card .meta { display:flex; gap:6px; margin-top:6px; flex-wrap:wrap; }
+  .cand-card .meta span { font-size:10px; padding:2px 7px; background:var(--paper-3); border-radius:99px; color:var(--ink-2); }
+  .vaga-card { padding:14px 16px; border:1px solid var(--border); border-radius:var(--r); margin-bottom:10px; transition:.15s; }
+  .vaga-card:hover { border-color:var(--brand-500); box-shadow:var(--sh-1); }
+  .vaga-card .top { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+  .vaga-card h4 { margin:0 0 4px; font-size:15px; }
+  .prio-urgente { color:#b91c1c; font-weight:600; }
+  .prio-alta { color:#a16207; font-weight:600; }
+  .pipe-col.over { background: var(--brand-100, #e6f7ee); outline:2px dashed var(--brand-500); }
+</style>
+</head>
+<body>
+<div class="app">
+  <div id="sidebar"></div>
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <h1>Recrutamento &amp; Seleção</h1>
+        <p class="subtitle">Vagas, candidatos e pipeline · uso interno do RH</p>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="goTab(0, this)">Vagas</button>
+      <button class="tab-btn" onclick="goTab(1, this)">Pipeline de candidatos</button>
+    </div>
+
+    <!-- ── VAGAS ─────────────────────────────────────────── -->
+    <div class="tab-content active">
+      <div class="flex justify-between items-center mb-3">
+        <div class="filter-bar" style="flex:1;margin:0">
+          <div class="field">
+            <label>Status</label>
+            <select id="f-vstatus" onchange="carregarVagas()">
+              <option value="">Todas</option>
+              <option value="aberta" selected>Abertas</option>
+              <option value="pausada">Pausadas</option>
+              <option value="encerrada">Encerradas</option>
+              <option value="preenchida">Preenchidas</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="novaVaga()">+ Nova vaga</button>
+      </div>
+      <div id="vagasList"></div>
+    </div>
+
+    <!-- ── PIPELINE ──────────────────────────────────────── -->
+    <div class="tab-content">
+      <div class="flex justify-between items-center mb-3">
+        <div class="filter-bar" style="flex:1;margin:0">
+          <div class="field">
+            <label>Vaga</label>
+            <select id="f-vaga" onchange="carregarPipeline()">
+              <option value="">Todas as vagas</option>
+            </select>
+          </div>
+        </div>
+        <div class="flex gap-2">
+          <button class="btn" onclick="parseCV()">  Parsear CV (Ingrid)</button>
+          <button class="btn btn-primary" onclick="novoCandidato()">+ Novo candidato</button>
+        </div>
+      </div>
+
+      <div class="pipeline" id="pipeline"></div>
+    </div>
+  </main>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+  requireAuth();
+  mountShell('reports');
+
+  const STATUS_LABEL = {
+    triagem: 'Triagem',
+    entrevista: 'Entrevista',
+    teste_tecnico: 'Teste técnico',
+    proposta: 'Proposta',
+    contratado: 'Contratado',
+    reprovado: 'Reprovado',
+  };
+  const STATUS_ORDER = ['triagem','entrevista','teste_tecnico','proposta','contratado','reprovado'];
+
+  let _vagas = [], _cands = [];
+
+  function goTab(idx, btn) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.tab-content')[idx].classList.add('active');
+    if (idx === 1) carregarPipeline();
+  }
+
+  /* ──────────── VAGAS ──────────── */
+  async function carregarVagas() {
+    const status = document.getElementById('f-vstatus').value;
+    const q = new URLSearchParams(); if (status) q.set('status', status);
+    _vagas = await api('/recruitment/openings?' + q);
+    const wrap = document.getElementById('vagasList');
+    if (!_vagas.length) { wrap.innerHTML = '<div class="card text-muted text-center">Nenhuma vaga.</div>'; return; }
+    wrap.innerHTML = _vagas.map(v => {
+      const prio = v.prioridade === 'urgente' ? 'prio-urgente' : v.prioridade === 'alta' ? 'prio-alta' : '';
+      const salario = v.salario_min || v.salario_max
+        ? `${v.salario_min ? fmt.brl(v.salario_min) : '—'} a ${v.salario_max ? fmt.brl(v.salario_max) : '—'}`
+        : 'A combinar';
+      return `<div class="vaga-card">
+        <div class="top">
+          <div style="flex:1">
+            <h4>${v.titulo} <span class="${prio}" style="font-size:11px">${v.prioridade !== 'media' ? '· ' + v.prioridade : ''}</span></h4>
+            <div class="text-sm text-muted">${v.positions?.titulo || ''} ${v.departments?.nome ? '· ' + v.departments.nome : ''} · ${v.vagas} vaga(s) · ${v.modalidade || '—'} · ${(v.tipo_contrato || 'clt').toUpperCase()}</div>
+            <div class="text-sm" style="margin-top:6px"><strong>Salário:</strong> ${salario} · <strong>Abertura:</strong> ${fmt.data(v.data_abertura)}</div>
+            <div class="meta" style="margin-top:8px;display:flex;gap:8px">
+              <span class="badge ${v.status === 'aberta' ? 'ativo' : v.status === 'preenchida' ? 'pendente' : 'inativo'}">${v.status}</span>
+              <span class="badge">${v.candidatos_ativos || 0} candidato(s) ativo(s) · ${v.total_candidatos || 0} total</span>
+            </div>
+          </div>
+          <div class="flex gap-1" style="flex-direction:column">
+            <button class="btn btn-sm" onclick="verVagaPipeline('${v.id}')">Ver pipeline</button>
+            <button class="btn btn-sm" onclick="editarVaga('${v.id}')">Editar</button>
+            <button class="btn btn-sm btn-danger" onclick="excluirVaga('${v.id}')">×</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  async function novaVaga(existente) {
+    const [poss, deps] = await Promise.all([api('/positions?active=true'), api('/departments?active=true').catch(() => [])]);
+    const posOpts = (poss || []).map(p => `<option value="${p.id}">${p.titulo}</option>`).join('');
+    const depOpts = (deps || []).map(d => `<option value="${d.id}">${d.nome}</option>`).join('');
+    const html = `<form id="vForm">
+      <div class="form-grid">
+        <div class="field" style="grid-column:span 2"><label>Título da vaga<span class="req">*</span></label>
+          <input name="titulo" required placeholder="Ex: Desenvolvedor Pleno - React"></div>
+        <div class="field"><label>Cargo</label><select name="position_id"><option value="">—</option>${posOpts}</select></div>
+        <div class="field"><label>Departamento</label><select name="department_id"><option value="">—</option>${depOpts}</select></div>
+        <div class="field"><label>Nº de vagas</label><input type="number" name="vagas" value="1" min="1"></div>
+        <div class="field"><label>Prioridade</label>
+          <select name="prioridade">
+            <option value="baixa">Baixa</option>
+            <option value="media" selected>Média</option>
+            <option value="alta">Alta</option>
+            <option value="urgente">Urgente</option>
+          </select></div>
+        <div class="field"><label>Modalidade</label>
+          <select name="modalidade">
+            <option value="">—</option>
+            <option value="presencial">Presencial</option>
+            <option value="remoto">Remoto</option>
+            <option value="hibrido">Híbrido</option>
+          </select></div>
+        <div class="field"><label>Tipo de contrato</label>
+          <select name="tipo_contrato">
+            <option value="clt">CLT</option>
+            <option value="pj">PJ</option>
+            <option value="estagio">Estágio</option>
+            <option value="temporario">Temporário</option>
+            <option value="aprendiz">Aprendiz</option>
+          </select></div>
+        <div class="field"><label>Salário mínimo</label><input type="number" step="0.01" name="salario_min"></div>
+        <div class="field"><label>Salário máximo</label><input type="number" step="0.01" name="salario_max"></div>
+        <div class="field"><label>Local de trabalho</label><input name="local_trabalho"></div>
+        <div class="field"><label>Status</label>
+          <select name="status">
+            <option value="aberta">Aberta</option>
+            <option value="pausada">Pausada</option>
+            <option value="encerrada">Encerrada</option>
+          </select></div>
+      </div>
+      <div class="field mt-3"><label>Requisitos</label><textarea name="requisitos" rows="3"></textarea></div>
+      <div class="field mt-3"><label>Responsabilidades</label><textarea name="responsabilidades" rows="3"></textarea></div>
+      <div class="field mt-3"><label>Benefícios</label><textarea name="beneficios" rows="2"></textarea></div>
+      <div class="field mt-3"><label>Observações internas</label><textarea name="observacoes" rows="2"></textarea></div>
+    </form>`;
+    showFormModal(existente ? 'Editar vaga' : 'Nova vaga', html, async () => {
+      const f = document.getElementById('vForm');
+      if (!validateForm(f)) return;
+      const d = formToObject(f);
+      try {
+        if (existente?.id) await api(`/recruitment/openings/${existente.id}`, { method: 'PUT', body: d });
+        else await api('/recruitment/openings', { method: 'POST', body: d });
+        toast('Vaga salva!', 'success');
+        closeFormModal();
+        carregarVagas();
+      } catch (err) { toast(err.message, 'error'); }
+    });
+    if (existente) setTimeout(() => fillForm(document.getElementById('vForm'), existente), 50);
+  }
+
+  async function editarVaga(id) {
+    const v = await api(`/recruitment/openings/${id}`);
+    novaVaga(v);
+  }
+
+  async function excluirVaga(id) {
+    if (!confirm('Excluir esta vaga e TODOS candidatos vinculados?')) return;
+    try { await api(`/recruitment/openings/${id}`, { method: 'DELETE' }); toast('Excluída.', 'info'); carregarVagas(); }
+    catch (err) { toast(err.message, 'error'); }
+  }
+
+  function verVagaPipeline(id) {
+    document.querySelectorAll('.tab-btn')[1].click();
+    setTimeout(() => {
+      document.getElementById('f-vaga').value = id;
+      carregarPipeline();
+    }, 100);
+  }
+
+  /* ──────────── PIPELINE ──────────── */
+  async function carregarPipeline() {
+    // Popula select de vagas
+    if (!_vagas.length) _vagas = await api('/recruitment/openings');
+    const selVaga = document.getElementById('f-vaga');
+    const valAtual = selVaga.value;
+    selVaga.innerHTML = '<option value="">Todas as vagas</option>' +
+      _vagas.map(v => `<option value="${v.id}" ${v.id === valAtual ? 'selected' : ''}>${v.titulo}</option>`).join('');
+
+    const vagaId = selVaga.value;
+    const q = new URLSearchParams(); if (vagaId) q.set('job_opening_id', vagaId);
+    _cands = await api('/recruitment/candidates?' + q);
+
+    const cols = STATUS_ORDER.map(st => {
+      const list = _cands.filter(c => c.status === st);
+      const cards = list.map(c => `
+        <div class="cand-card" draggable="true" data-id="${c.id}" ondragstart="dragStart(event)">
+          <strong>${c.nome_completo}</strong>
+          <small>${c.job_openings?.titulo || '—'}</small>
+          <div class="meta">
+            ${c.pretensao_salarial ? `<span>${fmt.brl(c.pretensao_salarial)}</span>` : ''}
+            ${c.experiencia_anos ? `<span>${c.experiencia_anos}a exp.</span>` : ''}
+            ${c.pontuacao != null ? `<span>${c.pontuacao}/100</span>` : ''}
+          </div>
+          <div class="text-right" style="margin-top:6px">
+            <button class="btn btn-sm" onclick="abrirCand('${c.id}')">Abrir</button>
+          </div>
+        </div>
+      `).join('');
+      return `<div class="pipe-col" data-status="${st}" ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="drop(event)">
+        <h4>${STATUS_LABEL[st]} <span class="count-pill">${list.length}</span></h4>
+        ${cards || '<small class="text-muted">Vazio</small>'}
+      </div>`;
+    }).join('');
+
+    document.getElementById('pipeline').innerHTML = cols;
+  }
+
+  function dragStart(ev) {
+    ev.dataTransfer.setData('text/plain', ev.target.dataset.id);
+    ev.target.classList.add('dragging');
+  }
+  function dragOver(ev) { ev.preventDefault(); ev.currentTarget.classList.add('over'); }
+  function dragLeave(ev) { ev.currentTarget.classList.remove('over'); }
+  async function drop(ev) {
+    ev.preventDefault();
+    ev.currentTarget.classList.remove('over');
+    const id = ev.dataTransfer.getData('text/plain');
+    const status = ev.currentTarget.dataset.status;
+    const card = _cands.find(c => c.id === id);
+    if (!card || card.status === status) return;
+    try {
+      await api(`/recruitment/candidates/${id}/status`, { method: 'PUT', body: { status } });
+      toast(`Movido para ${STATUS_LABEL[status]}`, 'success');
+      if (status === 'contratado') {
+        if (confirm('Candidato movido para "Contratado". Deseja converter agora em funcionário?')) {
+          await contratarCandidato(id);
+        }
+      }
+      carregarPipeline();
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function novoCandidato(existente, prefill) {
+    const opts = (_vagas || []).map(v => `<option value="${v.id}">${v.titulo}</option>`).join('');
+    const html = `<form id="cForm">
+      <div class="form-grid">
+        <div class="field" style="grid-column:span 2"><label>Nome completo<span class="req">*</span></label><input name="nome_completo" required></div>
+        <div class="field"><label>E-mail</label><input type="email" name="email"></div>
+        <div class="field"><label>Telefone</label><input name="telefone" data-mask="telefone"></div>
+        <div class="field"><label>CPF</label><input name="cpf" data-mask="cpf"></div>
+        <div class="field"><label>Data nasc.</label><input type="date" name="data_nascimento"></div>
+        <div class="field"><label>Cidade</label><input name="cidade"></div>
+        <div class="field"><label>Estado (UF)</label><input name="estado" maxlength="2"></div>
+        <div class="field"><label>LinkedIn</label><input name="linkedin_url" placeholder="https://linkedin.com/in/..."></div>
+        <div class="field"><label>Escolaridade</label><input name="escolaridade"></div>
+        <div class="field"><label>Pretensão salarial</label><input type="number" step="0.01" name="pretensao_salarial"></div>
+        <div class="field"><label>Anos de experiência</label><input type="number" step="0.5" name="experiencia_anos"></div>
+        <div class="field"><label>Vaga</label><select name="job_opening_id"><option value="">—</option>${opts}</select></div>
+        <div class="field"><label>Status no pipeline</label>
+          <select name="status">
+            <option value="triagem">Triagem</option>
+            <option value="entrevista">Entrevista</option>
+            <option value="teste_tecnico">Teste técnico</option>
+            <option value="proposta">Proposta</option>
+            <option value="contratado">Contratado</option>
+            <option value="reprovado">Reprovado</option>
+          </select></div>
+        <div class="field"><label>Pontuação (0-100)</label><input type="number" min="0" max="100" name="pontuacao"></div>
+        <div class="field"><label>Origem</label>
+          <select name="origem">
+            <option value="">—</option>
+            <option value="linkedin">LinkedIn</option>
+            <option value="indicacao">Indicação</option>
+            <option value="site">Site da empresa</option>
+            <option value="evento">Evento</option>
+            <option value="outros">Outros</option>
+          </select></div>
+      </div>
+      <div class="field mt-3"><label>Currículo (texto colado ou resumo)</label><textarea name="curriculo_texto" rows="4"></textarea></div>
+      <div class="field mt-3"><label>Observações internas</label><textarea name="observacoes" rows="2"></textarea></div>
+    </form>`;
+    showFormModal(existente ? 'Editar candidato' : 'Novo candidato', html, async () => {
+      const f = document.getElementById('cForm');
+      if (!validateForm(f)) return;
+      const d = formToObject(f);
+      try {
+        if (existente?.id) await api(`/recruitment/candidates/${existente.id}`, { method: 'PUT', body: d });
+        else await api('/recruitment/candidates', { method: 'POST', body: d });
+        toast('Candidato salvo!', 'success');
+        closeFormModal();
+        carregarPipeline();
+      } catch (err) { toast(err.message, 'error'); }
+    });
+    initMasks(document.getElementById('cForm'));
+    if (existente) setTimeout(() => fillForm(document.getElementById('cForm'), existente), 50);
+    if (prefill) setTimeout(() => fillForm(document.getElementById('cForm'), prefill), 50);
+  }
+
+  async function abrirCand(id) {
+    const c = await api(`/recruitment/candidates/${id}`);
+    const hist = (c.historico || []).map(h => `
+      <div class="text-sm" style="padding:6px 0;border-bottom:1px dashed var(--border)">
+        <strong>${h.acao}</strong> ${h.status_de ? `· ${h.status_de} → ${h.status_para}` : ''}
+        <span class="text-muted" style="float:right">${fmt.dataHora(h.created_at)}</span>
+        ${h.observacao ? `<br><small class="text-muted">${h.observacao}</small>` : ''}
+      </div>`).join('');
+    const html = `
+      <div class="form-grid">
+        <div class="field"><label>Nome</label><input value="${c.nome_completo}" disabled></div>
+        <div class="field"><label>Vaga</label><input value="${c.job_openings?.titulo || '—'}" disabled></div>
+        <div class="field"><label>E-mail</label><input value="${c.email || ''}" disabled></div>
+        <div class="field"><label>Telefone</label><input value="${c.telefone || ''}" disabled></div>
+        <div class="field"><label>Pretensão</label><input value="${c.pretensao_salarial ? fmt.brl(c.pretensao_salarial) : '—'}" disabled></div>
+        <div class="field"><label>Status</label><input value="${STATUS_LABEL[c.status] || c.status}" disabled></div>
+        <div class="field"><label>Pontuação</label><input value="${c.pontuacao != null ? c.pontuacao + '/100' : '—'}" disabled></div>
+        <div class="field"><label>Experiência</label><input value="${c.experiencia_anos || '—'} ano(s)" disabled></div>
+        ${c.linkedin_url ? `<div class="field" style="grid-column:span 2"><label>LinkedIn</label><a href="${c.linkedin_url}" target="_blank">${c.linkedin_url}</a></div>` : ''}
+      </div>
+      ${c.curriculo_texto ? `<div class="mt-3"><h3 style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-4);margin:0 0 6px">Currículo</h3><div style="background:var(--paper-2);padding:10px 14px;border-radius:var(--r-sm);max-height:200px;overflow:auto;white-space:pre-wrap;font-size:12px">${c.curriculo_texto}</div></div>` : ''}
+      ${c.observacoes ? `<div class="mt-3"><strong>Observações:</strong><p class="text-sm">${c.observacoes}</p></div>` : ''}
+
+      <h3 style="margin:18px 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-4)">Histórico</h3>
+      <div style="max-height:240px;overflow:auto">${hist || '<small class="text-muted">Sem histórico.</small>'}</div>
+
+      <div class="flex gap-2 mt-3">
+        <button class="btn" onclick="closeFormModal();novoCandidato(${JSON.stringify(c).replace(/"/g,'&quot;')})">Editar</button>
+        ${c.status !== 'contratado' ? `<button class="btn btn-success" onclick="contratarCandidato('${c.id}')">Converter em funcionário</button>` : ''}
+        <span class="spacer" style="flex:1"></span>
+        <button class="btn btn-danger" onclick="excluirCand('${c.id}')">Excluir</button>
+      </div>`;
+    showFormModal(c.nome_completo, html, () => closeFormModal());
+    document.getElementById('form-save').textContent = 'Fechar';
+  }
+
+  async function excluirCand(id) {
+    if (!confirm('Excluir candidato?')) return;
+    try { await api(`/recruitment/candidates/${id}`, { method: 'DELETE' }); toast('Excluído.', 'info'); closeFormModal(); carregarPipeline(); }
+    catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function contratarCandidato(id) {
+    const c = await api(`/recruitment/candidates/${id}`);
+    const html = `<form id="hForm">
+      <p class="text-muted">Será criado um funcionário com os dados disponíveis do candidato. Você pode complementar depois em Funcionários.</p>
+      <div class="form-grid">
+        <div class="field"><label>Data de admissão<span class="req">*</span></label><input type="date" name="data_admissao" value="${new Date().toISOString().slice(0,10)}" required></div>
+        <div class="field"><label>Salário base<span class="req">*</span></label><input type="number" step="0.01" name="salario_base" value="${c.pretensao_salarial || c.job_openings?.salario_min || ''}" required></div>
+        <div class="field"><label>Matrícula (opcional)</label><input name="matricula" placeholder="Auto"></div>
+      </div>
+      <div class="field mt-3"><label>Observações</label><textarea name="observacoes"></textarea></div>
+    </form>`;
+    showFormModal(`Contratar ${c.nome_completo}`, html, async () => {
+      const f = document.getElementById('hForm');
+      if (!validateForm(f)) return;
+      const d = formToObject(f);
+      try {
+        const r = await api(`/recruitment/candidates/${id}/contratar`, { method: 'POST', body: d });
+        toast(`Funcionário criado: ${r.funcionario.nome_completo}`, 'success');
+        closeFormModal();
+        carregarPipeline();
+        carregarVagas();
+      } catch (err) { toast(err.message, 'error'); }
+    });
+  }
+
+  async function parseCV() {
+    const html = `<form id="pForm">
+      <p class="text-muted">Cole o texto do currículo abaixo. A Ingrid vai extrair os dados e pré-preencher o cadastro do candidato.</p>
+      <div class="field"><textarea name="texto" rows="12" placeholder="Cole aqui o texto do currículo..." required></textarea></div>
+    </form>`;
+    showFormModal('Extrair currículo via Ingrid', html, async () => {
+      const t = document.querySelector('#pForm [name="texto"]').value;
+      if (!t.trim()) { toast('Cole o texto do CV.', 'warning'); return; }
+      showLoading();
+      try {
+        const r = await api('/recruitment/parse-cv', { method: 'POST', body: { texto: t } });
+        closeFormModal();
+        toast('Currículo extraído!', 'success');
+        novoCandidato(null, { ...r, curriculo_texto: t });
+      } catch (err) { toast(err.message, 'error'); }
+      finally { hideLoading(); }
+    });
+  }
+
+  function showFormModal(title, html, onSave) {
+    let m = document.getElementById('form-modal');
+    if (!m) { m = document.createElement('div'); m.id = 'form-modal'; m.className = 'modal-overlay'; m.onclick = (e) => { if (e.target === m) closeFormModal(); }; document.body.appendChild(m); }
+    m.innerHTML = `<div class="modal" style="max-width:720px"><div class="modal-header"><h2>${title}</h2><button class="modal-close" onclick="closeFormModal()">×</button></div><div class="modal-body">${html}</div><div class="modal-footer"><button class="btn" onclick="closeFormModal()">Cancelar</button><button class="btn btn-primary" id="form-save">Salvar</button></div></div>`;
+    m.classList.remove('hidden');
+    document.getElementById('form-save').onclick = onSave;
+  }
+  function closeFormModal() { document.getElementById('form-modal')?.remove(); }
+
+  carregarVagas();
+</script>
+</body>
+</html>

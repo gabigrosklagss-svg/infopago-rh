@@ -159,18 +159,18 @@
     </div>
 
     <div class="tabs">
-      <button class="tab-btn active" onclick="goTab(0, this)">📖 FAQ</button>
-      <button class="tab-btn" onclick="goTab(1, this)">📞 Contatos úteis</button>
-      <button class="tab-btn" onclick="goTab(2, this)">📃 Documentos da empresa</button>
-      <button class="tab-btn" onclick="goTab(3, this)">📢 Comunicados</button>
-      <button class="tab-btn" onclick="goTab(4, this)">📅 Calendário RH</button>
-      <button class="tab-btn" onclick="goTab(5, this)">🧮 Calculadora</button>
+      <button class="tab-btn active" onclick="goTab(0, this)"> FAQ</button>
+      <button class="tab-btn" onclick="goTab(1, this)"> Contatos úteis</button>
+      <button class="tab-btn" onclick="goTab(2, this)"> Documentos da empresa</button>
+      <button class="tab-btn" onclick="goTab(3, this)"> Comunicados</button>
+      <button class="tab-btn" onclick="goTab(4, this)"> Calendário RH</button>
+      <button class="tab-btn" onclick="goTab(5, this)"> Calculadora</button>
     </div>
 
     <!-- ── 0. FAQ ──────────────────────────────────────── -->
     <div class="tab-content active">
       <div class="card">
-        <input type="search" id="faq-search" placeholder="🔎 Buscar pergunta..." style="width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:var(--r-sm);font-family:inherit;font-size:13px;margin-bottom:16px" oninput="filtrarFAQ(this.value)">
+        <input type="search" id="faq-search" placeholder=" Buscar pergunta..." style="width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:var(--r-sm);font-family:inherit;font-size:13px;margin-bottom:16px" oninput="filtrarFAQ(this.value)">
         <div id="faq-list"></div>
       </div>
     </div>
@@ -235,12 +235,12 @@
       <div id="cal-container"></div>
 
       <div style="margin-top:18px;font-size:11.5px;color:var(--ink-3);display:flex;gap:14px;flex-wrap:wrap">
-        <span>🎉 Feriado nacional</span>
-        <span>🎂 Aniversariante</span>
-        <span>🏆 Aniversário de empresa</span>
-        <span>🏖️ Férias agendadas</span>
-        <span style="color:var(--danger)">⚠️ Férias vencendo</span>
-        <span>📎 Documento vencendo</span>
+        <span> Feriado nacional</span>
+        <span> Aniversariante</span>
+        <span> Aniversário de empresa</span>
+        <span> Férias agendadas</span>
+        <span style="color:var(--danger)"> Férias vencendo</span>
+        <span> Documento vencendo</span>
       </div>
     </div>
 
@@ -322,19 +322,19 @@
     },
     {
       q: 'Como anexar documentos do funcionário?',
-      a: `<p>Clique no nome do funcionário na lista → aba <strong>📎 Documentos</strong> → <strong>+ Adicionar documento</strong>. Escolha o tipo (RG, CTPS, exame, contrato, etc.) e faça upload de PDF, JPG, PNG ou WebP até 20 MB.</p><p>Os documentos ficam armazenados no Supabase Storage (privado) e são acessíveis via URL assinada com validade de 1 hora.</p>`
+      a: `<p>Clique no nome do funcionário na lista → aba <strong> Documentos</strong> → <strong>+ Adicionar documento</strong>. Escolha o tipo (RG, CTPS, exame, contrato, etc.) e faça upload de PDF, JPG, PNG ou WebP até 20 MB.</p><p>Os documentos ficam armazenados no Supabase Storage (privado) e são acessíveis via URL assinada com validade de 1 hora.</p>`
     },
     {
       q: 'Como solicitar e aprovar férias?',
-      a: `<p><strong>Solicitar:</strong> No pop-up do funcionário, aba "🏖 Férias" → "+ Solicitar férias". Informe período pretendido, dias vendidos e se vai adiantar o 13º.</p><p><strong>Aprovar:</strong> Vá em <strong>Jornada & Férias → Solicitações de férias</strong> e clique em ✓ Aprovar ou ✕ Negar. Quando aprovado, o sistema atualiza o período aquisitivo automaticamente.</p>`
+      a: `<p><strong>Solicitar:</strong> No pop-up do funcionário, aba " Férias" → "+ Solicitar férias". Informe período pretendido, dias vendidos e se vai adiantar o 13º.</p><p><strong>Aprovar:</strong> Vá em <strong>Jornada & Férias → Solicitações de férias</strong> e clique em ✓ Aprovar ou ✕ Negar. Quando aprovado, o sistema atualiza o período aquisitivo automaticamente.</p>`
     },
     {
       q: 'Como iniciar processo de admissão (onboarding)?',
-      a: `<p>No pop-up do funcionário, aba "📋 Admissão/Demissão" → "+ Iniciar admissão". O sistema cria automaticamente um checklist com 11 itens padrão CLT (documentos, exames, contrato, EPIs, e-mail, etc.).</p><p>Cada item tem um responsável (RH, Gestor, TI, Funcionário). Marque os itens conforme conclui. Quando todos obrigatórios são concluídos, o checklist é fechado automaticamente.</p>`
+      a: `<p>No pop-up do funcionário, aba " Admissão/Demissão" → "+ Iniciar admissão". O sistema cria automaticamente um checklist com 11 itens padrão CLT (documentos, exames, contrato, EPIs, e-mail, etc.).</p><p>Cada item tem um responsável (RH, Gestor, TI, Funcionário). Marque os itens conforme conclui. Quando todos obrigatórios são concluídos, o checklist é fechado automaticamente.</p>`
     },
     {
       q: 'Como excluir um holerite?',
-      a: `<p>Na lista de holerites, clique no botão <strong>🗑</strong> vermelho da linha. Apenas usuários com perfil admin ou rh podem excluir. A exclusão é permanente e remove:</p><ul><li>O registro do banco</li><li>O PDF do disco</li><li>Os logs de envio associados</li></ul>`
+      a: `<p>Na lista de holerites, clique no botão <strong></strong> vermelho da linha. Apenas usuários com perfil admin ou rh podem excluir. A exclusão é permanente e remove:</p><ul><li>O registro do banco</li><li>O PDF do disco</li><li>Os logs de envio associados</li></ul>`
     },
     {
       q: 'Como adicionar feriados municipais?',
@@ -449,8 +449,8 @@
         <td>${(d.tamanho_bytes / 1024).toFixed(0)} KB</td>
         <td>${fmt.data(d.created_at)}</td>
         <td>
-          <button class="btn btn-sm" onclick="baixarDoc('${d.id}')">⬇ Baixar</button>
-          <button class="btn btn-sm btn-danger" onclick="removerDoc('${d.id}')">🗑</button>
+          <button class="btn btn-sm" onclick="baixarDoc('${d.id}')"> Baixar</button>
+          <button class="btn btn-sm btn-danger" onclick="removerDoc('${d.id}')"></button>
         </td>
       </tr>
     `).join('');
@@ -511,11 +511,11 @@
     cont.innerHTML = lista.map(a => `
       <div class="ann-card ${a.importante ? 'importante' : ''} ${a.fixado ? 'fixado' : ''}">
         <div class="ann-head">
-          <h4>${a.fixado ? '<span class="pin-icon">📌</span> ' : ''}${a.titulo}</h4>
+          <h4>${a.fixado ? '<span class="pin-icon"></span> ' : ''}${a.titulo}</h4>
           <div class="flex gap-2">
             <span class="badge ${a.importante ? 'erro' : 'ativo'}">${CAT_ANN[a.categoria] || a.categoria}</span>
             <button class="btn btn-sm" onclick='abrirFormAnn(${JSON.stringify(a).replace(/'/g, "&#39;")})'>✎</button>
-            <button class="btn btn-sm btn-danger" onclick="removerAnn('${a.id}')">🗑</button>
+            <button class="btn btn-sm btn-danger" onclick="removerAnn('${a.id}')"></button>
           </div>
         </div>
         <div class="ann-conteudo">${a.conteudo}</div>
@@ -673,7 +673,7 @@
     const liquido = totalBruto - inss - irrf - vt - saude;
 
     document.getElementById('calc-result').innerHTML = `
-      <h4>📊 Estimativa de salário líquido (CLT 2026)</h4>
+      <h4> Estimativa de salário líquido (CLT 2026)</h4>
       <div class="row"><span>Salário base</span><span class="pos">${fmt.brl(bruto)}</span></div>
       ${he50 > 0 ? `<div class="row"><span>Horas extras 50%</span><span class="pos">${fmt.brl(he50)}</span></div>` : ''}
       ${he100 > 0 ? `<div class="row"><span>Horas extras 100%</span><span class="pos">${fmt.brl(he100)}</span></div>` : ''}

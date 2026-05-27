@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Advertência Disciplinar</title>
+<style>
+  @page { size: A4; margin: 25mm 30mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Calibri', 'Segoe UI', Arial, sans-serif;
+    font-size: 11pt;
+    color: #000;
+    margin: 0;
+    line-height: 1.5;
+  }
+  .doc {
+    max-width: 100%;
+  }
+
+  .cidade-data {
+    margin-bottom: 28pt;
+    font-size: 11pt;
+  }
+
+  .destinatario {
+    margin-bottom: 22pt;
+  }
+  .destinatario p { margin: 0; line-height: 1.5; }
+  .destinatario .nome { font-weight: bold; }
+  .destinatario .nesta { text-decoration: underline; letter-spacing: 2px; font-weight: bold; }
+
+  .referencia {
+    margin-bottom: 22pt;
+    font-weight: bold;
+  }
+
+  .intro {
+    margin-bottom: 18pt;
+  }
+
+  .motivo-box {
+    margin: 18pt 0 22pt 24pt;
+  }
+  .motivo-box .titulo {
+    font-weight: bold;
+    text-transform: uppercase;
+    margin-bottom: 6pt;
+  }
+  .motivo-box .titulo::before {
+    content: '\2756  ';   /* ❖ ornamento */
+    margin-right: 4pt;
+  }
+  .motivo-box .descricao {
+    margin-left: 18pt;
+    font-weight: bold;
+    text-transform: uppercase;
+  }
+
+  .corpo {
+    margin-bottom: 40pt;
+    text-align: justify;
+  }
+  .corpo .destaque {
+    text-decoration: underline;
+    font-weight: bold;
+  }
+
+  .assinatura-empresa {
+    text-align: center;
+    margin: 48pt 0 60pt;
+  }
+  .assinatura-empresa .linha {
+    border-top: 1px solid #000;
+    width: 60%;
+    margin: 0 auto 4pt;
+  }
+  .assinatura-empresa .empresa {
+    font-weight: bold;
+    font-size: 11pt;
+  }
+  .assinatura-empresa .cnpj {
+    font-size: 9.5pt;
+    color: #333;
+    margin-top: 2pt;
+  }
+
+  .ciente {
+    margin-top: 36pt;
+  }
+  .ciente .label {
+    margin-bottom: 6pt;
+  }
+  .ciente .linha {
+    border-top: 1px solid #000;
+    width: 50%;
+    margin-bottom: 4pt;
+  }
+  .ciente .nome {
+    font-weight: bold;
+    font-size: 11pt;
+  }
+  .ciente .ctps {
+    font-weight: bold;
+    font-size: 11pt;
+  }
+
+  .testemunhas {
+    margin-top: 50pt;
+  }
+  .testemunhas .label {
+    margin-bottom: 30pt;
+  }
+  .testemunhas .lines {
+    display: flex;
+    gap: 40pt;
+  }
+  .testemunhas .col {
+    flex: 1;
+  }
+  .testemunhas .linha {
+    border-top: 1px solid #000;
+    width: 100%;
+  }
+</style>
+</head>
+<body>
+
+<div class="doc">
+
+  <div class="cidade-data">
+    {{cidade}}, {{data_extenso}}.
+  </div>
+
+  <div class="destinatario">
+    <p>Ao Sr(a).</p>
+    <p class="nome">{{func_nome}} – CTPS {{func_ctps}}</p>
+    <p class="nesta">N E S T A</p>
+  </div>
+
+  <div class="referencia">
+    Ref.: ADVERTÊNCIA DISCIPLINAR
+  </div>
+
+  <div class="intro">
+    Pela presente fica o(a) Sr(a). advertido(a) pela seguinte falta:
+  </div>
+
+  <div class="motivo-box">
+    <div class="titulo">{{motivo}}</div>
+    {{#if descricao}}<div class="descricao">{{descricao}}</div>{{/if}}
+    {{#if data_ocorrencia_fmt}}<div class="descricao">EM {{data_ocorrencia_fmt}}</div>{{/if}}
+  </div>
+
+  <div class="corpo">
+    Vimos adverti-lo(a) <span class="destaque">{{tipo_advertencia}}</span> de que sua conduta ({{motivo_minusculo}}) se constitui em falta grave e pedimos que não a repita, caso contrário seremos obrigados a aplicar-lhe penalidade mais severa, conforme preceitua a CLT{{#if texto_suspensao}}{{texto_suspensao}}{{/if}}.
+  </div>
+
+  <div class="assinatura-empresa">
+    <div class="linha"></div>
+    <div class="empresa">{{empresa_nome}}</div>
+    {{#if empresa_cnpj}}<div class="cnpj">CNPJ: {{empresa_cnpj}}</div>{{/if}}
+  </div>
+
+  <div class="ciente">
+    <div class="label">Ciente:</div>
+    <div class="linha"></div>
+    <div class="nome">{{func_nome}}</div>
+    <div class="ctps">CTPS {{func_ctps}}</div>
+  </div>
+
+  <div class="testemunhas">
+    <div class="label">Testemunhas:</div>
+    <div class="lines">
+      <div class="col">
+        <div class="linha"></div>
+        <div style="font-size:9pt;color:#666;margin-top:3pt">Nome / CPF</div>
+      </div>
+      <div class="col">
+        <div class="linha"></div>
+        <div style="font-size:9pt;color:#666;margin-top:3pt">Nome / CPF</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

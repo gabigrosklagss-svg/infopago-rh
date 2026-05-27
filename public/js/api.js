@@ -47,7 +47,7 @@ function toast(message, type = 'info', title = '') {
     document.body.appendChild(container);
   }
 
-  const icons = { success: '✓', error: '✕', warning: '⚠', info: 'ℹ' };
+  const icons = { success: '✓', error: '✕', warning: '', info: '' };
   const titles = { success: 'Sucesso', error: 'Erro', warning: 'Atenção', info: 'Aviso' };
 
   const el = document.createElement('div');
@@ -289,8 +289,13 @@ const ICONS = {
   agent: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>`,
   reports: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21 21H3"/><path d="M5 21V11l4-4 4 4 7-7"/></svg>`,
   settings: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
+  hrdocs: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15h6"/><path d="M9 11h2"/><path d="M9 19h6"/></svg>`,
+  admin: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>`,
   bell: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>`,
   help: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+  recruit: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>`,
+  perf: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/></svg>`,
+  ctc: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`,
   chevron: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>`,
   logout: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>`,
 };
@@ -319,7 +324,15 @@ function renderSidebar(active) {
       <nav>
         ${item('employees', '/employees.html', 'Funcionários')}
         ${item('agent',     '/agent.html',     'Agente IA · Cadastro')}
-        ${item('settings',  '/settings.html',  'Departamentos e Cargos')}
+      </nav>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">Gente &amp; Talentos</div>
+      <nav>
+        ${item('recruit', '/recruitment.html', 'Recrutamento &amp; Seleção')}
+        ${item('perf',    '/performance.html', 'Avaliação de desempenho')}
+        ${item('ctc',     '/ctc.html',         'Custo de Contratação')}
       </nav>
     </div>
 
@@ -335,23 +348,45 @@ function renderSidebar(active) {
       <div class="nav-label">Folha de pagamento</div>
       <nav>
         ${item('payslips', '/payslips.html', 'Holerites e Folha')}
+        ${item('hrdocs',   '/hr-docs.html',  'Rescisão e 13º Salário')}
         ${item('email',    '/email-send.html', 'Envios e Agendamentos')}
+        ${item('settings', '/settings.html', 'Departamentos e Cargos')}
       </nav>
     </div>
 
+    ${getUser()?.role === 'admin' ? `<div class="nav-group">
+      <div class="nav-label">Administração</div>
+      <nav>
+        ${item('admin', '/admin.html', 'Auditoria · Backup · EPIs')}
+      </nav>
+    </div>` : ''}
+
     <div class="sidebar-footer">
-      <div class="env-badge">Produção</div>
-      <div class="sidebar-version">v1.1.0 · build ${buildId()}</div>
+      <div class="sidebar-user-card" title="Ver perfil" onclick="abrirPerfilUsuario()" style="cursor:pointer">
+        <div class="avatar">${getUser()?.avatar_url
+          ? `<img src="${getUser().avatar_url}" alt="">`
+          : (getUser()?.full_name || getUser()?.email || '?').split(' ').map(s => s[0]).slice(0, 2).join('').toUpperCase()}</div>
+        <div class="info">
+          <strong>${getUser()?.full_name || getUser()?.email?.split('@')[0] || ''}</strong>
+          <small>${getUser()?.role || 'rh'}${getUser()?.role === 'admin' ? ' · master' : ''}</small>
+        </div>
+      </div>
+
+      <button class="btn-sair" onclick="logout()" title="Encerrar sessão">
+        ${ICONS.logout}
+        <span>Sair do sistema</span>
+      </button>
+
+      <div class="sidebar-meta">
+        <span class="env-badge">Produção</span>
+        <span class="sidebar-version">v1.1</span>
+      </div>
     </div>
   </aside>`;
 }
 
-/* ── Top Navbar (busca + notificações + user) ─────────── */
+/* ── Top Navbar (busca + atalhos) ─────────────────────── */
 function renderTopbar() {
-  const user = getUser();
-  const initials = (user?.full_name || user?.email || '?').split(' ').map(s => s[0]).slice(0, 2).join('').toUpperCase();
-  const isAdmin = user?.role === 'admin';
-
   return `<header class="topbar">
     <div class="topbar-search">
       <input id="globalSearch" placeholder="Buscar funcionário, CPF, matrícula, holerite…" autocomplete="off">
@@ -363,15 +398,6 @@ function renderTopbar() {
       <button class="topbar-btn" title="Notificações" onclick="abrirNotificacoes()">
         ${ICONS.bell}<span class="dot"></span>
       </button>
-
-      <div class="topbar-user" onclick="abrirMenuUsuario(event)">
-        <div class="avatar">${initials}</div>
-        <div class="topbar-user-info">
-          <strong>${(user?.full_name || user?.email || '').split(' ')[0]}</strong>
-          <small>${user?.role || 'rh'}${isAdmin ? ' · master' : ''}</small>
-        </div>
-        ${ICONS.chevron}
-      </div>
     </div>
   </header>`;
 }
@@ -383,11 +409,9 @@ function renderFooter() {
   return `<footer class="app-footer">
     <span class="status-dot">Sistema operacional</span>
     <span class="sep">·</span>
-    <span>Conectado ao Supabase</span>
-    <span class="sep">·</span>
     <span>Último backup: <span class="mono">${horaBackup}</span></span>
     <span class="spacer"></span>
-    <span class="version">InfoPago RH v1.1.0 · build ${buildId()}</span>
+    <span class="version">InfoPago RH v1.1.0</span>
   </footer>`;
 }
 
@@ -460,10 +484,155 @@ function abrirMenuUsuario(ev) {
       <strong style="display:block;font-size:13px">${u?.full_name || u?.email}</strong>
       <small style="color:var(--ink-4);font-size:11px">${u?.email || ''}</small>
     </div>
-    <a href="/settings.html" style="display:block;padding:10px 16px;font-size:13px;color:var(--ink);text-decoration:none">⚙  Configurações</a>
-    <button onclick="logout()" style="width:100%;text-align:left;padding:10px 16px;font-size:13px;color:var(--danger);background:transparent;border:0;border-top:1px solid var(--border);cursor:pointer;font-family:inherit">↩  Sair do sistema</button>`;
+    <a href="/settings.html" style="display:block;padding:10px 16px;font-size:13px;color:var(--ink);text-decoration:none">  Configurações</a>
+    <button onclick="logout()" style="width:100%;text-align:left;padding:10px 16px;font-size:13px;color:var(--danger);background:transparent;border:0;border-top:1px solid var(--border);cursor:pointer;font-family:inherit">  Sair do sistema</button>`;
   document.body.appendChild(m);
   setTimeout(() => document.addEventListener('click', () => m.remove(), { once: true }), 100);
+}
+
+/* ── Modal de perfil do usuário ─────────────────────── */
+function abrirPerfilUsuario() {
+  const u = getUser();
+  if (!u) return;
+  const initials = (u.full_name || u.email || '?').split(' ').map(s => s[0]).slice(0, 2).join('').toUpperCase();
+
+  // Remove se já existe
+  document.getElementById('user-profile-modal')?.remove();
+
+  const m = document.createElement('div');
+  m.id = 'user-profile-modal';
+  m.className = 'modal-overlay';
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+
+  m.innerHTML = `
+    <div class="modal" style="max-width:520px">
+      <div class="modal-header">
+        <h2>Meu perfil</h2>
+        <button class="modal-close" onclick="document.getElementById('user-profile-modal').remove()">×</button>
+      </div>
+      <div class="modal-body">
+
+        <div class="flex gap-4 items-center mb-4" style="padding-bottom:18px;border-bottom:1px solid var(--border)">
+          <div id="profile-avatar" class="avatar-md" style="width:96px;height:96px;font-size:28px;flex-shrink:0">
+            ${u.avatar_url
+              ? `<img src="${u.avatar_url}?t=${Date.now()}">`
+              : initials}
+          </div>
+          <div class="flex-1">
+            <div style="font-weight:600;font-size:11px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Foto de perfil</div>
+            <p class="text-muted text-sm" style="margin:0 0 8px">JPG, PNG ou WebP · máx. 5 MB</p>
+            <div class="flex gap-2">
+              <input type="file" id="profile-photo-input" accept="image/jpeg,image/png,image/webp" style="display:none">
+              <button class="btn btn-sm btn-primary" onclick="document.getElementById('profile-photo-input').click()">Selecionar foto</button>
+              ${u.avatar_url ? `<button class="btn btn-sm" onclick="removerFotoUsuario()">Remover</button>` : ''}
+            </div>
+          </div>
+        </div>
+
+        <form id="profileForm">
+          <div class="form-grid">
+            <div class="field" style="grid-column:span 2">
+              <label>Nome completo</label>
+              <input name="full_name" value="${(u.full_name || '').replace(/"/g, '&quot;')}" required>
+            </div>
+            <div class="field">
+              <label>E-mail</label>
+              <input value="${u.email || ''}" disabled style="background:var(--paper-3);color:var(--ink-4)">
+            </div>
+            <div class="field">
+              <label>Permissão</label>
+              <input value="${u.role || 'rh'}${u.role === 'admin' ? ' · master' : ''}" disabled style="background:var(--paper-3);color:var(--ink-4)">
+            </div>
+            <div class="field" style="grid-column:span 2">
+              <label>Departamento</label>
+              <input name="department" value="${(u.department || '').replace(/"/g, '&quot;')}" placeholder="Ex: Recursos Humanos">
+            </div>
+          </div>
+
+          <div style="margin-top:16px;padding:10px 14px;background:var(--paper-3);border-radius:var(--r-sm);font-size:11.5px;color:var(--ink-3)">
+            <strong>ID:</strong> <code style="font-size:11px">${u.id}</code><br>
+            <strong>Cadastrado em:</strong> ${u.created_at ? fmt.dataHora(u.created_at) : '—'}
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="document.getElementById('user-profile-modal').remove()">Fechar</button>
+        <button class="btn btn-primary" onclick="salvarPerfilUsuario()">Salvar alterações</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(m);
+
+  // Listener pra upload de foto
+  document.getElementById('profile-photo-input').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('foto', file);
+    showLoading();
+    try {
+      const r = await fetch('/api/auth/me/avatar', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${getToken()}` },
+        body: fd,
+      });
+      if (!r.ok) throw new Error((await r.json()).error || 'Falha no upload');
+      const data = await r.json();
+      // Atualiza user local + sidebar + modal
+      const u2 = getUser();
+      u2.avatar_url = data.avatar_url;
+      setUser(u2);
+      document.getElementById('profile-avatar').innerHTML = `<img src="${data.avatar_url}?t=${Date.now()}">`;
+      // Atualiza sidebar avatar
+      const sbAvatar = document.querySelector('.sidebar-user-card .avatar');
+      if (sbAvatar) sbAvatar.innerHTML = `<img src="${data.avatar_url}?t=${Date.now()}" alt="">`;
+      toast('Foto atualizada!', 'success');
+    } catch (err) { toast(err.message, 'error'); }
+    finally { hideLoading(); }
+  });
+}
+
+async function removerFotoUsuario() {
+  if (!confirm('Remover sua foto de perfil?')) return;
+  showLoading();
+  try {
+    await api('/auth/me/avatar', { method: 'DELETE' });
+    const u = getUser();
+    u.avatar_url = null;
+    setUser(u);
+    const initials = (u.full_name || u.email || '?').split(' ').map(s => s[0]).slice(0, 2).join('').toUpperCase();
+    const av = document.getElementById('profile-avatar');
+    if (av) av.innerHTML = initials;
+    const sbAvatar = document.querySelector('.sidebar-user-card .avatar');
+    if (sbAvatar) sbAvatar.innerHTML = initials;
+    toast('Foto removida.', 'success');
+    // Re-render do modal pra esconder o botão "Remover"
+    document.getElementById('user-profile-modal')?.remove();
+    abrirPerfilUsuario();
+  } catch (err) { toast(err.message, 'error'); }
+  finally { hideLoading(); }
+}
+
+async function salvarPerfilUsuario() {
+  const f = document.getElementById('profileForm');
+  const data = formToObject(f);
+  if (!data.full_name?.trim()) {
+    toast('Nome é obrigatório.', 'warning');
+    return;
+  }
+  showLoading();
+  try {
+    const r = await api('/auth/me', { method: 'PUT', body: { full_name: data.full_name, department: data.department || null } });
+    const u = getUser();
+    Object.assign(u, r);
+    setUser(u);
+    // Atualiza nome na sidebar imediatamente
+    const sbName = document.querySelector('.sidebar-user-card .info strong');
+    if (sbName) sbName.textContent = u.full_name || u.email?.split('@')[0] || '';
+    toast('Perfil atualizado!', 'success');
+    document.getElementById('user-profile-modal')?.remove();
+  } catch (err) { toast(err.message, 'error'); }
+  finally { hideLoading(); }
 }
 
 document.addEventListener('DOMContentLoaded', () => initMasks());

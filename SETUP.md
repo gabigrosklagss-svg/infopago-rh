@@ -5,7 +5,7 @@ PDFs e envio automático por e-mail.
 
 ---
 
-## ✅ O que você precisa
+##  O que você precisa
 
 - **Node.js 18+** ([nodejs.org](https://nodejs.org))
 - **Conta Supabase** (gratuita) — [supabase.com](https://supabase.com)
@@ -13,7 +13,7 @@ PDFs e envio automático por e-mail.
 
 ---
 
-## 🚀 Instalação rápida (4 passos)
+##  Instalação rápida (4 passos)
 
 ### 1. Subir o schema no Supabase
 
@@ -58,19 +58,19 @@ Acesse **http://localhost:3001**
 
 ---
 
-## 🆕 O que tem de novo (v1.1)
+##  O que tem de novo (v1.1)
 
-✅ **Bug UUID corrigido** — campos vazios (departamento, cargo) são tratados como NULL.
-✅ **Tabelas tributárias 2026** — INSS, IRRF, FGTS e Salário-família atualizados; sistema multi-ano (usa a tabela correta conforme o ano da competência).
-✅ **CRUD de Cargos e Departamentos** nas Configurações.
-✅ **Pop-up completo do funcionário** — clique no nome para ver tudo: faltas, atestados, advertências, aumentos salariais, histórico de holerites e férias.
-✅ **Validação visual** — campos obrigatórios não preenchidos ficam **vermelhos** e aparece um **toast** no canto inferior direito listando o que falta.
-✅ **Holerite PDF tradicional** — padrão clássico (Cód./Descrição/Referência/Vencimentos/Descontos) com bases de cálculo (INSS, FGTS, IRRF) no rodapé.
-✅ **Envio automático** — o PDF é anexado ao e-mail com link de confirmação de recebimento.
+ **Bug UUID corrigido** — campos vazios (departamento, cargo) são tratados como NULL.
+ **Tabelas tributárias 2026** — INSS, IRRF, FGTS e Salário-família atualizados; sistema multi-ano (usa a tabela correta conforme o ano da competência).
+ **CRUD de Cargos e Departamentos** nas Configurações.
+ **Pop-up completo do funcionário** — clique no nome para ver tudo: faltas, atestados, advertências, aumentos salariais, histórico de holerites e férias.
+ **Validação visual** — campos obrigatórios não preenchidos ficam **vermelhos** e aparece um **toast** no canto inferior direito listando o que falta.
+ **Holerite PDF tradicional** — padrão clássico (Cód./Descrição/Referência/Vencimentos/Descontos) com bases de cálculo (INSS, FGTS, IRRF) no rodapé.
+ **Envio automático** — o PDF é anexado ao e-mail com link de confirmação de recebimento.
 
 ---
 
-## 📁 Estrutura
+##  Estrutura
 
 ```
 Sistema RH/
@@ -118,7 +118,7 @@ Sistema RH/
 
 ---
 
-## 💰 Tabelas tributárias atualizadas (CLT 2026)
+##  Tabelas tributárias atualizadas (CLT 2026)
 
 ### INSS 2026 (progressivo)
 | Faixa | Alíquota |
@@ -142,13 +142,13 @@ Sistema RH/
 - **Salário-família:** R$ 65,00 por filho até 14 anos (teto: salário até R$ 1.906,04)
 - **FGTS:** 8% sobre salário bruto (2% para aprendiz)
 
-> ⚠ **Quando o Governo publicar a portaria 2027**, abra `src/services/payroll.js`,
+>  **Quando o Governo publicar a portaria 2027**, abra `src/services/payroll.js`,
 > adicione um novo bloco em `TABELAS_TRIBUTARIAS` com a chave `2027:` e o
 > sistema usará automaticamente conforme o ano da competência do holerite.
 
 ---
 
-## 📋 Fluxo de uso
+##  Fluxo de uso
 
 ### 1. Configurar a empresa
 - **Configurações → Empresa**: razão social, CNPJ, endereço
@@ -168,11 +168,11 @@ Sistema RH/
 - Sistema calcula INSS, IRRF, FGTS automaticamente
 
 ### 4. Gerar PDFs
-- Selecione os holerites e clique em **📄 PDFs (selecionados)**
-- Ou gere individualmente clicando no botão 📄 de cada linha
+- Selecione os holerites e clique em ** PDFs (selecionados)**
+- Ou gere individualmente clicando no botão  de cada linha
 
 ### 5. Enviar por e-mail
-- Selecione os holerites com PDF gerado e clique em **✉ Enviar**
+- Selecione os holerites com PDF gerado e clique em ** Enviar**
 - O funcionário recebe o PDF anexado + link para confirmar recebimento
 - Você acompanha em **Envios → Histórico**
 
@@ -183,7 +183,7 @@ Sistema RH/
 
 ---
 
-## 🔧 Solução de problemas
+##  Solução de problemas
 
 ### "Puppeteer falhou ao iniciar"
 ```powershell
@@ -193,7 +193,7 @@ npm run install:chromium
 ### "SMTP falhou ao conectar"
 - Confirme que o Gmail tem 2FA ativado
 - Use a **Senha de App** (16 caracteres SEM espaços), não a senha normal
-- Em Configurações → E-mail, clique **🔧 Testar conexão**
+- Em Configurações → E-mail, clique ** Testar conexão**
 
 ### "Token inválido / não autenticado"
 - Saia e entre novamente (Sair → Login)

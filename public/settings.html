@@ -14,10 +14,10 @@
     </div>
 
     <div class="tabs">
-      <button class="tab-btn active" onclick="goTab(0, this)">🏢 Empresa</button>
-      <button class="tab-btn" onclick="goTab(1, this)">📧 E-mail (SMTP)</button>
-      <button class="tab-btn" onclick="goTab(2, this)">🏛 Departamentos</button>
-      <button class="tab-btn" onclick="goTab(3, this)">🪪 Cargos</button>
+      <button class="tab-btn active" onclick="goTab(0, this)"> Empresa</button>
+      <button class="tab-btn" onclick="goTab(1, this)"> E-mail (SMTP)</button>
+      <button class="tab-btn" onclick="goTab(2, this)"> Departamentos</button>
+      <button class="tab-btn" onclick="goTab(3, this)"> Cargos</button>
     </div>
 
     <!-- ── Empresa ────────────────────────────────────── -->
@@ -37,7 +37,7 @@
           <div class="field"><label>Dia padrão de pagamento</label><input type="number" name="dia_pagamento" min="1" max="31" value="5"></div>
         </div>
         <div class="text-right mt-4">
-          <button type="button" class="btn btn-primary" onclick="salvarEmpresa()">💾 Salvar</button>
+          <button type="button" class="btn btn-primary" onclick="salvarEmpresa()"> Salvar</button>
         </div>
       </form>
     </div>
@@ -54,8 +54,8 @@
           <div class="field"><label>Nome remetente</label><input name="email_nome_remetente" value="RH"></div>
         </div>
         <div class="flex gap-2 mt-4 justify-between">
-          <button type="button" class="btn" onclick="testarSMTP()">🔧 Testar conexão</button>
-          <button type="button" class="btn btn-primary" onclick="salvarSMTP()">💾 Salvar</button>
+          <button type="button" class="btn" onclick="testarSMTP()"> Testar conexão</button>
+          <button type="button" class="btn btn-primary" onclick="salvarSMTP()"> Salvar</button>
         </div>
       </form>
     </div>
@@ -152,17 +152,37 @@
     const ds = await api('/departments');
     document.getElementById('tbody-dept').innerHTML = ds.length
       ? ds.map(d => `
-          <tr>
+          <tr ${!d.active ? 'style="opacity:.55"' : ''}>
             <td>${d.codigo || '—'}</td>
             <td><strong>${d.nome}</strong></td>
             <td>${d.responsavel || '—'}</td>
             <td><span class="badge ${d.active ? 'ativo' : 'demitido'}">${d.active ? 'Ativo' : 'Inativo'}</span></td>
             <td>
-              <button class="btn btn-sm" onclick='abrirFormDept(${JSON.stringify(d)})'>✎</button>
-              ${d.active ? `<button class="btn btn-sm btn-danger" onclick="desativarDept('${d.id}')">Desativar</button>` : ''}
+              <button class="btn btn-sm" onclick='abrirFormDept(${JSON.stringify(d)})'>Editar</button>
+              ${d.active
+                ? `<button class="btn btn-sm btn-danger" onclick="toggleAtivoDept('${d.id}', false)">Desativar</button>`
+                : `<button class="btn btn-sm btn-success" onclick="toggleAtivoDept('${d.id}', true)">Ativar</button>
+                   <button class="btn btn-sm btn-danger" onclick="excluirDeptDef('${d.id}', '${(d.nome || '').replace(/'/g, "\\'")}')">Excluir</button>`}
             </td>
           </tr>`).join('')
       : '<tr><td colspan="5" class="table-empty">Nenhum departamento. Clique em + Novo departamento.</td></tr>';
+  }
+
+  async function toggleAtivoDept(id, novoEstado) {
+    try {
+      await api(`/departments/${id}`, { method: 'PUT', body: { active: novoEstado } });
+      toast(novoEstado ? 'Departamento ativado.' : 'Departamento desativado.', 'success');
+      loadDepts();
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function excluirDeptDef(id, nome) {
+    if (!confirm(`Excluir DEFINITIVAMENTE o departamento "${nome}"?\n\nIsso não pode ser desfeito. Use só pra departamentos sem funcionários vinculados.`)) return;
+    try {
+      await api(`/departments/${id}/hard`, { method: 'DELETE' });
+      toast('Excluído.', 'success');
+      loadDepts();
+    } catch (err) { toast(err.message, 'error'); }
   }
 
   function abrirFormDept(d = null) {
@@ -202,7 +222,7 @@
     window._depts = ds;
     document.getElementById('tbody-pos').innerHTML = ps.length
       ? ps.map(p => `
-          <tr>
+          <tr ${!p.active ? 'style="opacity:.55"' : ''}>
             <td><strong>${p.titulo}</strong></td>
             <td>${p.cbo || '—'}</td>
             <td>${p.nivel || '—'}</td>
@@ -210,11 +230,31 @@
             <td>${p.salario_minimo ? fmt.brl(p.salario_minimo) + ' a ' + fmt.brl(p.salario_maximo) : '—'}</td>
             <td><span class="badge ${p.active ? 'ativo' : 'demitido'}">${p.active ? 'Ativo' : 'Inativo'}</span></td>
             <td>
-              <button class="btn btn-sm" onclick='abrirFormPos(${JSON.stringify(p)})'>✎</button>
-              ${p.active ? `<button class="btn btn-sm btn-danger" onclick="desativarPos('${p.id}')">Desativar</button>` : ''}
+              <button class="btn btn-sm" onclick='abrirFormPos(${JSON.stringify(p)})'>Editar</button>
+              ${p.active
+                ? `<button class="btn btn-sm btn-danger" onclick="toggleAtivoPos('${p.id}', false)">Desativar</button>`
+                : `<button class="btn btn-sm btn-success" onclick="toggleAtivoPos('${p.id}', true)">Ativar</button>
+                   <button class="btn btn-sm btn-danger" onclick="excluirPosDef('${p.id}', '${(p.titulo || '').replace(/'/g, "\\'")}')">Excluir</button>`}
             </td>
           </tr>`).join('')
       : '<tr><td colspan="7" class="table-empty">Nenhum cargo. Clique em + Novo cargo.</td></tr>';
+  }
+
+  async function toggleAtivoPos(id, novoEstado) {
+    try {
+      await api(`/positions/${id}`, { method: 'PUT', body: { active: novoEstado } });
+      toast(novoEstado ? 'Cargo ativado.' : 'Cargo desativado.', 'success');
+      loadPositions();
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function excluirPosDef(id, nome) {
+    if (!confirm(`Excluir DEFINITIVAMENTE o cargo "${nome}"?\n\nIsso não pode ser desfeito.`)) return;
+    try {
+      await api(`/positions/${id}/hard`, { method: 'DELETE' });
+      toast('Excluído.', 'success');
+      loadPositions();
+    } catch (err) { toast(err.message, 'error'); }
   }
 
   function abrirFormPos(p = null) {

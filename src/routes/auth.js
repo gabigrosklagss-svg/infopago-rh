@@ -1,6 +1,19 @@
 const router = require('express').Router();
 const { supabase, supabasePublic } = require('../config/supabase');
 const { requireAuth, requireRole } = require('../middleware/auth');
+const multer = require('multer');
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (/image\/(jpeg|png|webp)/.test(file.mimetype)) cb(null, true);
+    else cb(new Error('Apenas imagens JPG, PNG ou WebP.'));
+  },
+});
+
+const PHOTOS_BUCKET = 'employee-photos';
+const SUPABASE_URL = process.env.SUPABASE_URL;
 
 // POST /api/auth/login
 router.post('/login', async (req, res) => {
@@ -40,6 +53,62 @@ router.post('/logout', requireAuth, async (req, res) => {
 // GET /api/auth/me
 router.get('/me', requireAuth, (req, res) => {
   res.json(req.user);
+});
+
+// PUT /api/auth/me — usuário atualiza o próprio perfil (nome e departamento)
+router.put('/me', requireAuth, async (req, res) => {
+  const { full_name, department } = req.body;
+  const payload = {};
+  if (full_name !== undefined) payload.full_name = full_name;
+  if (department !== undefined) payload.department = department;
+  if (!Object.keys(payload).length) return res.status(400).json({ error: 'Nenhum campo para atualizar.' });
+
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .update(payload)
+    .eq('id', req.user.id)
+    .select('id, full_name, role, active, avatar_url, department')
+    .single();
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ ...data, email: req.user.email });
+});
+
+// POST /api/auth/me/avatar — upload da foto de perfil do usuário logado
+router.post('/me/avatar', requireAuth, upload.single('foto'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
+
+  const userId = req.user.id;
+  const ext = (req.file.originalname.split('.').pop() || 'jpg').toLowerCase();
+  const storage_path = `users/${userId}/avatar_${Date.now()}.${ext}`;
+
+  // Remove avatar antigo
+  if (req.user.avatar_url && req.user.avatar_url.includes(`/${PHOTOS_BUCKET}/`)) {
+    const oldPath = req.user.avatar_url.split(`/${PHOTOS_BUCKET}/`)[1];
+    if (oldPath) await supabase.storage.from(PHOTOS_BUCKET).remove([oldPath]).catch(() => {});
+  }
+
+  const { error: upErr } = await supabase.storage
+    .from(PHOTOS_BUCKET)
+    .upload(storage_path, req.file.buffer, {
+      contentType: req.file.mimetype,
+      upsert: true,
+      cacheControl: '3600',
+    });
+  if (upErr) return res.status(500).json({ error: `Falha no upload: ${upErr.message}` });
+
+  const avatar_url = `${SUPABASE_URL}/storage/v1/object/public/${PHOTOS_BUCKET}/${storage_path}`;
+  await supabase.from('user_profiles').update({ avatar_url }).eq('id', userId);
+  res.json({ avatar_url });
+});
+
+// DELETE /api/auth/me/avatar — remove a foto de perfil
+router.delete('/me/avatar', requireAuth, async (req, res) => {
+  if (req.user.avatar_url && req.user.avatar_url.includes(`/${PHOTOS_BUCKET}/`)) {
+    const oldPath = req.user.avatar_url.split(`/${PHOTOS_BUCKET}/`)[1];
+    if (oldPath) await supabase.storage.from(PHOTOS_BUCKET).remove([oldPath]).catch(() => {});
+  }
+  await supabase.from('user_profiles').update({ avatar_url: null }).eq('id', req.user.id);
+  res.json({ success: true });
 });
 
 // GET /api/auth/users — listar usuários do sistema (admin)

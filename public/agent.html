@@ -3,10 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Agente IA — InfoPago RH</title>
+<title>Ingrid — InfoPago RH</title>
 <link rel="stylesheet" href="/css/main.css">
 <style>
-  /* Header com avatar + título */
   .agent-header {
     display: flex; align-items: center; gap: 14px;
     padding: 16px 20px;
@@ -24,16 +23,14 @@
     box-shadow: 0 0 14px rgba(57, 225, 117, .3);
   }
   .agent-header h3 { margin: 0; font-size: 15px; font-weight: 700; }
-  .agent-header small { font-size: 11.5px; color: var(--ink-3); display: block; margin-top: 2px; }
 
-  /* CHAT MODE */
   .chat-shell {
     background: var(--paper);
     border: 1px solid var(--border);
     border-radius: var(--r);
     overflow: hidden;
     display: flex; flex-direction: column;
-    height: calc(100vh - 280px);
+    height: calc(100vh - 240px);
     min-height: 520px;
   }
   .chat-msgs {
@@ -85,34 +82,51 @@
     font-style: italic;
   }
 
-  .tool-call {
-    background: var(--paper-2);
-    border: 1px solid var(--border);
-    border-left: 3px solid var(--brand-500);
-    padding: 10px 14px;
+  /* Anexo de arquivo na mensagem do usuário */
+  .file-chip {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(255,255,255,.15);
+    padding: 6px 10px;
     border-radius: 6px;
     font-size: 12px;
-    margin-top: 8px;
+    margin-bottom: 6px;
+    border: 1px solid rgba(255,255,255,.2);
   }
-  .tool-call .tool-name {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11.5px;
-    color: var(--brand-700);
-    font-weight: 700;
-    margin-bottom: 4px;
+  .file-chip-icon {
+    width: 16px; height: 16px;
+    background: var(--brand-300);
+    color: var(--brand-900);
+    border-radius: 3px;
+    display: grid; place-items: center;
+    font-weight: 800; font-size: 10px;
   }
-  .tool-call .tool-msg {
-    color: var(--ink-2);
-    font-size: 12px;
-  }
-  .tool-call.error { border-left-color: var(--danger); background: #fff5f5; }
-  .tool-call.error .tool-name { color: var(--danger); }
 
   .chat-input-wrap {
     border-top: 1px solid var(--border);
     padding: 14px 18px;
     background: var(--paper-2);
   }
+
+  /* Pré-visualização do arquivo anexado */
+  .attached-file-preview {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px;
+    background: var(--brand-50);
+    border: 1px solid var(--brand-100);
+    border-radius: var(--r-sm);
+    margin-bottom: 10px;
+    font-size: 12.5px;
+    color: var(--brand-800);
+  }
+  .attached-file-preview .name { flex: 1; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .attached-file-preview .size { color: var(--ink-3); font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+  .attached-file-preview .remove {
+    background: transparent; border: 0; cursor: pointer;
+    color: var(--danger); font-size: 16px; padding: 2px 6px; border-radius: 3px;
+    line-height: 1;
+  }
+  .attached-file-preview .remove:hover { background: var(--danger-bg); }
+
   .chat-input-wrap textarea {
     width: 100%;
     min-height: 48px;
@@ -146,6 +160,21 @@
     font-size: 10px;
   }
 
+  .btn-attach {
+    background: transparent;
+    border: 1px solid var(--border-2);
+    padding: 7px 10px;
+    border-radius: var(--r-sm);
+    cursor: pointer;
+    color: var(--ink-3);
+    font-family: inherit;
+    font-size: 12px;
+    display: inline-flex; align-items: center; gap: 6px;
+    transition: all var(--t-fast);
+  }
+  .btn-attach:hover { background: var(--brand-50); border-color: var(--brand-500); color: var(--brand-700); }
+  .btn-attach svg { width: 13px; height: 13px; stroke-width: 2; }
+
   .suggestions {
     padding: 0 24px 12px;
     display: flex; flex-wrap: wrap; gap: 6px;
@@ -159,52 +188,9 @@
     cursor: pointer;
     color: var(--ink-2);
     transition: all var(--t-fast);
+    font-family: inherit;
   }
   .sugg:hover { background: var(--brand-50); border-color: var(--brand-500); color: var(--brand-800); }
-
-  /* CV MODE — mantém estrutura antiga */
-  .cv-shell {
-    display: grid;
-    grid-template-columns: 1fr 1.2fr;
-    gap: 18px;
-    align-items: start;
-  }
-  @media (max-width: 1100px) { .cv-shell { grid-template-columns: 1fr; } }
-  .chat-box { background: var(--paper); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; }
-  .cv-body { padding: 18px; min-height: 280px; }
-  .cv-input { border-top: 1px solid var(--border); padding: 12px 14px; background: var(--paper-2); }
-  .cv-input textarea {
-    width: 100%; min-height: 80px; padding: 10px 12px;
-    font-family: inherit; font-size: 13px;
-    border: 1px solid var(--border-2); border-radius: var(--r-sm);
-    background: #fff; resize: vertical; outline: none;
-  }
-  .cv-input textarea:focus { border-color: var(--brand-500); box-shadow: var(--sh-neon); }
-  .cv-file { display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
-  .file-label {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 6px 12px; border: 1px dashed var(--border-3); border-radius: var(--r-sm);
-    color: var(--ink-3); font-size: 12px; cursor: pointer; transition: all var(--t-fast);
-  }
-  .file-label:hover { border-color: var(--brand-500); color: var(--brand-700); }
-  .file-name { font-size: 12px; color: var(--ink-2); flex: 1; }
-  .file-clear { background: transparent; border: 0; cursor: pointer; color: var(--danger); font-size: 18px; line-height: 1; }
-
-  .cv-msg { padding: 12px 14px; border-radius: var(--r); margin-bottom: 10px; font-size: 13px; line-height: 1.55; }
-  .cv-msg.user { background: var(--brand-50); border-left: 3px solid var(--brand-500); }
-  .cv-msg.ai { background: var(--paper-3); border-left: 3px solid var(--ink-4); }
-  .cv-msg .who { font-size: 10.5px; text-transform: uppercase; letter-spacing: .12em; font-weight: 700; color: var(--ink-4); margin-bottom: 4px; }
-  .cv-msg.user .who { color: var(--brand-700); }
-
-  .preview-panel { background: var(--paper); border: 1px solid var(--border); border-radius: var(--r); padding: 20px 22px; }
-  .preview-panel .empty { text-align: center; padding: 48px 18px; color: var(--ink-4); font-size: 13px; }
-  .preview-panel .empty svg { width: 56px; height: 56px; color: var(--ink-5); margin-bottom: 16px; }
-  .preview-section { margin-top: 20px; }
-  .preview-section h4 { margin: 0 0 10px; font-size: 11px; font-weight: 700; color: var(--ink-3); text-transform: uppercase; letter-spacing: .12em; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
-  .confianca-tag { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
-  .confianca-tag.alta { background: var(--success-bg); color: var(--brand-700); }
-  .confianca-tag.media { background: var(--warn-bg); color: var(--warn); }
-  .confianca-tag.baixa { background: var(--danger-bg); color: var(--danger); }
 </style>
 </head>
 <body>
@@ -214,107 +200,58 @@
     <div class="breadcrumb">
       <a href="/dashboard.html">Painel</a>
       <span class="sep">›</span>
-      <a href="/employees.html">Funcionários</a>
-      <span class="sep">›</span>
-      <span>Agente IA</span>
+      <span>Ingrid</span>
     </div>
 
     <div class="page-header">
       <div>
-        <h1>Agente IA InfoPago</h1>
-        <p class="subtitle">Converse com a IA para operar o sistema, ou anexe um currículo para cadastro automático.</p>
+        <h1>Ingrid · Assistente IA</h1>
+        <p class="subtitle">Converse para operar o sistema, ou anexe um currículo para cadastro automático.</p>
       </div>
     </div>
 
-    <div class="tabs">
-      <button class="tab-btn active" onclick="goTab(0, this)">💬 Chat com agente</button>
-      <button class="tab-btn" onclick="goTab(1, this)">📄 Extrair dados de currículo</button>
-    </div>
+    <div class="chat-shell">
+      <div class="agent-header">
+        <div class="ai-avatar">iP</div>
+        <div><h3>Ingrid</h3></div>
+      </div>
 
-    <!-- ── 0. CHAT MODE ──────────────────────────────────── -->
-    <div class="tab-content active">
-      <div class="chat-shell">
-        <div class="agent-header">
-          <div class="ai-avatar">iP</div>
-          <div>
-            <h3>InfoPago IA</h3>
-            <small>Powered by Claude · acesso a 16 ferramentas do sistema</small>
-          </div>
-        </div>
+      <div class="chat-msgs" id="chat-msgs">
+        <div class="msg ai">
+          <div class="avatar">iP</div>
+          <div class="bubble">Olá! Eu sou a <strong>Ingrid</strong>, sua assistente do InfoPago RH. Posso operar o sistema pra você: cadastrar funcionários, gerar holerites, lançar pontos, registrar advertências, publicar comunicados, consultar dados, e muito mais.
 
-        <div class="chat-msgs" id="chat-msgs">
-          <div class="msg ai">
-            <div class="avatar">iP</div>
-            <div class="bubble">Olá! Sou o agente do InfoPago RH. Posso operar o sistema pra você — cadastrar funcionários, gerar holerites, lançar pontos, registrar advertências, publicar comunicados, consultar dados, etc.
-
-<strong>Me peça algo em linguagem natural</strong>, como:
-• "Cadastra o departamento Marketing"
-• "Quem são os funcionários ativos?"
-• "Aplica advertência verbal no João por atraso de 30 minutos"
-• "Gera o holerite do Pedro para maio/2026"
-• "Publica um comunicado urgente sobre confraternização dia 20/12"</div>
-          </div>
-        </div>
-
-        <div class="suggestions" id="suggestions">
-          <button class="sugg" onclick="enviarSugestao('Quantos funcionários ativos temos?')">Quantos funcionários ativos temos?</button>
-          <button class="sugg" onclick="enviarSugestao('Lista os departamentos da empresa')">Lista os departamentos</button>
-          <button class="sugg" onclick="enviarSugestao('Como está a folha do mês?')">Como está a folha do mês?</button>
-          <button class="sugg" onclick="enviarSugestao('Quais cargos existem?')">Quais cargos existem?</button>
-        </div>
-
-        <div class="chat-input-wrap">
-          <textarea id="chat-input" placeholder="Digite uma instrução em linguagem natural..." onkeydown="onKey(event)"></textarea>
-          <div class="chat-actions">
-            <span class="hint"><kbd>Enter</kbd> envia · <kbd>Shift</kbd>+<kbd>Enter</kbd> quebra linha · <kbd>Esc</kbd> limpa</span>
-            <button class="btn" onclick="limparChat()">🗑 Limpar</button>
-            <button class="btn btn-primary" onclick="enviar()">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2z"/></svg>
-              Enviar
-            </button>
-          </div>
+Você pode também <strong>anexar um currículo</strong> (PDF, JPG ou PNG) e eu extraio os dados pra cadastrar o funcionário automaticamente. Basta clicar em "Anexar arquivo" abaixo.</div>
         </div>
       </div>
-    </div>
 
-    <!-- ── 1. CV MODE ──────────────────────────────────── -->
-    <div class="tab-content">
-      <div class="cv-shell">
-        <div class="chat-box">
-          <div class="agent-header">
-            <div class="ai-avatar">iP</div>
-            <div>
-              <h3>Extrair dados</h3>
-              <small>Upload de PDF/JPG/PNG ou texto colado</small>
-            </div>
-          </div>
+      <div class="suggestions" id="suggestions">
+        <button class="sugg" onclick="enviarSugestao('Quantos funcionários ativos temos?')">Quantos funcionários ativos temos?</button>
+        <button class="sugg" onclick="enviarSugestao('Lista os departamentos da empresa')">Lista os departamentos</button>
+        <button class="sugg" onclick="enviarSugestao('Como está a folha do mês?')">Como está a folha do mês?</button>
+        <button class="sugg" onclick="enviarSugestao('Quais cargos existem?')">Quais cargos existem?</button>
+      </div>
 
-          <div class="cv-body" id="cv-body">
-            <div class="cv-msg ai">
-              <div class="who">🤖 Agente</div>
-              Envie um currículo ou cole o texto com os dados do candidato. Eu extraio e você revisa antes de criar.
-            </div>
-          </div>
-
-          <div class="cv-input">
-            <textarea id="cv-texto" placeholder="Cole texto com dados do candidato, ou deixe vazio se for só upload..."></textarea>
-            <div class="cv-file">
-              <label class="file-label" for="cv-file-input">📎 Anexar arquivo</label>
-              <input type="file" id="cv-file-input" accept="application/pdf,image/jpeg,image/png,image/webp" style="display:none" onchange="onCVFile(this.files[0])">
-              <span class="file-name" id="cv-file-name"></span>
-              <button class="file-clear hidden" id="cv-file-clear" onclick="limparArquivoCV()" title="Remover">✕</button>
-              <button class="btn btn-primary" onclick="analisarCV()" style="margin-left:auto">Analisar</button>
-            </div>
-          </div>
+      <div class="chat-input-wrap">
+        <div id="attached-preview" class="attached-file-preview" style="display:none">
+          <span class="file-chip-icon">PDF</span>
+          <span class="name" id="attached-name"></span>
+          <span class="size" id="attached-size"></span>
+          <button class="remove" onclick="removerAnexo()" title="Remover">×</button>
         </div>
 
-        <div class="preview-panel">
-          <div id="preview-content">
-            <div class="empty">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 11h-6"/><path d="M19 8v6"/></svg>
-              <div>Os dados extraídos vão aparecer aqui para revisão.</div>
-            </div>
-          </div>
+        <textarea id="chat-input" placeholder="Digite uma instrução em linguagem natural, ou anexe um currículo abaixo..." onkeydown="onKey(event)"></textarea>
+
+        <div class="chat-actions">
+          <label class="btn-attach" for="file-input">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+            Anexar arquivo
+          </label>
+          <input type="file" id="file-input" accept="application/pdf,image/jpeg,image/png,image/webp" style="display:none" onchange="anexarArquivo(this.files[0])">
+
+          <span class="hint"></span>
+          <button class="btn" onclick="limparChat()">Limpar</button>
+          <button class="btn btn-primary" onclick="enviar()">Enviar</button>
         </div>
       </div>
     </div>
@@ -326,17 +263,48 @@
   requireAuth();
   mountShell('agent');
 
-  function goTab(idx, btn) {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-    btn.classList.add('active');
-    document.querySelectorAll('.tab-content')[idx].classList.add('active');
+  /* ════════════════════════════════════════════════════
+     CHAT UNIFICADO — texto + anexo de currículo
+     ════════════════════════════════════════════════════ */
+  const STORAGE_KEY_CONVO = 'rh_chat_history';
+  const STORAGE_KEY_RENDER = 'rh_chat_render';
+
+  let conversation = [];
+  let renderLog = [];
+  let arquivoAnexado = null;
+
+  function persistChat() {
+    try {
+      localStorage.setItem(STORAGE_KEY_CONVO, JSON.stringify(conversation));
+      localStorage.setItem(STORAGE_KEY_RENDER, JSON.stringify(renderLog));
+    } catch (e) { console.warn('Falha ao persistir chat:', e.message); }
   }
 
-  /* ════════════════════════════════════════════════════
-     CHAT MODE — conversa multi-turn com tool use
-     ════════════════════════════════════════════════════ */
-  let conversation = []; // Histórico no formato Anthropic
+  function restoreChat() {
+    try {
+      const c = localStorage.getItem(STORAGE_KEY_CONVO);
+      const r = localStorage.getItem(STORAGE_KEY_RENDER);
+      if (!c || !r) return false;
+      conversation = JSON.parse(c);
+      renderLog = JSON.parse(r).filter(m => m.type === 'user' || m.type === 'ai');
+      if (!conversation.length) return false;
+      const cont = document.getElementById('chat-msgs');
+      cont.innerHTML = `<div class="msg ai">
+        <div class="avatar">iP</div>
+        <div class="bubble"><small style="color:var(--ink-3)">Conversa anterior continua abaixo</small></div>
+      </div>`;
+      for (const m of renderLog) {
+        if (m.type === 'user') addMsg('user', m.content, false, m.fileName);
+        else if (m.type === 'ai') addMsg('ai', m.content);
+      }
+      persistChat();
+      document.getElementById('suggestions').style.display = 'none';
+      return true;
+    } catch (e) {
+      console.warn('Falha ao restaurar chat:', e.message);
+      return false;
+    }
+  }
 
   function onKey(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -347,13 +315,18 @@
     }
   }
 
-  function addMsg(role, content, isHtml = false) {
+  function addMsg(role, content, isHtml = false, fileName = null) {
     const cont = document.getElementById('chat-msgs');
     const div = document.createElement('div');
     div.className = `msg ${role}`;
-    const avatar = role === 'user' ? (getUser()?.full_name || '?').split(' ').map(s => s[0]).slice(0, 2).join('').toUpperCase() : 'iP';
+    const avatar = role === 'user'
+      ? (getUser()?.full_name || '?').split(' ').map(s => s[0]).slice(0, 2).join('').toUpperCase()
+      : 'iP';
     const safe = isHtml ? content : escapeHTML(content);
-    div.innerHTML = `<div class="avatar">${avatar}</div><div class="bubble">${safe}</div>`;
+    const filePart = fileName
+      ? `<div class="file-chip"><span class="file-chip-icon">${(fileName.split('.').pop() || 'F').toUpperCase().slice(0,3)}</span>${escapeHTML(fileName)}</div>`
+      : '';
+    div.innerHTML = `<div class="avatar">${avatar}</div><div class="bubble">${filePart}${safe}</div>`;
     cont.appendChild(div);
     cont.scrollTop = cont.scrollHeight;
     return div;
@@ -378,24 +351,67 @@
     enviar();
   }
 
+  /* ── Anexar arquivo ──────────────────────────────── */
+  function anexarArquivo(f) {
+    if (!f) return;
+    if (f.size > 10 * 1024 * 1024) {
+      toast('Arquivo muito grande (máx. 10 MB).', 'warning');
+      return;
+    }
+    arquivoAnexado = f;
+    document.getElementById('attached-name').textContent = f.name;
+    document.getElementById('attached-size').textContent = `${(f.size/1024).toFixed(0)} KB`;
+    document.getElementById('attached-preview').style.display = 'flex';
+    document.getElementById('chat-input').placeholder = 'Adicione uma instrução (opcional). Ex: "cadastra esse funcionário"';
+  }
+
+  function removerAnexo() {
+    arquivoAnexado = null;
+    document.getElementById('file-input').value = '';
+    document.getElementById('attached-preview').style.display = 'none';
+    document.getElementById('chat-input').placeholder = 'Digite uma instrução em linguagem natural, ou anexe um currículo abaixo...';
+  }
+
+  /* ── Enviar (texto + arquivo opcional) ─────────────── */
   async function enviar() {
     const input = document.getElementById('chat-input');
-    const texto = input.value.trim();
-    if (!texto) return;
-
-    // Esconde sugestões depois da 1ª mensagem
+    let texto = input.value.trim();
+    if (!texto && !arquivoAnexado) return;
     document.getElementById('suggestions').style.display = 'none';
 
-    addMsg('user', texto);
+    const fileName = arquivoAnexado?.name || null;
+
+    // Renderiza mensagem do usuário (com chip de arquivo se houver)
+    if (!texto && arquivoAnexado) texto = 'Extraia os dados deste currículo e me mostre o que encontrou.';
+    addMsg('user', texto, false, fileName);
+    renderLog.push({ type: 'user', content: texto, fileName });
     input.value = '';
     input.disabled = true;
-
-    // Adiciona ao histórico
-    conversation.push({ role: 'user', content: texto });
 
     const thinking = addSystemMsg(`<span class="loading"></span> Pensando…`);
 
     try {
+      // Se tem arquivo, extrai primeiro
+      let textoFinal = texto;
+      if (arquivoAnexado) {
+        const fd = new FormData();
+        fd.append('arquivo', arquivoAnexado);
+        const r = await fetch('/api/agent/parse', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${getToken()}` },
+          body: fd,
+        });
+        if (!r.ok) throw new Error((await r.json()).error || 'Falha ao processar arquivo');
+        const extr = await r.json();
+
+        // Injeta os dados extraídos como contexto na mensagem do usuário
+        textoFinal = `${texto}\n\n[Anexei um currículo. Os dados extraídos pela leitura automática foram:]\n\`\`\`json\n${JSON.stringify(extr.dados || {}, null, 2)}\n\`\`\`\n[Confiança da extração: ${extr.confianca}. ${extr.observacoes || ''}]`;
+      }
+
+      conversation.push({ role: 'user', content: textoFinal });
+      persistChat();
+
+      // Chama o chat com tools (Ingrid decide o que fazer)
       const r = await api('/agent/chat', {
         method: 'POST',
         body: { messages: conversation },
@@ -403,38 +419,25 @@
 
       thinking.remove();
 
-      // Mostra tool calls de forma resumida (system messages)
-      if (r.trace) {
-        for (const t of r.trace) {
-          if (t.tool) {
-            const isErr = String(t.result_summary || '').startsWith('Erro');
-            addSystemMsg(`<div class="tool-call ${isErr ? 'error' : ''}">
-              <div class="tool-name">⚙ ${t.tool}</div>
-              <div class="tool-msg">${escapeHTML(t.result_summary)}</div>
-            </div>`);
-          }
-        }
-      }
-
-      // Mostra resposta final
       if (r.message) {
         addMsg('ai', r.message);
+        renderLog.push({ type: 'ai', content: r.message });
       }
 
-      // Atualiza histórico completo
       conversation = r.messages;
-
-      // Mostra tokens consumidos (footer discreto)
-      if (r.usage_total) {
-        addSystemMsg(`<small style="font-size:10.5px">📊 ${r.usage_total.input} tok entrada · ${r.usage_total.output} tok saída</small>`);
-      }
+      removerAnexo();
+      persistChat();
     } catch (err) {
       thinking.remove();
-      addSystemMsg(`<span style="color:var(--danger)">❌ ${escapeHTML(err.message)}</span>`);
+      addSystemMsg(`<span style="color:var(--danger)">${escapeHTML(err.message)}</span>`);
       if (err.message.includes('ANTHROPIC_API_KEY')) {
         addSystemMsg(`<span style="font-size:12px">Configure a chave em <code>secrets/.env</code> e reinicie o servidor.</span>`);
+      } else if (err.message.includes('tool_use') || err.message.includes('tool_result') || err.message.includes('invalid_request')) {
+        addSystemMsg(`<div style="font-size:12px">Histórico ficou inconsistente. <button class="btn btn-sm btn-primary" onclick="resetarHistorico()" style="margin-left:8px">Resetar conversa</button></div>`);
       }
       conversation.pop();
+      renderLog.pop();
+      persistChat();
     } finally {
       input.disabled = false;
       input.focus();
@@ -443,154 +446,23 @@
 
   function limparChat() {
     if (!confirm('Limpar todo o histórico da conversa?')) return;
+    resetarHistorico();
+  }
+
+  function resetarHistorico() {
     conversation = [];
+    renderLog = [];
+    localStorage.removeItem(STORAGE_KEY_CONVO);
+    localStorage.removeItem(STORAGE_KEY_RENDER);
     document.getElementById('chat-msgs').innerHTML = `<div class="msg ai">
       <div class="avatar">iP</div>
       <div class="bubble">Conversa limpa. Em que posso ajudar?</div>
     </div>`;
     document.getElementById('suggestions').style.display = 'flex';
+    removerAnexo();
   }
 
-  /* ════════════════════════════════════════════════════
-     CV MODE — extração de currículo
-     ════════════════════════════════════════════════════ */
-  let arquivoSelecionado = null;
-  let dadosExtraidos = null;
-
-  function onCVFile(f) {
-    if (!f) return;
-    arquivoSelecionado = f;
-    document.getElementById('cv-file-name').textContent = `📎 ${f.name} (${(f.size/1024).toFixed(0)} KB)`;
-    document.getElementById('cv-file-clear').classList.remove('hidden');
-  }
-  function limparArquivoCV() {
-    arquivoSelecionado = null;
-    document.getElementById('cv-file-input').value = '';
-    document.getElementById('cv-file-name').textContent = '';
-    document.getElementById('cv-file-clear').classList.add('hidden');
-  }
-
-  function addCVMsg(who, html, className = '') {
-    const cont = document.getElementById('cv-body');
-    const div = document.createElement('div');
-    div.className = `cv-msg ${className}`;
-    div.innerHTML = `<div class="who">${who}</div>${html}`;
-    cont.appendChild(div);
-    cont.scrollTop = cont.scrollHeight;
-    return div;
-  }
-
-  async function analisarCV() {
-    const texto = document.getElementById('cv-texto').value;
-    if (!arquivoSelecionado && !texto.trim()) {
-      toast('Anexe um arquivo ou cole texto.', 'warning');
-      return;
-    }
-    const resumo = [];
-    if (arquivoSelecionado) resumo.push(`📎 ${arquivoSelecionado.name}`);
-    if (texto.trim()) resumo.push(`💬 "${texto.slice(0, 100)}${texto.length > 100 ? '…' : ''}"`);
-    addCVMsg('🧑 Você', resumo.join('<br>'), 'user');
-
-    const loading = addCVMsg('🤖 Agente', `<span class="loading"></span> Analisando…`, 'ai');
-
-    const fd = new FormData();
-    if (arquivoSelecionado) fd.append('arquivo', arquivoSelecionado);
-    if (texto.trim()) fd.append('texto', texto.trim());
-
-    try {
-      const r = await fetch('/api/agent/parse', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${getToken()}` },
-        body: fd,
-      });
-      if (!r.ok) throw new Error((await r.json()).error || `Erro ${r.status}`);
-      const data = await r.json();
-
-      loading.innerHTML = `<div class="who">🤖 Agente</div>
-        Análise concluída · <span class="confianca-tag ${data.confianca}">Confiança ${data.confianca}</span>
-        ${data.observacoes ? `<div style="margin-top:8px;font-size:12px;color:var(--ink-3)"><em>${data.observacoes}</em></div>` : ''}`;
-
-      dadosExtraidos = data.dados || {};
-      renderPreview(dadosExtraidos, data);
-      limparArquivoCV();
-      document.getElementById('cv-texto').value = '';
-    } catch (err) {
-      loading.innerHTML = `<div class="who">🤖 Agente</div><div style="color:var(--danger)"><strong>Erro:</strong> ${err.message}</div>`;
-      toast(err.message, 'error');
-    }
-  }
-
-  function renderPreview(dados, full) {
-    const cont = document.getElementById('preview-content');
-    const campo = (label, name, value, type = 'text', extra = '') => `
-      <div class="field"><label>${label}</label>
-        <input type="${type}" name="${name}" value="${value ?? ''}" ${extra}></div>`;
-
-    cont.innerHTML = `
-      <h3 class="card-title">Revisar dados <small>${full.confianca}</small></h3>
-      <form id="previewForm">
-        <div class="preview-section">
-          <h4>Identificação</h4>
-          <div class="form-grid">
-            ${campo('Nome completo *', 'nome_completo', dados.nome_completo, 'text', 'required')}
-            ${campo('CPF *', 'cpf', dados.cpf, 'text', 'required data-mask="cpf"')}
-            ${campo('RG', 'rg', dados.rg)}
-            ${campo('PIS/PASEP', 'pis_pasep', dados.pis_pasep)}
-          </div>
-        </div>
-        <div class="preview-section">
-          <h4>Pessoal</h4>
-          <div class="form-grid">
-            ${campo('Nascimento *', 'data_nascimento', dados.data_nascimento, 'date', 'required')}
-            ${campo('Escolaridade', 'escolaridade', dados.escolaridade)}
-            ${campo('Nacionalidade', 'nacionalidade', dados.nacionalidade || 'Brasileiro(a)')}
-          </div>
-        </div>
-        <div class="preview-section">
-          <h4>Contato</h4>
-          <div class="form-grid">
-            ${campo('E-mail', 'email_pessoal', dados.email_pessoal, 'email')}
-            ${campo('Celular', 'celular', dados.celular, 'text', 'data-mask="telefone"')}
-            ${campo('CEP', 'cep', dados.cep, 'text', 'data-mask="cep"')}
-            ${campo('Cidade', 'cidade', dados.cidade)}
-            ${campo('UF', 'uf', dados.uf)}
-          </div>
-        </div>
-        <div class="preview-section">
-          <h4>Vínculo</h4>
-          <div class="form-grid">
-            ${campo('Admissão *', 'data_admissao', new Date().toISOString().split('T')[0], 'date', 'required')}
-            ${campo('Salário *', 'salario_base', '', 'number', 'step="0.01" required')}
-            ${campo('Carga semanal', 'carga_horaria_semanal', dados.carga_horaria_semanal || 44, 'number')}
-          </div>
-        </div>
-        <div class="flex gap-2 justify-end mt-5" style="border-top:1px solid var(--border);padding-top:14px">
-          <button type="button" class="btn" onclick="limparPreview()">Descartar</button>
-          <button type="button" class="btn btn-primary" onclick="criarFuncionario()">✅ Criar funcionário</button>
-        </div>
-      </form>`;
-    initMasks(cont);
-  }
-
-  function limparPreview() {
-    document.getElementById('preview-content').innerHTML = `<div class="empty">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-      <div>Os dados extraídos vão aparecer aqui.</div></div>`;
-  }
-
-  async function criarFuncionario() {
-    const f = document.getElementById('previewForm');
-    if (!validateForm(f)) return;
-    const data = formToObject(f);
-    showLoading();
-    try {
-      const emp = await api('/agent/create-employee', { method: 'POST', body: data });
-      toast(`Funcionário ${emp.nome_completo} cadastrado!`, 'success');
-      limparPreview();
-    } catch (err) {
-      toast(err.message, 'error');
-    } finally { hideLoading(); }
-  }
+  restoreChat();
 </script>
 </body>
 </html>

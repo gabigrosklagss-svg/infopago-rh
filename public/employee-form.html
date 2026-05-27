@@ -16,7 +16,7 @@
       </div>
       <div class="flex gap-2">
         <a href="/employees.html" class="btn">← Voltar</a>
-        <button class="btn btn-primary" onclick="salvar()">💾 Salvar</button>
+        <button class="btn btn-primary" onclick="salvar()"> Salvar</button>
       </div>
     </div>
 
@@ -40,7 +40,7 @@
             <p class="text-muted text-sm" style="margin:0 0 8px">JPG, PNG ou WebP · máx. 5 MB</p>
             <div class="flex gap-2">
               <input type="file" id="photo-input" accept="image/jpeg,image/png,image/webp" style="display:none">
-              <button type="button" class="btn btn-sm" onclick="document.getElementById('photo-input').click()">📷 Selecionar foto</button>
+              <button type="button" class="btn btn-sm" onclick="document.getElementById('photo-input').click()"> Selecionar foto</button>
               <button type="button" class="btn btn-sm btn-ghost hidden" id="photo-remove">Remover</button>
             </div>
           </div>
@@ -106,7 +106,7 @@
         <h3 class="card-title mt-5">Cargo / Departamento</h3>
         <div class="form-grid">
           <div class="field"><label>Departamento</label><select name="department_id" id="sel-dept"><option value="">—</option></select></div>
-          <div class="field"><label>Cargo</label><select name="position_id" id="sel-pos"><option value="">—</option></select></div>
+          <div class="field"><label>Cargo</label><select name="position_id" id="sel-pos" onchange="aplicarSalarioDoCargo()"><option value="">—</option></select></div>
           <div class="field"><label>Gestor direto</label><select name="gestor_id" id="sel-gestor"><option value="">—</option></select></div>
           <div class="field"><label>Setor</label><input name="setor"></div>
           <div class="field"><label>Seção</label><input name="secao"></div>
@@ -116,8 +116,8 @@
 
         <h3 class="card-title mt-5">Salário</h3>
         <div class="form-grid">
-          <div class="field"><label>Salário base (R$)<span class="req">*</span></label><input type="number" name="salario_base" step="0.01" required></div>
-          <div class="field"><label>Motivo (em caso de reajuste)</label><input name="motivo_reajuste" placeholder="Promoção, dissídio..."></div>
+          <div class="field"><label>Salário base (R$)<span class="req">*</span></label><input type="number" name="salario_base" id="inp-salario" step="0.01" required></div>
+          <div class="field hidden" id="campo-motivo-reajuste"><label>Motivo do reajuste</label><input name="motivo_reajuste" placeholder="Promoção, dissídio, mérito..."></div>
         </div>
       </div>
 
@@ -210,7 +210,11 @@
       api('/employees?status=ativo&limit=300'),
     ]);
     document.getElementById('sel-dept').innerHTML = '<option value="">—</option>' + depts.map(d => `<option value="${d.id}">${d.nome}</option>`).join('');
-    document.getElementById('sel-pos').innerHTML  = '<option value="">—</option>' + pos.map(p => `<option value="${p.id}">${p.titulo}${p.nivel ? ' · ' + p.nivel : ''}</option>`).join('');
+    // Guarda os cargos pra usar no auto-preenchimento de salário
+    window._cargos = Object.fromEntries(pos.map(p => [p.id, p]));
+    document.getElementById('sel-pos').innerHTML  = '<option value="">—</option>' + pos.map(p =>
+      `<option value="${p.id}" data-sal-min="${p.salario_minimo || ''}" data-sal-max="${p.salario_maximo || ''}">${p.titulo}${p.salario_minimo ? ' · faixa R$ ' + fmt.brl(p.salario_minimo).replace('R$ ', '') + ' a ' + fmt.brl(p.salario_maximo).replace('R$ ', '') : ''}</option>`
+    ).join('');
     document.getElementById('sel-gestor').innerHTML = '<option value="">—</option>' + (emps.data || []).map(e => `<option value="${e.id}">${e.nome_completo}</option>`).join('');
   }
 
@@ -221,6 +225,8 @@
       const e = await api(`/employees/${editId}`);
       const f = document.getElementById('form');
       fillForm(f, e);
+      // Em edição, mostrar campo de motivo do reajuste
+      document.getElementById('campo-motivo-reajuste').classList.remove('hidden');
       if (e.foto_url) renderPhotoPreview(e.foto_url);
       else {
         const init = (e.nome_completo || '?').split(' ').slice(0,2).map(s=>s[0]).join('').toUpperCase();
@@ -230,9 +236,31 @@
     finally { hideLoading(); }
   }
 
+  /* Auto-preenche salário com base na faixa mínima do cargo escolhido */
+  function aplicarSalarioDoCargo() {
+    const sel = document.getElementById('sel-pos');
+    const inp = document.getElementById('inp-salario');
+    if (!sel.value) return;
+    const cargo = (window._cargos || {})[sel.value];
+    if (!cargo?.salario_minimo) return;
+
+    // Se está editando funcionário e já tem salário, pergunta antes de sobrescrever
+    if (editId && inp.value && parseFloat(inp.value) > 0) {
+      const confirma = confirm(`O cargo "${cargo.titulo}" tem faixa salarial inicial de R$ ${cargo.salario_minimo}.\n\nQuer atualizar o salário deste funcionário?`);
+      if (!confirma) return;
+    }
+    inp.value = cargo.salario_minimo;
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
   function renderPhotoPreview(url) {
     const p = document.getElementById('photo-preview');
-    p.innerHTML = `<img src="${url}?t=${Date.now()}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">`;
+    p.style.background = 'none';
+    p.style.boxShadow = 'none';
+    p.style.overflow = 'hidden';
+    p.style.position = 'relative';
+    p.style.padding = '0';
+    p.innerHTML = `<img src="${url}?t=${Date.now()}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block">`;
     document.getElementById('photo-remove').classList.remove('hidden');
   }
 

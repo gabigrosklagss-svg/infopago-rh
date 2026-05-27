@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rescisão e 13º Salário — InfoPago RH</title>
+<link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<div class="app">
+  <div id="sidebar"></div>
+  <main class="main">
+    <div class="breadcrumb">
+      <a href="/dashboard.html">Painel</a>
+      <span class="sep">›</span>
+      <span>Documentos da folha</span>
+    </div>
+
+    <div class="page-header">
+      <div>
+        <h1>Rescisão e 13º Salário</h1>
+        <p class="subtitle">Cálculos automáticos com PDF (TRCT) e folha de 13º</p>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="goTab(0, this)">Rescisões (TRCT)</button>
+      <button class="tab-btn" onclick="goTab(1, this)">13º Salário</button>
+    </div>
+    <p class="text-muted text-sm" style="margin:-8px 0 14px">Recibos de Férias agora ficam na seção <a href="/vacations.html" style="color:var(--brand-700);font-weight:600">Férias</a>.</p>
+
+    <!-- RESCISÕES -->
+    <div class="tab-content active">
+      <div class="flex justify-between items-center mb-4">
+        <h3 style="margin:0">Rescisões</h3>
+        <button class="btn btn-primary" onclick="novaRescisao()">+ Nova rescisão</button>
+      </div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Funcionário</th><th>Demissão</th><th>Tipo</th><th>Líquido</th><th>Status</th><th></th></tr></thead>
+          <tbody id="tbody-resc"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 13º -->
+    <div class="tab-content">
+      <div class="flex justify-between items-center mb-4">
+        <h3 style="margin:0">13º Salário</h3>
+        <div class="flex gap-2">
+          <button class="btn" onclick="lote13(1)">+ Gerar 1ª parcela (lote)</button>
+          <button class="btn btn-primary" onclick="lote13(2)">+ Gerar 2ª parcela (lote)</button>
+          <button class="btn" onclick="novo13()">+ Individual</button>
+        </div>
+      </div>
+      <div class="filter-bar">
+        <div class="field"><label>Ano</label><select id="f13-ano" onchange="loadList13()"></select></div>
+        <div class="field"><label>Parcela</label>
+          <select id="f13-parc" onchange="loadList13()">
+            <option value="">Todas</option><option value="1">1ª</option><option value="2">2ª</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Funcionário</th><th>Ano</th><th>Parcela</th><th>Meses</th><th>Bruto</th><th>Líquido</th><th></th></tr></thead>
+          <tbody id="tbody-13"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- FÉRIAS -->
+    <div class="tab-content">
+      <div class="flex justify-between items-center mb-4">
+        <h3 style="margin:0">Recibos de Férias</h3>
+        <button class="btn btn-primary" onclick="novoRecibo()">+ Novo recibo</button>
+      </div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Funcionário</th><th>Período de gozo</th><th>Dias</th><th>Líquido</th><th>Status</th><th></th></tr></thead>
+          <tbody id="tbody-fer"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+  requireAuth();
+  mountShell('hrdocs');
+
+  function goTab(idx, btn) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.tab-content')[idx].classList.add('active');
+    if (idx === 0) loadRescisoes();
+    if (idx === 1) loadList13();
+    if (idx === 2) loadRecibos();
+  }
+
+  /* ════════════════ RESCISÕES ════════════════ */
+  const TIPOS = {
+    sem_justa_causa_empregador: 'Sem justa causa (empregador)',
+    pedido_demissao: 'Pedido de demissão',
+    justa_causa: 'Justa causa',
+    comum_acordo: 'Comum acordo',
+    termino_contrato_experiencia: 'Fim contrato experiência',
+    termino_contrato_determinado: 'Fim contrato determinado',
+    aposentadoria: 'Aposentadoria',
+    falecimento: 'Falecimento',
+  };
+
+  async function loadRescisoes() {
+    const list = await api('/terminations');
+    document.getElementById('tbody-resc').innerHTML = list.length ? list.map(t => `
+      <tr>
+        <td><strong>${t.employees?.nome_completo}</strong><br><small class="text-muted">${fmt.matricula(t.employees?.matricula)}</small></td>
+        <td>${fmt.data(t.data_demissao)}</td>
+        <td><small>${TIPOS[t.tipo_rescisao] || t.tipo_rescisao}</small></td>
+        <td><strong>${fmt.brl(t.total_liquido)}</strong></td>
+        <td><span class="badge ${t.status === 'paga' ? 'ativo' : 'pendente'}">${t.status}</span></td>
+        <td>
+          <button class="btn btn-sm" onclick="gerarPdfResc('${t.id}')">PDF</button>
+          ${t.pdf_path ? `<button class="btn btn-sm" onclick="downloadAuth('/api/terminations/${t.id}/download','rescisao.pdf')">Baixar</button>` : ''}
+          <button class="btn btn-sm btn-danger" onclick="excluirResc('${t.id}')">Excluir</button>
+        </td>
+      </tr>
+    `).join('') : '<tr><td colspan="6" class="table-empty">Nenhuma rescisão registrada.</td></tr>';
+  }
+
+  async function novaRescisao() {
+    const emps = await api('/employees?status=ativo&limit=300');
+    const opts = (emps.data || []).map(e => `<option value="${e.id}" data-salario="${e.salario_base}" data-admissao="${e.data_admissao}">${fmt.matricula(e.matricula)} · ${e.nome_completo}</option>`).join('');
+    const tiposOpts = Object.entries(TIPOS).map(([k,v]) => `<option value="${k}">${v}</option>`).join('');
+
+    const html = `<form id="rescForm">
+      <div class="form-grid">
+        <div class="field" style="grid-column:span 2"><label>Funcionário<span class="req">*</span></label>
+          <select name="employee_id" required>${opts}</select></div>
+        <div class="field"><label>Data demissão<span class="req">*</span></label><input type="date" name="data_demissao" required></div>
+        <div class="field"><label>Tipo de rescisão<span class="req">*</span></label>
+          <select name="tipo_rescisao" required>${tiposOpts}</select></div>
+        <div class="field"><label>Aviso prévio</label>
+          <select name="aviso_previo_tipo">
+            <option value="nao_aplica">Não se aplica</option>
+            <option value="trabalhado">Trabalhado</option>
+            <option value="indenizado">Indenizado</option>
+            <option value="dispensado">Dispensado</option>
+          </select></div>
+        <div class="field"><label>Saldo FGTS acumulado (R$)</label><input type="number" name="saldo_fgts_acumulado" value="0" step="0.01"></div>
+        <div class="field"><label>Outros proventos</label><input type="number" name="outros_proventos" value="0" step="0.01"></div>
+        <div class="field" style="grid-column:span 2"><label>Descrição outros proventos</label><input name="outros_proventos_desc"></div>
+        <div class="field"><label>Pensão alimentícia</label><input type="number" name="pensao_alimenticia" value="0" step="0.01"></div>
+        <div class="field"><label>Adiantamentos</label><input type="number" name="adiantamentos" value="0" step="0.01"></div>
+        <div class="field"><label>Outros descontos</label><input type="number" name="outros_descontos" value="0" step="0.01"></div>
+        <div class="field"><label>Descrição outros descontos</label><input name="outros_descontos_desc"></div>
+      </div>
+      <label class="toggle mt-3"><input type="checkbox" name="tem_ferias_vencidas"><span class="slider"></span> Tem período aquisitivo de férias não gozado</label>
+      <div class="field mt-3"><label>Motivo / Observações</label><textarea name="motivo"></textarea></div>
+    </form>`;
+
+    showFormModal('Nova rescisão (TRCT)', html, async () => {
+      const f = document.getElementById('rescForm');
+      if (!validateForm(f)) return;
+      const d = formToObject(f);
+      d.tem_ferias_vencidas = !!d.tem_ferias_vencidas;
+      ['saldo_fgts_acumulado','outros_proventos','pensao_alimenticia','adiantamentos','outros_descontos'].forEach(k => d[k] = parseFloat(d[k]) || 0);
+      showLoading();
+      try {
+        const r = await api('/terminations', { method: 'POST', body: d });
+        toast(`Rescisão calculada · líquido ${fmt.brl(r.total_liquido)}`, 'success');
+        closeFormModal();
+        loadRescisoes();
+      } catch (err) { toast(err.message, 'error'); }
+      finally { hideLoading(); }
+    });
+  }
+
+  async function gerarPdfResc(id) {
+    showLoading();
+    try { await api(`/terminations/${id}/pdf`, { method: 'POST' }); toast('PDF gerado.', 'success'); loadRescisoes(); }
+    catch (err) { toast(err.message, 'error'); }
+    finally { hideLoading(); }
+  }
+
+  async function excluirResc(id) {
+    if (!confirm('Excluir esta rescisão permanentemente?')) return;
+    try { await api(`/terminations/${id}`, { method: 'DELETE' }); toast('Excluída.', 'success'); loadRescisoes(); }
+    catch (err) { toast(err.message, 'error'); }
+  }
+
+  /* ════════════════ 13º ════════════════ */
+  const anoAtual = new Date().getFullYear();
+  document.getElementById('f13-ano').innerHTML = [anoAtual, anoAtual-1, anoAtual-2].map(a => `<option value="${a}">${a}</option>`).join('');
+
+  async function loadList13() {
+    const ano = document.getElementById('f13-ano').value;
+    const parc = document.getElementById('f13-parc').value;
+    const q = new URLSearchParams({ ano }); if (parc) q.set('parcela', parc);
+    const list = await api(`/thirteenth?${q}`);
+    document.getElementById('tbody-13').innerHTML = list.length ? list.map(t => `
+      <tr>
+        <td><strong>${t.employees?.nome_completo}</strong><br><small class="text-muted">${fmt.matricula(t.employees?.matricula)}</small></td>
+        <td>${t.ano}</td>
+        <td>${t.parcela}ª</td>
+        <td>${t.meses_trabalhados}/12</td>
+        <td>${fmt.brl(t.valor_parcela)}</td>
+        <td><strong>${fmt.brl(t.valor_liquido)}</strong></td>
+        <td>
+          <button class="btn btn-sm" onclick="gerarPdf13('${t.id}')">PDF</button>
+          ${t.pdf_path ? `<button class="btn btn-sm" onclick="downloadAuth('/api/thirteenth/${t.id}/download','13o.pdf')">Baixar</button>` : ''}
+          <button class="btn btn-sm btn-danger" onclick="excluir13('${t.id}')">×</button>
+        </td>
+      </tr>
+    `).join('') : '<tr><td colspan="7" class="table-empty">Nenhum registro.</td></tr>';
+  }
+
+  async function novo13() {
+    const emps = await api('/employees?status=ativo&limit=300');
+    const opts = (emps.data || []).map(e => `<option value="${e.id}">${fmt.matricula(e.matricula)} · ${e.nome_completo}</option>`).join('');
+    const html = `<form id="t13Form">
+      <div class="form-grid">
+        <div class="field" style="grid-column:span 2"><label>Funcionário<span class="req">*</span></label><select name="employee_id" required>${opts}</select></div>
+        <div class="field"><label>Ano<span class="req">*</span></label><input type="number" name="ano" value="${anoAtual}" required></div>
+        <div class="field"><label>Parcela<span class="req">*</span></label>
+          <select name="parcela" required><option value="1">1ª (50% sem desconto)</option><option value="2">2ª (50% com INSS+IRRF)</option></select></div>
+        <div class="field"><label>Data pagamento</label><input type="date" name="data_pagamento"></div>
+        <div class="field"><label>Média HE (R$)</label><input type="number" name="media_he" value="0" step="0.01"></div>
+      </div>
+    </form>`;
+    showFormModal('Gerar 13º individual', html, async () => {
+      const f = document.getElementById('t13Form');
+      if (!validateForm(f)) return;
+      const d = formToObject(f);
+      d.ano = parseInt(d.ano); d.parcela = parseInt(d.parcela); d.media_he = parseFloat(d.media_he) || 0;
+      try {
+        const r = await api('/thirteenth', { method: 'POST', body: d });
+        toast(`13º gerado · líquido ${fmt.brl(r.valor_liquido)}`, 'success');
+        closeFormModal();
+        loadList13();
+      } catch (err) { toast(err.message, 'error'); }
+    });
+  }
+
+  async function lote13(parcela) {
+    const data_pagamento = prompt(`Data de pagamento da ${parcela}ª parcela do 13º/${anoAtual} (formato YYYY-MM-DD):`);
+    if (!data_pagamento) return;
+    if (!confirm(`Gerar 13º (${parcela}ª parcela) para TODOS os funcionários ativos?`)) return;
+    showLoading();
+    try {
+      const r = await api(`/thirteenth/lote/${anoAtual}/${parcela}`, { method: 'POST', body: { data_pagamento } });
+      toast(`${r.gerados} gerado(s), ${r.erros} erro(s)`, r.erros ? 'warning' : 'success');
+      loadList13();
+    } catch (err) { toast(err.message, 'error'); }
+    finally { hideLoading(); }
+  }
+
+  async function gerarPdf13(id) {
+    try { await api(`/thirteenth/${id}/pdf`, { method: 'POST' }); toast('PDF gerado.', 'success'); loadList13(); }
+    catch (err) { toast(err.message, 'error'); }
+  }
+  async function excluir13(id) {
+    if (!confirm('Excluir este 13º?')) return;
+    try { await api(`/thirteenth/${id}`, { method: 'DELETE' }); toast('Excluído.', 'success'); loadList13(); }
+    catch (err) { toast(err.message, 'error'); }
+  }
+
+  /* ════════════════ RECIBOS DE FÉRIAS ════════════════ */
+  async function loadRecibos() {
+    const list = await api('/vacation-receipts');
+    document.getElementById('tbody-fer').innerHTML = list.length ? list.map(r => `
+      <tr>
+        <td><strong>${r.employees?.nome_completo}</strong><br><small class="text-muted">${fmt.matricula(r.employees?.matricula)}</small></td>
+        <td>${fmt.data(r.data_inicio_gozo)} → ${fmt.data(r.data_fim_gozo)}</td>
+        <td>${r.dias_ferias} + ${r.dias_abono} abono</td>
+        <td><strong>${fmt.brl(r.total_liquido)}</strong></td>
+        <td><span class="badge ${r.status === 'pago' ? 'ativo' : 'pendente'}">${r.status}</span></td>
+        <td>
+          <button class="btn btn-sm" onclick="gerarPdfFer('${r.id}')">PDF</button>
+          ${r.pdf_path ? `<button class="btn btn-sm" onclick="downloadAuth('/api/vacation-receipts/${r.id}/download','recibo-ferias.pdf')">Baixar</button>` : ''}
+          <button class="btn btn-sm btn-danger" onclick="excluirFer('${r.id}')">×</button>
+        </td>
+      </tr>
+    `).join('') : '<tr><td colspan="6" class="table-empty">Nenhum recibo gerado.</td></tr>';
+  }
+
+  async function novoRecibo() {
+    const emps = await api('/employees?status=ativo&limit=300');
+    const opts = (emps.data || []).map(e => `<option value="${e.id}">${fmt.matricula(e.matricula)} · ${e.nome_completo}</option>`).join('');
+    const html = `<form id="ferForm">
+      <div class="form-grid">
+        <div class="field" style="grid-column:span 2"><label>Funcionário<span class="req">*</span></label><select name="employee_id" required>${opts}</select></div>
+        <div class="field"><label>Início do gozo<span class="req">*</span></label><input type="date" name="data_inicio_gozo" required></div>
+        <div class="field"><label>Fim do gozo<span class="req">*</span></label><input type="date" name="data_fim_gozo" required></div>
+        <div class="field"><label>Dias de férias<span class="req">*</span></label><input type="number" name="dias_ferias" required min="1" max="30" value="30"></div>
+        <div class="field"><label>Dias de abono (vendidos)</label><input type="number" name="dias_abono" value="0" min="0" max="10"></div>
+        <div class="field"><label>Média HE (R$)</label><input type="number" name="media_he" value="0" step="0.01"></div>
+        <div class="field"><label>Data pagamento</label><input type="date" name="data_pagamento"></div>
+        <div class="field"><label>Período aquisitivo (início)</label><input type="date" name="periodo_aquisitivo_inicio"></div>
+        <div class="field"><label>Período aquisitivo (fim)</label><input type="date" name="periodo_aquisitivo_fim"></div>
+      </div>
+      <label class="toggle mt-3"><input type="checkbox" name="adiantamento_13"><span class="slider"></span> Adiantar 1ª parcela do 13º junto</label>
+      <div class="field mt-3"><label>Observações</label><textarea name="observacoes"></textarea></div>
+    </form>`;
+    showFormModal('Novo recibo de férias', html, async () => {
+      const f = document.getElementById('ferForm');
+      if (!validateForm(f)) return;
+      const d = formToObject(f);
+      d.dias_ferias = parseInt(d.dias_ferias); d.dias_abono = parseInt(d.dias_abono) || 0;
+      d.media_he = parseFloat(d.media_he) || 0;
+      d.adiantamento_13 = !!d.adiantamento_13;
+      try {
+        const r = await api('/vacation-receipts', { method: 'POST', body: d });
+        toast(`Recibo gerado · líquido ${fmt.brl(r.total_liquido)}`, 'success');
+        closeFormModal();
+        loadRecibos();
+      } catch (err) { toast(err.message, 'error'); }
+    });
+  }
+
+  async function gerarPdfFer(id) {
+    try { await api(`/vacation-receipts/${id}/pdf`, { method: 'POST' }); toast('PDF gerado.', 'success'); loadRecibos(); }
+    catch (err) { toast(err.message, 'error'); }
+  }
+  async function excluirFer(id) {
+    if (!confirm('Excluir este recibo?')) return;
+    try { await api(`/vacation-receipts/${id}`, { method: 'DELETE' }); toast('Excluído.', 'success'); loadRecibos(); }
+    catch (err) { toast(err.message, 'error'); }
+  }
+
+  /* Modal helper */
+  function showFormModal(title, html, onSave) {
+    let m = document.getElementById('form-modal');
+    if (!m) { m = document.createElement('div'); m.id = 'form-modal'; m.className = 'modal-overlay'; m.onclick = (e) => { if (e.target === m) closeFormModal(); }; document.body.appendChild(m); }
+    m.innerHTML = `<div class="modal modal-lg"><div class="modal-header"><h2>${title}</h2><button class="modal-close" onclick="closeFormModal()">×</button></div><div class="modal-body">${html}</div><div class="modal-footer"><button class="btn" onclick="closeFormModal()">Cancelar</button><button class="btn btn-primary" id="form-save">Salvar</button></div></div>`;
+    m.classList.remove('hidden');
+    initMasks(m);
+    document.getElementById('form-save').onclick = onSave;
+  }
+  function closeFormModal() { document.getElementById('form-modal')?.remove(); }
+
+  loadRescisoes();
+</script>
+</body>
+</html>

@@ -30,6 +30,26 @@ router.post('/', requireAuth, requireRole('admin', 'rh'), async (req, res) => {
   if (!payload.titulo) return res.status(400).json({ error: 'Título é obrigatório.' });
   const { data, error } = await supabase.from('positions').insert(payload).select().single();
   if (error) return res.status(400).json({ error: error.message });
+
+  // Auto-cria uma faixa salarial inicial no Plano de Cargos
+  if (data.salario_minimo) {
+    try {
+      const nivelLabel = payload.nivel
+        ? payload.nivel.charAt(0).toUpperCase() + payload.nivel.slice(1)
+        : 'Inicial';
+      await supabase.from('position_grades').insert({
+        position_id: data.id,
+        grade_nivel: nivelLabel,
+        salario_base: data.salario_minimo,
+        ordem: 1,
+        ativo: true,
+        descricao_competencias: payload.cbo_descricao || null,
+      });
+    } catch (e) {
+      console.warn('[positions] faixa não criada:', e.message);
+    }
+  }
+
   res.status(201).json(data);
 });
 
@@ -41,9 +61,19 @@ router.put('/:id', requireAuth, requireRole('admin', 'rh'), async (req, res) => 
   res.json(data);
 });
 
-router.delete('/:id', requireAuth, requireRole('admin'), async (req, res) => {
+router.delete('/:id', requireAuth, requireRole('admin', 'rh'), async (req, res) => {
+  // Soft delete
   const { error } = await supabase.from('positions').update({ active: false }).eq('id', req.params.id);
   if (error) return res.status(400).json({ error: error.message });
+  res.json({ success: true });
+});
+
+router.delete('/:id/hard', requireAuth, requireRole('admin'), async (req, res) => {
+  const { error } = await supabase.from('positions').delete().eq('id', req.params.id);
+  if (error) {
+    if (error.code === '23503') return res.status(400).json({ error: 'Não é possível excluir: existem funcionários vinculados a este cargo.' });
+    return res.status(400).json({ error: error.message });
+  }
   res.json({ success: true });
 });
 

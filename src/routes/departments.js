@@ -27,10 +27,20 @@ router.put('/:id', requireAuth, requireRole('admin', 'rh'), async (req, res) => 
   res.json(data);
 });
 
-router.delete('/:id', requireAuth, requireRole('admin'), async (req, res) => {
-  // Desativa em vez de apagar
+router.delete('/:id', requireAuth, requireRole('admin', 'rh'), async (req, res) => {
+  // Soft delete (desativa)
   const { error } = await supabase.from('departments').update({ active: false }).eq('id', req.params.id);
   if (error) return res.status(400).json({ error: error.message });
+  res.json({ success: true });
+});
+
+router.delete('/:id/hard', requireAuth, requireRole('admin'), async (req, res) => {
+  // Hard delete (remove de verdade). Falha se houver funcionários vinculados (FK).
+  const { error } = await supabase.from('departments').delete().eq('id', req.params.id);
+  if (error) {
+    if (error.code === '23503') return res.status(400).json({ error: 'Não é possível excluir: existem funcionários ou cargos vinculados a este departamento.' });
+    return res.status(400).json({ error: error.message });
+  }
   res.json({ success: true });
 });
 

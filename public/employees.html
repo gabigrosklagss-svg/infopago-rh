@@ -132,6 +132,7 @@
 
   /* ── Ficha completa (pop-up) ──────────────────────────── */
   let currentFichaTab = 'dados';
+  let currentFichaEmployeeId = null;
 
   async function openFicha(id) {
     showLoading();
@@ -160,14 +161,14 @@
 
         <!-- Tabs -->
         <div class="tabs">
-          <button class="tab-btn active" onclick="setTab('dados')">📋 Dados</button>
-          <button class="tab-btn" onclick="setTab('documentos')">📎 Documentos (${d.documentos.length})</button>
-          <button class="tab-btn" onclick="setTab('holerites')">📄 Holerites (${d.holerites.length})</button>
-          <button class="tab-btn" onclick="setTab('faltas')">📅 Faltas/Atestados (${d.faltas_atestados.length})</button>
-          <button class="tab-btn" onclick="setTab('advertencias')">⚠ Advertências (${d.advertencias.length})</button>
-          <button class="tab-btn" onclick="setTab('salario')">💰 Histórico Salarial (${d.historico_salarial.length})</button>
-          <button class="tab-btn" onclick="setTab('ferias')">🏖 Férias (${d.ferias.length})</button>
-          <button class="tab-btn" onclick="setTab('processos')">📋 Admissão/Demissão (${d.checklists.length})</button>
+          <button class="tab-btn active" onclick="setTab('dados')"> Dados</button>
+          <button class="tab-btn" onclick="setTab('documentos')"> Documentos (${d.documentos.length})</button>
+          <button class="tab-btn" onclick="setTab('holerites')"> Holerites (${d.holerites.length})</button>
+          <button class="tab-btn" onclick="setTab('faltas')"> Faltas/Atestados (${d.faltas_atestados.length})</button>
+          <button class="tab-btn" onclick="setTab('advertencias')"> Advertências (${d.advertencias.length})</button>
+          <button class="tab-btn" onclick="setTab('salario')"> Histórico Salarial (${d.historico_salarial.length})</button>
+          <button class="tab-btn" onclick="setTab('ferias')"> Férias (${d.ferias.length})</button>
+          <button class="tab-btn" onclick="setTab('processos')"> Admissão/Demissão (${d.checklists.length})</button>
         </div>
 
         <!-- Conteúdo: Dados -->
@@ -225,7 +226,7 @@
                 <td>${fmt.brl(h.salario_liquido)}</td>
                 <td><span class="badge ${h.status}">${h.status}</span></td>
                 <td>${fmt.data(h.data_pagamento)}</td>
-                <td>${h.pdf_path ? `<button class="btn btn-sm" onclick="downloadAuth('/api/payslips/${h.id}/download', 'Holerite_${h.competencia_mes}_${h.competencia_ano}.pdf')">📄 PDF</button>` : ''}</td>
+                <td>${h.pdf_path ? `<button class="btn btn-sm" onclick="downloadAuth('/api/payslips/${h.id}/download', 'Holerite_${h.competencia_mes}_${h.competencia_ano}.pdf')"> PDF</button>` : ''}</td>
               </tr>`).join('')}</tbody></table>` : '<p class="text-muted">Nenhum holerite gerado.</p>'}
         </div>
 
@@ -246,13 +247,18 @@
         <div id="tab-advertencias" class="tab-content">
           <button class="btn btn-primary btn-sm mb-3" onclick="abrirFormWarning('${id}')">+ Aplicar advertência</button>
           ${d.advertencias.length ? `<table class="table">
-            <thead><tr><th>Tipo</th><th>Data</th><th>Motivo</th><th>Dias susp.</th><th>Ciente</th></tr></thead>
+            <thead><tr><th>Tipo</th><th>Data</th><th>Motivo</th><th>Dias susp.</th><th>Ciente</th><th></th></tr></thead>
             <tbody>${d.advertencias.map(a => `
               <tr><td><span class="badge ${a.tipo}">${a.tipo.replace('_', ' ')}</span></td>
               <td>${fmt.data(a.data_ocorrencia)}</td>
               <td>${a.motivo}</td>
               <td>${a.dias_suspensao || 0}</td>
-              <td>${a.funcionario_ciente ? '✓ Sim' : '✕ Não'}</td></tr>`).join('')}</tbody></table>`
+              <td>
+                <button class="btn btn-sm ${a.funcionario_ciente ? 'btn-success' : ''}" onclick="toggleCienteAdvertencia('${a.id}', ${!a.funcionario_ciente}, '${id}')" title="Clique para alterar">
+                  ${a.funcionario_ciente ? 'Sim' : 'Não'}
+                </button>
+              </td>
+              <td><button class="btn btn-sm btn-primary" onclick="baixarAdvertenciaPDF('${a.id}', '${(d.employee.nome_completo || '').split(' ')[0]}', '${a.data_ocorrencia}')">Gerar PDF</button></td></tr>`).join('')}</tbody></table>`
             : '<p class="text-muted">Sem advertências registradas.</p>'}
         </div>
 
@@ -306,11 +312,11 @@
                 <td><strong>${formatTipoDoc(doc.tipo)}</strong></td>
                 <td>${doc.descricao || '—'}</td>
                 <td>${fmt.data(doc.data_emissao)}</td>
-                <td>${doc.data_validade ? fmt.data(doc.data_validade) + (vencido ? ' ⚠' : '') : '—'}</td>
+                <td>${doc.data_validade ? fmt.data(doc.data_validade) + (vencido ? ' ' : '') : '—'}</td>
                 <td>${(doc.tamanho_bytes/1024).toFixed(0)} KB</td>
                 <td>${fmt.data(doc.created_at)}</td>
                 <td>
-                  <button class="btn btn-sm" onclick="baixarDocumento('${doc.id}')">⬇ Baixar</button>
+                  <button class="btn btn-sm" onclick="baixarDocumento('${doc.id}')"> Baixar</button>
                   <button class="btn btn-sm btn-danger" onclick="apagarDocumento('${doc.id}', '${id}')">✕</button>
                 </td></tr>`;
             }).join('')}</tbody></table>`
@@ -329,7 +335,7 @@
             const pct = total ? Math.round(concluidos/total*100) : 0;
             return `<div class="card mb-3">
               <h4 style="margin-top:0;display:flex;justify-content:space-between;align-items:center">
-                <span>${c.tipo === 'onboarding' ? '🟢 Admissão' : '🔴 Demissão'} · <small class="text-muted">${fmt.data(c.data_inicio)}</small></span>
+                <span>${c.tipo === 'onboarding' ? ' Admissão' : ' Demissão'} · <small class="text-muted">${fmt.data(c.data_inicio)}</small></span>
                 <span class="badge ${c.status === 'concluido' ? 'ativo' : 'pendente'}">${c.status} · ${pct}%</span>
               </h4>
               <div style="background:var(--paper-3);border-radius:4px;height:6px;margin-bottom:14px;overflow:hidden">
@@ -357,20 +363,39 @@
       `;
 
       document.getElementById('modal').classList.remove('hidden');
-      currentFichaTab = 'dados';
+
+      // Se for um funcionário diferente, volta pra 'dados'.
+      // Se for o MESMO funcionário (recarregamento após ação), restaura a aba que estava aberta.
+      if (currentFichaEmployeeId !== id) {
+        currentFichaTab = 'dados';
+        currentFichaEmployeeId = id;
+      } else if (currentFichaTab && currentFichaTab !== 'dados') {
+        ativarAbaFicha(currentFichaTab);
+      }
     } catch (err) { toast(err.message, 'error'); }
     finally { hideLoading(); }
   }
 
-  function setTab(tab) {
+  /** Ativa programaticamente uma aba (sem depender de event.target). */
+  function ativarAbaFicha(tab) {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-    event.target.classList.add('active');
-    document.getElementById(`tab-${tab}`).classList.add('active');
+    const btn = [...document.querySelectorAll('.tab-btn')].find(b => (b.getAttribute('onclick') || '').includes(`'${tab}'`));
+    if (btn) btn.classList.add('active');
+    const cont = document.getElementById(`tab-${tab}`);
+    if (cont) cont.classList.add('active');
     currentFichaTab = tab;
   }
 
-  function closeModal() { document.getElementById('modal').classList.add('hidden'); }
+  function setTab(tab) {
+    ativarAbaFicha(tab);
+  }
+
+  function closeModal() {
+    document.getElementById('modal').classList.add('hidden');
+    currentFichaEmployeeId = null;
+    currentFichaTab = 'dados';
+  }
 
   /* ── Modais para criar advertência / falta ─────────── */
   function abrirFormAbsence(empId) {
@@ -412,6 +437,24 @@
         openFicha(empId);
       } catch (err) { toast(err.message, 'error'); }
     });
+  }
+
+  async function baixarAdvertenciaPDF(warningId, nomeFunc, data) {
+    const nomeArq = `Advertencia_${nomeFunc}_${data}.pdf`;
+    await downloadAuth(`/api/warnings/${warningId}/pdf`, nomeArq);
+  }
+
+  async function toggleCienteAdvertencia(warningId, novoValor, empId) {
+    try {
+      await api(`/warnings/${warningId}`, {
+        method: 'PUT',
+        body: { funcionario_ciente: novoValor },
+      });
+      toast(novoValor ? 'Marcado como ciente.' : 'Desmarcado.', 'success');
+      openFicha(empId);
+    } catch (err) {
+      toast(err.message, 'error');
+    }
   }
 
   function abrirFormWarning(empId) {

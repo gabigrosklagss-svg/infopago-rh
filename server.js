@@ -5,9 +5,9 @@ const fs = require('fs');
 const secretsPath = path.join(__dirname, 'secrets', '.env');
 const fallbackPath = path.join(__dirname, '.env');
 if (fs.existsSync(secretsPath)) {
-  require('dotenv').config({ path: secretsPath });
+  require('dotenv').config({ path: secretsPath, override: true });
 } else if (fs.existsSync(fallbackPath)) {
-  require('dotenv').config({ path: fallbackPath });
+  require('dotenv').config({ path: fallbackPath, override: true });
   console.warn('⚠ .env na raiz — mova para secrets/.env para mais segurança');
 } else {
   console.error('❌ Nenhum arquivo .env encontrado (procurei em secrets/.env e .env)');
@@ -19,6 +19,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { supabase } = require('./src/config/supabase');
 const { initScheduler } = require('./src/utils/scheduler');
+const { auditLogger } = require('./src/middleware/audit');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -29,6 +30,9 @@ app.use('/api/auth', rateLimit({ windowMs: 15 * 60 * 1000, max: 20 }));
 app.use('/api', rateLimit({ windowMs: 60 * 1000, max: 200 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Middleware de auditoria — registra todas as ações de escrita
+app.use(auditLogger());
 
 // Estáticos
 app.use(express.static(path.join(__dirname, 'public')));
@@ -48,9 +52,19 @@ app.use('/api/absences',    require('./src/routes/absences'));
 app.use('/api/documents',   require('./src/routes/documents'));
 app.use('/api/time',        require('./src/routes/time'));
 app.use('/api/vacation-requests', require('./src/routes/vacationRequests'));
+app.use('/api/vacation-receipts', require('./src/routes/vacationReceipts'));
 app.use('/api/checklists',  require('./src/routes/checklists'));
 app.use('/api/help',        require('./src/routes/help'));
 app.use('/api/agent',       require('./src/routes/agent'));
+app.use('/api/terminations', require('./src/routes/terminations'));
+app.use('/api/thirteenth',  require('./src/routes/thirteenth'));
+app.use('/api/epis',        require('./src/routes/epis'));
+app.use('/api/salary-plan', require('./src/routes/salaryPlan'));
+app.use('/api/audit',       require('./src/routes/audit'));
+app.use('/api/backup',      require('./src/routes/backup'));
+app.use('/api/performance', require('./src/routes/performance'));
+app.use('/api/recruitment', require('./src/routes/recruitment'));
+app.use('/api/collective-vacations', require('./src/routes/collectiveVacations'));
 
 // Endpoint público para confirmação de recebimento de holerite
 app.get('/confirmar/:token', async (req, res) => {

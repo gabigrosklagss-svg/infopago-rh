@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>TRCT</title>
+<style>
+  @page { size: A4; margin: 12mm; }
+  body { font-family: 'Courier New', Consolas, monospace; font-size: 9.5pt; color: #000; margin: 0; }
+  .doc { border: 1.5px solid #000; }
+  .titulo { background: #e0e0e0; padding: 8px 12px; text-align: center; font-weight: bold; font-size: 11pt; border-bottom: 1px solid #000; }
+  .secao { border-bottom: 1px solid #000; padding: 6px 10px; }
+  .secao h3 { margin: 0 0 6px; font-size: 9pt; text-transform: uppercase; background: #f0f0f0; padding: 3px 6px; border-left: 3px solid #000; }
+  .lbl { font-size: 7.5pt; color: #555; text-transform: uppercase; letter-spacing: .03em; }
+  .val { font-weight: bold; margin-top: 1px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; }
+  table.verbas { width: 100%; border-collapse: collapse; font-size: 9pt; }
+  table.verbas th { background: #d8d8d8; border: 1px solid #000; padding: 4px 6px; text-align: left; font-size: 8pt; }
+  table.verbas th.num { text-align: right; }
+  table.verbas td { border: 1px solid #000; padding: 4px 6px; height: 18px; }
+  table.verbas td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .total-bar { display: flex; border-top: 2px solid #000; background: #f0f0f0; }
+  .total-cell { flex: 1; padding: 8px 12px; border-right: 1px solid #aaa; }
+  .total-cell:last-child { border-right: 0; }
+  .total-cell .lbl { font-size: 7.5pt; }
+  .total-cell .val { font-size: 13pt; font-weight: bold; }
+  .liquido { background: #d4f4dd; }
+  .sign-row { display: flex; gap: 20px; padding: 14px 10px; }
+  .sign-cell { flex: 1; }
+  .sign-line { border-top: 1px solid #000; margin-top: 24px; padding-top: 3px; text-align: center; font-size: 7.5pt; color: #444; }
+  .declaracao { padding: 12px 10px; font-size: 8.5pt; line-height: 1.5; border-top: 1px solid #000; background: #fafafa; }
+</style>
+</head>
+<body>
+
+<div class="doc">
+
+  <div class="titulo">TERMO DE RESCISÃO DO CONTRATO DE TRABALHO (TRCT)</div>
+
+  <!-- EMPRESA -->
+  <div class="secao">
+    <h3>Empregador</h3>
+    <div class="grid-2">
+      <div><div class="lbl">Razão Social</div><div class="val">{{empresa_nome}}</div></div>
+      <div><div class="lbl">CNPJ</div><div class="val">{{empresa_cnpj}}</div></div>
+    </div>
+    <div style="margin-top:6px"><div class="lbl">Endereço</div><div class="val">{{empresa_endereco}}</div></div>
+  </div>
+
+  <!-- EMPREGADO -->
+  <div class="secao">
+    <h3>Empregado</h3>
+    <div class="grid-3">
+      <div><div class="lbl">Nome</div><div class="val">{{func_nome}}</div></div>
+      <div><div class="lbl">CPF</div><div class="val">{{func_cpf}}</div></div>
+      <div><div class="lbl">PIS/PASEP</div><div class="val">{{func_pis}}</div></div>
+    </div>
+    <div class="grid-4" style="margin-top:6px">
+      <div><div class="lbl">CTPS</div><div class="val">{{func_ctps}}</div></div>
+      <div><div class="lbl">Admissão</div><div class="val">{{data_admissao}}</div></div>
+      <div><div class="lbl">Demissão</div><div class="val">{{data_demissao}}</div></div>
+      <div><div class="lbl">Cargo</div><div class="val">{{func_cargo}}</div></div>
+    </div>
+    <div class="grid-3" style="margin-top:6px">
+      <div><div class="lbl">Tipo de rescisão</div><div class="val">{{tipo_rescisao_texto}}</div></div>
+      <div><div class="lbl">Aviso prévio</div><div class="val">{{aviso_texto}} · {{aviso_dias}} dias</div></div>
+      <div><div class="lbl">Salário base</div><div class="val">R$ {{salario_base}}</div></div>
+    </div>
+  </div>
+
+  <!-- VERBAS RESCISÓRIAS -->
+  <div class="secao">
+    <h3>Discriminação das Verbas Rescisórias</h3>
+    <table class="verbas">
+      <thead>
+        <tr>
+          <th>Cód.</th>
+          <th>Descrição</th>
+          <th>Referência</th>
+          <th class="num">Vencimentos</th>
+          <th class="num">Descontos</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each linhas_verbas}}
+        <tr>
+          <td>{{codigo}}</td>
+          <td>{{descricao}}</td>
+          <td>{{referencia}}</td>
+          <td class="num">{{vencimento}}</td>
+          <td class="num">{{desconto}}</td>
+        </tr>
+        {{/each}}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- FGTS -->
+  <div class="secao">
+    <h3>FGTS</h3>
+    <div class="grid-4">
+      <div><div class="lbl">Saldo FGTS</div><div class="val">R$ {{fgts_saldo}}</div></div>
+      <div><div class="lbl">FGTS Rescisão</div><div class="val">R$ {{fgts_rescisao_total}}</div></div>
+      <div><div class="lbl">Base p/ multa</div><div class="val">R$ {{fgts_base_multa}}</div></div>
+      <div><div class="lbl">Multa ({{multa_pct}}%)</div><div class="val">R$ {{multa_fgts}}</div></div>
+    </div>
+  </div>
+
+  <!-- TOTAIS -->
+  <div class="total-bar">
+    <div class="total-cell"><div class="lbl">Total Proventos</div><div class="val">R$ {{total_proventos}}</div></div>
+    <div class="total-cell"><div class="lbl">Total Descontos</div><div class="val" style="color:#921818">R$ {{total_descontos}}</div></div>
+    <div class="total-cell liquido"><div class="lbl">Valor Líquido a Receber</div><div class="val" style="color:#1B5B3E">R$ {{total_liquido}}</div></div>
+  </div>
+
+  <!-- Declaração -->
+  <div class="declaracao">
+    Declaro que recebi a importância líquida acima discriminada, referente às verbas rescisórias do meu contrato de trabalho com {{empresa_nome}},
+    nada mais tendo a reclamar a qualquer título, dando ao empregador plena, geral e irrevogável quitação relativa ao período contratual encerrado em {{data_demissao}}.
+  </div>
+
+  <!-- Assinaturas -->
+  <div class="sign-row">
+    <div class="sign-cell">
+      <div class="lbl">Local e Data</div>
+      <div class="sign-line">{{cidade}}, {{data_pagamento}}</div>
+    </div>
+    <div class="sign-cell">
+      <div class="lbl">Assinatura do Empregado</div>
+      <div class="sign-line">_________________________________________________</div>
+    </div>
+    <div class="sign-cell">
+      <div class="lbl">Assinatura do Empregador</div>
+      <div class="sign-line">_________________________________________________</div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

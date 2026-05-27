@@ -156,7 +156,7 @@ router.get('/calendar', requireAuth, async (req, res) => {
   const feriadosMap = feriadosDoAno(ano);
   const feriados = Object.entries(feriadosMap)
     .filter(([data]) => data.startsWith(`${ano}-${String(mes).padStart(2, '0')}`))
-    .map(([data, nome]) => ({ data, tipo: 'feriado', titulo: nome, cor: '#92500D', icone: '🎉' }));
+    .map(([data, nome]) => ({ data, tipo: 'feriado', titulo: nome, cor: '#92500D', icone: '' }));
 
   // Aniversariantes do mês
   const { data: emps } = await supabase.from('employees')
@@ -171,10 +171,10 @@ router.get('/calendar', requireAuth, async (req, res) => {
     return {
       data: `${ano}-${String(mes).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`,
       tipo: 'aniversario',
-      titulo: `🎂 ${e.nome_completo}`,
+      titulo: ` ${e.nome_completo}`,
       subtitulo: `Aniversário · ${e.matricula}`,
       cor: '#1B4A78',
-      icone: '🎂',
+      icone: '',
     };
   });
 
@@ -189,10 +189,10 @@ router.get('/calendar', requireAuth, async (req, res) => {
     return {
       data: `${ano}-${String(mes).padStart(2,'0')}-${String(adm.getDate()).padStart(2,'0')}`,
       tipo: 'admissao',
-      titulo: `🏆 ${e.nome_completo}`,
+      titulo: ` ${e.nome_completo}`,
       subtitulo: `${anos} ano(s) de empresa`,
       cor: '#1B5B3E',
-      icone: '🏆',
+      icone: '',
     };
   });
 
@@ -207,10 +207,10 @@ router.get('/calendar', requireAuth, async (req, res) => {
   const eventosFerias = (ferias || []).map(f => ({
     data: f.data_inicio_pretendida,
     tipo: 'ferias',
-    titulo: `🏖️ ${f.employees?.nome_completo}`,
+    titulo: ` ${f.employees?.nome_completo}`,
     subtitulo: `Férias até ${f.data_fim_pretendida}`,
     cor: '#1B4A78',
-    icone: '🏖️',
+    icone: '',
   }));
 
   // Períodos aquisitivos vencendo no mês
@@ -222,10 +222,10 @@ router.get('/calendar', requireAuth, async (req, res) => {
   const eventosVencimento = (vacAVencer || []).map(v => ({
     data: v.periodo_aquisitivo_fim,
     tipo: 'ferias_vencendo',
-    titulo: `⚠ Férias vencendo: ${v.employees?.nome_completo}`,
+    titulo: ` Férias vencendo: ${v.employees?.nome_completo}`,
     subtitulo: `Período ${v.periodo_aquisitivo_inicio} até ${v.periodo_aquisitivo_fim}`,
     cor: '#B0282A',
-    icone: '⚠️',
+    icone: '',
   }));
 
   // Documentos vencendo no mês
@@ -236,10 +236,10 @@ router.get('/calendar', requireAuth, async (req, res) => {
   const eventosDocs = (docs || []).map(d => ({
     data: d.data_validade,
     tipo: 'doc_vencendo',
-    titulo: `📎 Doc venc.: ${d.employees?.nome_completo}`,
+    titulo: ` Doc venc.: ${d.employees?.nome_completo}`,
     subtitulo: `${d.tipo.toUpperCase().replace('_', ' ')}`,
     cor: '#92500D',
-    icone: '📎',
+    icone: '',
   }));
 
   const todos = [...feriados, ...aniversariantes, ...aniversarioEmpresa, ...eventosFerias, ...eventosVencimento, ...eventosDocs]

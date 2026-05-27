@@ -175,44 +175,95 @@ async function extrairDadosCurriculo({ fileBuffer, mimeType, text }) {
 }
 
 /**
+ * Sanitiza histórico removendo pares tool_use/tool_result órfãos que podem ter
+ * sido salvos parcialmente por execuções anteriores interrompidas.
+ */
+function sanitizarHistorico(messages) {
+  if (!Array.isArray(messages) || messages.length === 0) return [];
+  const cleaned = [];
+  let i = 0;
+  while (i < messages.length) {
+    const m = messages[i];
+    if (m.role === 'assistant' && Array.isArray(m.content)) {
+      const toolUses = m.content.filter(b => b.type === 'tool_use');
+      if (toolUses.length > 0) {
+        const next = messages[i + 1];
+        const validNext = next && next.role === 'user' && Array.isArray(next.content)
+          && toolUses.every(tu => next.content.some(b => b.type === 'tool_result' && b.tool_use_id === tu.id));
+        if (!validNext) {
+          i++;
+          if (next && next.role === 'user' && Array.isArray(next.content) && next.content.some(b => b.type === 'tool_result')) i++;
+          continue;
+        }
+      }
+    }
+    if (m.role === 'user' && Array.isArray(m.content) && m.content.some(b => b.type === 'tool_result')) {
+      const prev = cleaned[cleaned.length - 1];
+      if (!prev || prev.role !== 'assistant' || !Array.isArray(prev.content) || !prev.content.some(b => b.type === 'tool_use')) {
+        i++;
+        continue;
+      }
+    }
+    cleaned.push(m);
+    i++;
+  }
+  while (cleaned.length > 0) {
+    const last = cleaned[cleaned.length - 1];
+    if (last.role === 'assistant' && Array.isArray(last.content) && last.content.some(b => b.type === 'tool_use')) {
+      cleaned.pop();
+    } else break;
+  }
+  return cleaned;
+}
+
+/**
  * Chat multi-turn com tool use — o agente pode chamar funções do sistema.
- *
- * @param {Array} messages - histórico (formato Anthropic)
- * @param {Function} executeTool - executor de tool: (name, input, ctx) => result
- * @param {Array} tools - definições das tools
- * @param {Object} ctx - contexto do usuário (passado pras tools)
- * @returns {Object} { finalMessage, fullTrace }
  */
 async function chatComTools(messages, executeTool, tools, ctx) {
   const c = getClient();
 
-  const systemPrompt = `Você é o assistente IA do InfoPago RH, sistema de gestão de RH e folha de pagamento CLT brasileiro.
+  const systemPrompt = `Você é a Ingrid, assistente IA do InfoPago RH, sistema de gestão de RH e folha de pagamento CLT brasileiro.
 
-Você pode chamar funções para CONSULTAR e MODIFICAR o sistema (cadastrar funcionários, gerar holerites, lançar pontos, advertências, comunicados, etc.).
+# Identidade
+Nome Ingrid. Personalidade profissional, prestativa, direta. Se perguntarem quem você é, responde "Eu sou a Ingrid, sua assistente do InfoPago RH". Nunca use emojis nas respostas.
 
-Diretrizes:
-- Antes de criar/modificar dados, CONFIRME com o usuário se algo crítico estiver implícito (ex: salário, datas).
-- Para datas, use formato YYYY-MM-DD.
-- Para CPFs use formato 000.000.000-00.
-- Se precisar de um funcionário e o usuário só falar o primeiro nome, use a ferramenta de busca antes de modificar nada.
-- Se uma ação puder ter consequências irreversíveis (excluir, demitir), pergunte ao usuário antes.
-- Responda sempre em português brasileiro, tom profissional mas amigável.
-- Se o usuário pedir algo que precisa de várias operações, encadeie as tools sem pedir confirmação a cada passo (mas resuma no fim).
-- Você tem acesso ao usuário atual: ${ctx.userName} (${ctx.userRole}).
-- Data de hoje: ${new Date().toLocaleDateString('pt-BR')}.`;
+# REGRA DE OURO — EXECUTE, NÃO DESCREVA
+NUNCA escreva "Vou fazer X, aguarde..." sem CHAMAR as ferramentas na MESMA resposta.
+Quando o usuário pede uma ação, você DEVE invocar as tools imediatamente. Não anuncie, EXECUTE.
+Só responda em texto puro DEPOIS que as tools terminaram, para confirmar o resultado.
+
+# Operações em lote
+Se o usuário pedir algo que precisa de várias chamadas (ex: "lança ponto pra todos os dias úteis do mês"), CHAME múltiplas tools em paralelo na mesma resposta.
+Você pode chamar até 25-30 tools em sequência sem pedir confirmação a cada passo.
+No FINAL, resuma o que foi feito.
+
+# Formatos obrigatórios
+- Datas: YYYY-MM-DD
+- CPF: 000.000.000-00
+- Horários: HH:MM (24h)
+
+# Resoluções
+- Se usuário falar nome incompleto, use buscar/listar para identificar antes de modificar.
+- Em ações IRREVERSÍVEIS (excluir, demitir, justa causa), CONFIRME antes.
+- Em ações reversíveis ou em lote rotineiras (ponto, holerite, comunicado), EXECUTE direto.
+
+# Contexto atual
+Usuário: ${ctx.userName} (${ctx.userRole}).
+Data de hoje: ${new Date().toLocaleDateString('pt-BR')}.
+Idioma: português brasileiro, tom profissional mas amigável.`;
 
   const trace = [];
   let iterations = 0;
-  const MAX_ITERATIONS = 10;
+  const MAX_ITERATIONS = 30;
 
-  let convo = [...messages];
+  let convo = sanitizarHistorico(messages);
 
   while (iterations < MAX_ITERATIONS) {
     iterations++;
 
     const response = await c.messages.create({
       model: 'claude-sonnet-4-5',
-      max_tokens: 2048,
+      max_tokens: 8192,
       system: systemPrompt,
       tools,
       messages: convo,
@@ -271,7 +322,7 @@ Diretrizes:
   }
 
   return {
-    message: '⚠ Limite de 10 iterações atingido. Tarefa pode estar incompleta.',
+    message: 'Limite de 30 iterações atingido. Tarefa pode estar incompleta.',
     messages: convo,
     trace,
   };

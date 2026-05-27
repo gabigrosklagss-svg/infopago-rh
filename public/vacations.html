@@ -18,26 +18,34 @@
 
     <div class="page-header">
       <div>
-        <h1>Solicitações de férias</h1>
-        <p class="subtitle">Aprovação · negação · histórico</p>
-      </div>
-      <div class="page-header-actions">
-        <button class="btn btn-primary" onclick="abrirNovaSolicitacao()">+ Nova solicitação</button>
+        <h1>Férias</h1>
+        <p class="subtitle">Solicitações, aprovações e recibos de férias</p>
       </div>
     </div>
 
-    <div class="filter-bar">
-      <div class="field">
-        <label>Status</label>
-        <select id="f-status" onchange="carregar()">
-          <option value="pendente">Pendentes</option>
-          <option value="">Todas</option>
-          <option value="aprovada">Aprovadas</option>
-          <option value="negada">Negadas</option>
-          <option value="cancelada">Canceladas</option>
-        </select>
-      </div>
+    <div class="tabs">
+      <button class="tab-btn active" onclick="goTab(0, this)">Solicitações</button>
+      <button class="tab-btn" onclick="goTab(1, this)">Recibos de Férias</button>
+      <button class="tab-btn" onclick="goTab(2, this)">Férias Coletivas</button>
     </div>
+
+    <!-- ── SOLICITAÇÕES ──────────────────────────────────── -->
+    <div class="tab-content active">
+      <div class="flex justify-between items-center mb-3">
+        <div class="filter-bar" style="flex:1;margin:0">
+          <div class="field">
+            <label>Status</label>
+            <select id="f-status" onchange="carregar()">
+              <option value="pendente">Pendentes</option>
+              <option value="">Todas</option>
+              <option value="aprovada">Aprovadas</option>
+              <option value="negada">Negadas</option>
+              <option value="cancelada">Canceladas</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-primary" style="margin-left:12px" onclick="abrirNovaSolicitacao()">+ Nova solicitação</button>
+      </div>
 
     <div class="table-wrap">
       <div class="table-toolbar">
@@ -60,6 +68,41 @@
         <tbody id="tbody"></tbody>
       </table>
     </div>
+    </div>
+
+    <!-- ── FÉRIAS COLETIVAS ──────────────────────────────── -->
+    <div class="tab-content">
+      <div class="flex justify-between items-center mb-3">
+        <div>
+          <h3 style="margin:0">Períodos de férias coletivas</h3>
+          <p class="text-muted text-sm" style="margin:4px 0 0">Defina períodos que atingem toda empresa, um departamento ou filial. Ao aplicar, gera lançamentos em massa.</p>
+        </div>
+        <button class="btn btn-primary" onclick="novaColetiva()">+ Novo período</button>
+      </div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr>
+            <th>Título</th><th>Período</th><th>Dias</th><th>Escopo</th><th>Funcionários</th><th>Status</th><th></th>
+          </tr></thead>
+          <tbody id="tbody-coletivas"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── RECIBOS DE FÉRIAS ─────────────────────────────── -->
+    <div class="tab-content">
+      <div class="flex justify-between items-center mb-3">
+        <h3 style="margin:0">Recibos de Férias</h3>
+        <button class="btn btn-primary" onclick="novoRecibo()">+ Novo recibo</button>
+      </div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Funcionário</th><th>Período de gozo</th><th>Dias</th><th>Líquido</th><th>Status</th><th></th></tr></thead>
+          <tbody id="tbody-recibos"></tbody>
+        </table>
+      </div>
+    </div>
+
   </main>
 </div>
 
@@ -67,6 +110,200 @@
 <script>
   requireAuth();
   mountShell('vacation');
+
+  function goTab(idx, btn) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.tab-content')[idx].classList.add('active');
+    if (idx === 1) carregarColetivas();
+    if (idx === 2) carregarRecibos();
+  }
+
+  /* ════════════════ FÉRIAS COLETIVAS ════════════════ */
+  async function carregarColetivas() {
+    const list = await api('/collective-vacations');
+    const tb = document.getElementById('tbody-coletivas');
+    if (!list.length) { tb.innerHTML = '<tr><td colspan="7" class="table-empty">Nenhum período cadastrado.</td></tr>'; return; }
+    tb.innerHTML = list.map(c => {
+      const escopoLabel = c.escopo === 'empresa' ? 'Toda a empresa' :
+                         c.escopo === 'departamento' ? (c.departments?.nome || 'Departamento') :
+                         c.escopo === 'filial' ? (c.filial || 'Filial') : c.escopo;
+      const statusClass = c.status === 'aplicada' ? 'ativo' : c.status === 'cancelada' ? 'inativo' : 'pendente';
+      return `<tr>
+        <td><strong>${c.titulo}</strong>${c.observacoes ? `<br><small class="text-muted">${c.observacoes.slice(0,80)}</small>` : ''}</td>
+        <td>${fmt.data(c.data_inicio)} → ${fmt.data(c.data_fim)}</td>
+        <td class="num"><strong>${c.dias}</strong></td>
+        <td>${escopoLabel}</td>
+        <td class="num">${c.total_funcionarios || 0}</td>
+        <td><span class="badge ${statusClass}">${c.status}</span></td>
+        <td>
+          ${c.status === 'planejada' ? `
+            <button class="btn btn-sm btn-success" onclick="aplicarColetiva('${c.id}','${c.titulo.replace(/'/g,'\\\'')}')">Aplicar</button>
+            <button class="btn btn-sm" onclick="editarColetiva('${c.id}')">Editar</button>
+          ` : ''}
+          ${c.status === 'aplicada' ? `
+            <button class="btn btn-sm" onclick="verColetiva('${c.id}')">Ver</button>
+            <button class="btn btn-sm btn-danger" onclick="cancelarColetiva('${c.id}')">Cancelar</button>
+          ` : ''}
+          ${c.status === 'planejada' ? `<button class="btn btn-sm btn-danger" onclick="excluirColetiva('${c.id}')">×</button>` : ''}
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  async function novaColetiva(existente) {
+    const deps = await api('/departments?active=true').catch(() => []);
+    const depOpts = (deps || []).map(d => `<option value="${d.id}">${d.nome}</option>`).join('');
+    const html = `<form id="colForm">
+      <div class="form-grid">
+        <div class="field" style="grid-column:span 2"><label>Título<span class="req">*</span></label>
+          <input name="titulo" required placeholder="Ex: Recesso de fim de ano 2026"></div>
+        <div class="field"><label>Início<span class="req">*</span></label><input type="date" name="data_inicio" required></div>
+        <div class="field"><label>Fim<span class="req">*</span></label><input type="date" name="data_fim" required></div>
+        <div class="field"><label>Escopo</label>
+          <select name="escopo" onchange="document.getElementById('col-dep').style.display=this.value==='departamento'?'block':'none';document.getElementById('col-fil').style.display=this.value==='filial'?'block':'none'">
+            <option value="empresa">Toda a empresa</option>
+            <option value="departamento">Por departamento</option>
+            <option value="filial">Por filial</option>
+          </select></div>
+        <div class="field" id="col-dep" style="display:none"><label>Departamento</label>
+          <select name="department_id"><option value="">—</option>${depOpts}</select></div>
+        <div class="field" id="col-fil" style="display:none"><label>Filial</label><input name="filial"></div>
+      </div>
+      <div class="field mt-3"><label>Observações</label><textarea name="observacoes"></textarea></div>
+    </form>`;
+    showFormModal(existente ? 'Editar período' : 'Novo período de férias coletivas', html, async () => {
+      const f = document.getElementById('colForm');
+      if (!validateForm(f)) return;
+      const d = formToObject(f);
+      if (d.escopo !== 'departamento') d.department_id = null;
+      if (d.escopo !== 'filial') d.filial = null;
+      try {
+        if (existente?.id) await api(`/collective-vacations/${existente.id}`, { method: 'PUT', body: d });
+        else await api('/collective-vacations', { method: 'POST', body: d });
+        toast('Período salvo!', 'success');
+        closeFormModal();
+        carregarColetivas();
+      } catch (err) { toast(err.message, 'error'); }
+    });
+    if (existente) {
+      setTimeout(() => {
+        fillForm(document.getElementById('colForm'), existente);
+        document.querySelector('[name="escopo"]').dispatchEvent(new Event('change'));
+      }, 50);
+    }
+  }
+
+  async function editarColetiva(id) {
+    const c = await api(`/collective-vacations/${id}`);
+    novaColetiva(c);
+  }
+
+  async function aplicarColetiva(id, titulo) {
+    if (!confirm(`Aplicar férias coletivas "${titulo}"? Isso vai criar lançamentos de ausência em massa pra todos os funcionários do escopo.`)) return;
+    showLoading();
+    try {
+      const r = await api(`/collective-vacations/${id}/aplicar`, { method: 'POST' });
+      toast(`Aplicado! ${r.total} funcionário(s) afetado(s).`, 'success');
+      carregarColetivas();
+    } catch (err) { toast(err.message, 'error'); }
+    finally { hideLoading(); }
+  }
+
+  async function cancelarColetiva(id) {
+    if (!confirm('Cancelar este período aplicado? Os lançamentos de ausência serão removidos.')) return;
+    try {
+      await api(`/collective-vacations/${id}/cancelar`, { method: 'POST' });
+      toast('Cancelado.', 'info');
+      carregarColetivas();
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function excluirColetiva(id) {
+    if (!confirm('Excluir definitivamente?')) return;
+    try {
+      await api(`/collective-vacations/${id}`, { method: 'DELETE' });
+      toast('Excluído.', 'info');
+      carregarColetivas();
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function verColetiva(id) {
+    const c = await api(`/collective-vacations/${id}`);
+    const linhas = (c.funcionarios || []).map(f => `
+      <tr><td>${f.employees?.matricula || ''}</td>
+      <td><strong>${f.employees?.nome_completo || ''}</strong></td>
+      <td><small class="text-muted">${f.employees?.departments?.nome || ''}</small></td></tr>`).join('');
+    showFormModal(`Funcionários — ${c.titulo}`, `
+      <p class="text-muted">${fmt.data(c.data_inicio)} → ${fmt.data(c.data_fim)} · ${c.dias} dias · ${c.total_funcionarios} pessoas</p>
+      <table class="table"><thead><tr><th>Matr.</th><th>Nome</th><th>Depto</th></tr></thead><tbody>${linhas || '<tr><td colspan="3" class="table-empty">—</td></tr>'}</tbody></table>
+    `, () => closeFormModal());
+    document.getElementById('form-save').textContent = 'Fechar';
+  }
+
+  /* ════════════════ RECIBOS DE FÉRIAS ════════════════ */
+  async function carregarRecibos() {
+    const list = await api('/vacation-receipts');
+    document.getElementById('tbody-recibos').innerHTML = list.length ? list.map(r => `
+      <tr>
+        <td><strong>${r.employees?.nome_completo}</strong><br><small class="text-muted">${fmt.matricula(r.employees?.matricula)}</small></td>
+        <td>${fmt.data(r.data_inicio_gozo)} → ${fmt.data(r.data_fim_gozo)}</td>
+        <td>${r.dias_ferias} + ${r.dias_abono} abono</td>
+        <td><strong>${fmt.brl(r.total_liquido)}</strong></td>
+        <td><span class="badge ${r.status === 'pago' ? 'ativo' : 'pendente'}">${r.status}</span></td>
+        <td>
+          <button class="btn btn-sm" onclick="gerarPdfRecibo('${r.id}')">PDF</button>
+          ${r.pdf_path ? `<button class="btn btn-sm" onclick="downloadAuth('/api/vacation-receipts/${r.id}/download','recibo-ferias.pdf')">Baixar</button>` : ''}
+          <button class="btn btn-sm btn-danger" onclick="excluirRecibo('${r.id}')">×</button>
+        </td>
+      </tr>
+    `).join('') : '<tr><td colspan="6" class="table-empty">Nenhum recibo gerado.</td></tr>';
+  }
+
+  async function novoRecibo() {
+    const emps = await api('/employees?status=ativo&limit=300');
+    const opts = (emps.data || []).map(e => `<option value="${e.id}">${fmt.matricula(e.matricula)} · ${e.nome_completo}</option>`).join('');
+    const html = `<form id="ferForm">
+      <div class="form-grid">
+        <div class="field" style="grid-column:span 2"><label>Funcionário<span class="req">*</span></label><select name="employee_id" required>${opts}</select></div>
+        <div class="field"><label>Início do gozo<span class="req">*</span></label><input type="date" name="data_inicio_gozo" required></div>
+        <div class="field"><label>Fim do gozo<span class="req">*</span></label><input type="date" name="data_fim_gozo" required></div>
+        <div class="field"><label>Dias de férias<span class="req">*</span></label><input type="number" name="dias_ferias" required min="1" max="30" value="30"></div>
+        <div class="field"><label>Dias de abono</label><input type="number" name="dias_abono" value="0" min="0" max="10"></div>
+        <div class="field"><label>Média HE (R$)</label><input type="number" name="media_he" value="0" step="0.01"></div>
+        <div class="field"><label>Data pagamento</label><input type="date" name="data_pagamento"></div>
+        <div class="field"><label>Período aquisitivo (início)</label><input type="date" name="periodo_aquisitivo_inicio"></div>
+        <div class="field"><label>Período aquisitivo (fim)</label><input type="date" name="periodo_aquisitivo_fim"></div>
+      </div>
+      <label class="toggle mt-3"><input type="checkbox" name="adiantamento_13"><span class="slider"></span> Adiantar 1ª parcela do 13º junto</label>
+      <div class="field mt-3"><label>Observações</label><textarea name="observacoes"></textarea></div>
+    </form>`;
+    showFormModal('Novo recibo de férias', html, async () => {
+      const f = document.getElementById('ferForm');
+      if (!validateForm(f)) return;
+      const d = formToObject(f);
+      d.dias_ferias = parseInt(d.dias_ferias); d.dias_abono = parseInt(d.dias_abono) || 0;
+      d.media_he = parseFloat(d.media_he) || 0;
+      d.adiantamento_13 = !!d.adiantamento_13;
+      try {
+        const r = await api('/vacation-receipts', { method: 'POST', body: d });
+        toast(`Recibo gerado · líquido ${fmt.brl(r.total_liquido)}`, 'success');
+        closeFormModal();
+        carregarRecibos();
+      } catch (err) { toast(err.message, 'error'); }
+    });
+  }
+
+  async function gerarPdfRecibo(id) {
+    try { await api(`/vacation-receipts/${id}/pdf`, { method: 'POST' }); toast('PDF gerado.', 'success'); carregarRecibos(); }
+    catch (err) { toast(err.message, 'error'); }
+  }
+  async function excluirRecibo(id) {
+    if (!confirm('Excluir este recibo?')) return;
+    try { await api(`/vacation-receipts/${id}`, { method: 'DELETE' }); toast('Excluído.', 'success'); carregarRecibos(); }
+    catch (err) { toast(err.message, 'error'); }
+  }
 
   async function carregar() {
     const status = document.getElementById('f-status').value;

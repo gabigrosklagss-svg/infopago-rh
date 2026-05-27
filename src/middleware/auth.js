@@ -14,7 +14,7 @@ async function requireAuth(req, res, next) {
 
   const { data: profile } = await supabase
     .from('user_profiles')
-    .select('id, full_name, role, active')
+    .select('id, full_name, role, active, avatar_url, department, created_at')
     .eq('id', userData.user.id)
     .maybeSingle();
 

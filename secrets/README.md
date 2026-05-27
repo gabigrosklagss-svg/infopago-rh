@@ -1,4 +1,4 @@
-# 🔐 Pasta de segredos — InfoPago RH
+#  Pasta de segredos — InfoPago RH
 
 Esta pasta contém **credenciais sensíveis** e é tratada com camadas extras de proteção:
 
@@ -6,18 +6,18 @@ Esta pasta contém **credenciais sensíveis** e é tratada com camadas extras de
 
 | Camada | O que faz | Status |
 |---|---|---|
-| `.gitignore` | Bloqueia commit pro Git/GitHub | ✅ Linha `secrets/` |
-| **Sem rota HTTP** | Não é servida por `app.use('/uploads')` nem nada similar | ✅ |
-| **NTFS herança removida** | Não herda permissões da pasta-mãe | ✅ `icacls /inheritance:r` |
-| **Acesso restrito ao dono** | Só o usuário Windows que criou consegue ler | ✅ `icacls /grant:r ${user}:(F)` |
-| **Carregamento no startup** | Lido só uma vez quando o servidor inicia | ✅ via `dotenv.config()` |
+| `.gitignore` | Bloqueia commit pro Git/GitHub |  Linha `secrets/` |
+| **Sem rota HTTP** | Não é servida por `app.use('/uploads')` nem nada similar |  |
+| **NTFS herança removida** | Não herda permissões da pasta-mãe |  `icacls /inheritance:r` |
+| **Acesso restrito ao dono** | Só o usuário Windows que criou consegue ler |  `icacls /grant:r ${user}:(F)` |
+| **Carregamento no startup** | Lido só uma vez quando o servidor inicia |  via `dotenv.config()` |
 
 ## Arquivos
 
 - **`.env`** — todas as credenciais (Supabase, Gmail SMTP, Anthropic, JWT)
 - **`README.md`** — este arquivo (explicativo, sem segredos)
 
-## ⚠ Avisos importantes
+##  Avisos importantes
 
 - **Nunca** copie o conteúdo do `.env` para outros lugares (chat, e-mail, anotações)
 - **Nunca** envie esta pasta por upload

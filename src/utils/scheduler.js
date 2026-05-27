@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const { supabase } = require('../config/supabase');
 const { enviarEmLote } = require('../services/emailService');
+const { executarBackup } = require('../services/backup');
 
 async function executarAgendamentos() {
   const hoje = new Date().toISOString().split('T')[0];
@@ -45,10 +46,20 @@ async function executarAgendamentos() {
 }
 
 function initScheduler() {
-  // Executa diariamente às 7:55 e 8:05 (para cobrir o horário de envio)
+  // Envio de holerites agendados — diariamente 7:55 e 8:05
   cron.schedule('55 7 * * *', executarAgendamentos);
   cron.schedule('5 8 * * *',  executarAgendamentos);
-  console.log('  ⏰ Agendador de envios iniciado (7:55 e 8:05 diariamente)');
+
+  // Backup automático diário às 03:00
+  cron.schedule('0 3 * * *', async () => {
+    try {
+      await executarBackup();
+    } catch (err) {
+      console.warn('[backup] falha:', err.message);
+    }
+  });
+
+  console.log('   Agendador iniciado: envios 7:55/8:05 · backup diario 03:00');
 }
 
 module.exports = { initScheduler, executarAgendamentos };

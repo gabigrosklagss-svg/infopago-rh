@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Administração — InfoPago RH</title>
+<link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<div class="app">
+  <div id="sidebar"></div>
+  <main class="main">
+    <div class="breadcrumb">
+      <a href="/dashboard.html">Painel</a>
+      <span class="sep">›</span>
+      <span>Administração</span>
+    </div>
+
+    <div class="page-header">
+      <div>
+        <h1>Administração</h1>
+        <p class="subtitle">Auditoria, backups, cargos e salários, EPIs</p>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="goTab(0, this)">Auditoria</button>
+      <button class="tab-btn" onclick="goTab(1, this)">Backups</button>
+      <button class="tab-btn" onclick="goTab(2, this)">Plano de Cargos</button>
+      <button class="tab-btn" onclick="goTab(3, this)">EPIs</button>
+    </div>
+
+    <!-- AUDITORIA -->
+    <div class="tab-content active">
+      <div class="kpi-grid" id="audit-stats"></div>
+      <div class="filter-bar">
+        <div class="field"><label>Entidade</label>
+          <select id="f-entity" onchange="loadAudit()">
+            <option value="">Todas</option>
+            <option value="employee">Funcionários</option>
+            <option value="payslip">Holerites</option>
+            <option value="warning">Advertências</option>
+            <option value="absence">Faltas/Atestados</option>
+            <option value="termination">Rescisões</option>
+            <option value="thirteenth">13º</option>
+            <option value="vacation_receipt">Recibo Férias</option>
+            <option value="document">Documentos</option>
+            <option value="time_entry">Ponto</option>
+            <option value="auth">Login/Usuários</option>
+            <option value="settings">Configurações</option>
+            <option value="epi">EPIs</option>
+            <option value="salary_plan">Cargos/Salários</option>
+          </select>
+        </div>
+        <div class="field"><label>Ação</label>
+          <select id="f-action" onchange="loadAudit()">
+            <option value="">Todas</option>
+            <option value="create">Criação</option>
+            <option value="update">Atualização</option>
+            <option value="delete">Exclusão</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Data/hora</th><th>Usuário</th><th>Descrição</th><th>Ação</th><th>IP</th></tr></thead>
+          <tbody id="tbody-audit"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- BACKUPS -->
+    <div class="tab-content card">
+      <div class="flex justify-between items-center mb-4">
+        <div>
+          <h3 style="margin:0">Backups do sistema</h3>
+          <p class="text-muted text-sm" style="margin:4px 0 0">Backup automático diário às 03:00 · mantém os últimos 30</p>
+        </div>
+        <button class="btn btn-primary" onclick="rodarBackup()">Backup agora</button>
+      </div>
+      <table class="table">
+        <thead><tr><th>Arquivo</th><th>Tamanho</th><th>Criado em</th><th></th></tr></thead>
+        <tbody id="tbody-backups"></tbody>
+      </table>
+    </div>
+
+    <!-- PLANO DE CARGOS -->
+    <div class="tab-content card">
+      <div class="flex justify-between items-center mb-4">
+        <h3 style="margin:0">Plano de cargos e salários — Faixas</h3>
+        <button class="btn btn-primary" onclick="novaGrade()">+ Nova faixa</button>
+      </div>
+      <p class="text-muted text-sm mb-3">Cadastre faixas dentro de cada cargo (ex: Júnior I, Júnior II, Pleno I, Pleno II, Sênior I...) com salário base e requisitos para progressão.</p>
+      <table class="table">
+        <thead><tr><th>Cargo</th><th>Faixa</th><th>Salário</th><th>Competências</th><th>Tempo mín.</th><th></th></tr></thead>
+        <tbody id="tbody-grades"></tbody>
+      </table>
+
+      <h3 class="card-title mt-5">Movimentações de carreira <small>últimas 50</small></h3>
+      <div class="flex justify-between items-center mb-3">
+        <p class="text-muted text-sm" style="margin:0">Promoções, transferências, reclassificações e aumentos por mérito</p>
+        <button class="btn btn-sm btn-primary" onclick="novaMovimentacao()">+ Nova movimentação</button>
+      </div>
+      <table class="table">
+        <thead><tr><th>Data</th><th>Funcionário</th><th>Tipo</th><th>Anterior</th><th>Novo</th><th>%</th></tr></thead>
+        <tbody id="tbody-movs"></tbody>
+      </table>
+    </div>
+
+    <!-- EPIs -->
+    <div class="tab-content card">
+      <div class="flex justify-between items-center mb-4">
+        <h3 style="margin:0">Catálogo de EPIs</h3>
+        <button class="btn btn-primary" onclick="novoEpi()">+ Novo EPI</button>
+      </div>
+      <table class="table">
+        <thead><tr><th>EPI</th><th>CA</th><th>Categoria</th><th>Validade</th><th>Estoque</th><th></th></tr></thead>
+        <tbody id="tbody-epis"></tbody>
+      </table>
+
+      <h3 class="card-title mt-5">Entregas de EPI</h3>
+      <div class="flex gap-3 items-center mb-3">
+        <input type="search" id="busca-entregas" placeholder="Pesquisar por nome ou matrícula do funcionário..." oninput="filtrarEntregas()" style="flex:1;padding:8px 12px;border:1px solid var(--border-2);border-radius:var(--r-sm);font-family:inherit;font-size:13px">
+        <button class="btn btn-sm btn-primary" onclick="novaEntrega()">+ Nova entrega</button>
+      </div>
+      <table class="table">
+        <thead><tr><th>Funcionário</th><th>EPI</th><th>Qtd</th><th>Entrega</th><th>Vencimento</th><th>Ciente</th></tr></thead>
+        <tbody id="tbody-entregas"></tbody>
+      </table>
+    </div>
+
+  </main>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+  requireAuth();
+  mountShell('admin');
+
+  function goTab(idx, btn) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.tab-content')[idx].classList.add('active');
+    if (idx === 0) { loadAudit(); loadAuditStats(); }
+    if (idx === 1) loadBackups();
+    if (idx === 2) { loadGrades(); loadMovs(); }
+    if (idx === 3) { loadEpis(); loadEntregas(); }
+  }
+
+  /* ════════════════ AUDITORIA ════════════════ */
+  /* Fallback pra logs antigos sem metadata.descricao */
+  const PATH_LABELS = {
+    employees: 'funcionário', departments: 'departamento', positions: 'cargo',
+    payslips: 'holerite', email: 'envio de e-mail', warnings: 'advertência',
+    absences: 'falta/atestado', documents: 'documento', time: 'lançamento de ponto',
+    'vacation-requests': 'solicitação de férias', 'vacation-receipts': 'recibo de férias',
+    checklists: 'checklist', help: 'central de ajuda', agent: 'agente IA',
+    terminations: 'rescisão', thirteenth: '13º salário', epis: 'EPI',
+    'salary-plan': 'plano de cargos', settings: 'configurações', auth: 'autenticação',
+    backup: 'backup', reports: 'relatório',
+  };
+  function gerarDescFallback(l) {
+    const verbo = l.action === 'create' ? 'Cadastrou' : l.action === 'delete' ? 'Excluiu' : 'Atualizou';
+    if (l.http_path) {
+      const parts = l.http_path.replace(/^\/api\//, '').split('/');
+      const root = parts[0];
+      const label = PATH_LABELS[root] || root || 'recurso';
+      if (l.http_path.includes('/pdf')) return `Gerou PDF (${label})`;
+      if (l.http_path.includes('/lote')) return `Geração em lote (${label})`;
+      if (l.http_path.includes('/aprovar')) return 'Aprovou solicitação';
+      if (l.http_path.includes('/negar')) return 'Negou solicitação';
+      if (l.http_path.includes('/foto') || l.http_path.includes('/avatar')) return 'Atualizou foto';
+      if (l.http_path.includes('/login')) return 'Fez login no sistema';
+      if (l.http_path.includes('/bate-ponto')) return 'Bateu ponto';
+      if (l.http_path.includes('/run')) return 'Executou ação manual';
+      if (l.http_path.includes('/send')) return 'Enviou e-mail';
+      return `${verbo} ${label}`;
+    }
+    return `${verbo} ${l.entity || 'recurso'}`;
+  }
+
+  async function loadAuditStats() {
+    try {
+      const s = await api('/audit/stats?dias=7');
+      document.getElementById('audit-stats').innerHTML = `
+        <div class="kpi"><div class="kpi-label">Eventos (7d)</div><div class="kpi-value">${s.total}</div></div>
+        <div class="kpi success"><div class="kpi-label">Criações</div><div class="kpi-value">${s.byAction.create || 0}</div></div>
+        <div class="kpi warning"><div class="kpi-label">Atualizações</div><div class="kpi-value">${s.byAction.update || 0}</div></div>
+        <div class="kpi danger"><div class="kpi-label">Exclusões</div><div class="kpi-value">${s.byAction.delete || 0}</div></div>
+      `;
+    } catch (err) { /* ignora se sem permissão */ }
+  }
+
+  async function loadAudit() {
+    const q = new URLSearchParams();
+    const ent = document.getElementById('f-entity').value;
+    const act = document.getElementById('f-action').value;
+    if (ent) q.set('entity', ent);
+    if (act) q.set('action', act);
+    q.set('limit', 100);
+    try {
+      const r = await api(`/audit?${q}`);
+      const rows = r.data || [];
+      document.getElementById('tbody-audit').innerHTML = rows.length ? rows.map(l => {
+        // Se a descrição salva contém "unknown", regenera a partir do http_path
+        const descSalva = l.metadata?.descricao;
+        const desc = (descSalva && !descSalva.includes('unknown')) ? descSalva : gerarDescFallback(l);
+        const acaoLabel = { create: 'Criação', update: 'Atualização', delete: 'Exclusão' }[l.action] || l.action;
+        return `
+        <tr>
+          <td><small>${fmt.dataHora(l.created_at)}</small></td>
+          <td><strong>${l.user_name || '—'}</strong><br><small class="text-muted">${l.user_role || ''}</small></td>
+          <td><strong>${desc}</strong>${l.entity_label && !desc.includes(l.entity_label) ? `<br><small class="text-muted">${l.entity_label}</small>` : ''}</td>
+          <td><span class="badge ${l.action === 'create' ? 'ativo' : l.action === 'delete' ? 'erro' : 'pendente'}">${acaoLabel}</span></td>
+          <td><small>${l.ip_address || '—'}</small></td>
+        </tr>`;
+      }).join('') : '<tr><td colspan="5" class="table-empty">Nenhum registro.</td></tr>';
+    } catch (err) {
+      document.getElementById('tbody-audit').innerHTML = `<tr><td colspan="6" class="table-empty">${err.message}</td></tr>`;
+    }
+  }
+
+  /* ════════════════ BACKUPS ════════════════ */
+  async function loadBackups() {
+    try {
+      const list = await api('/backup');
+      document.getElementById('tbody-backups').innerHTML = list.length ? list.map(b => `
+        <tr>
+          <td><code style="font-size:11px">${b.arquivo}</code></td>
+          <td>${b.tamanho_kb} KB</td>
+          <td>${fmt.dataHora(b.criado_em)}</td>
+          <td>
+            <button class="btn btn-sm" onclick="downloadAuth('/api/backup/download/${b.arquivo}','${b.arquivo}')">Baixar</button>
+            <button class="btn btn-sm btn-danger" onclick="excluirBackup('${b.arquivo}')">×</button>
+          </td>
+        </tr>
+      `).join('') : '<tr><td colspan="4" class="table-empty">Nenhum backup ainda. Clique em "Backup agora".</td></tr>';
+    } catch (err) {
+      document.getElementById('tbody-backups').innerHTML = `<tr><td colspan="4" class="table-empty">${err.message}</td></tr>`;
+    }
+  }
+
+  async function rodarBackup() {
+    showLoading();
+    try {
+      const r = await api('/backup/run', { method: 'POST' });
+      toast(`Backup criado · ${r.sizeMB} MB`, 'success');
+      loadBackups();
+    } catch (err) { toast(err.message, 'error'); }
+    finally { hideLoading(); }
+  }
+
+  async function excluirBackup(arq) {
+    if (!confirm(`Excluir ${arq}?`)) return;
+    await api(`/backup/${arq}`, { method: 'DELETE' });
+    toast('Excluído.', 'success'); loadBackups();
+  }
+
+  /* ════════════════ CARGOS / FAIXAS ════════════════ */
+  let _gradesCache = [];
+  async function loadGrades() {
+    _gradesCache = await api('/salary-plan/grades');
+    document.getElementById('tbody-grades').innerHTML = _gradesCache.length ? _gradesCache.map(g => `
+      <tr>
+        <td><strong>${g.positions?.titulo}</strong><br><small class="text-muted">${g.positions?.departments?.nome || ''}</small></td>
+        <td><span class="badge ativo">${g.grade_nivel}</span></td>
+        <td><strong>${fmt.brl(g.salario_base)}</strong></td>
+        <td><small>${g.descricao_competencias || '—'}</small></td>
+        <td>${g.tempo_minimo_meses ? g.tempo_minimo_meses + ' meses' : '—'}</td>
+        <td>
+          <button class="btn btn-sm" onclick="editarGrade('${g.id}')">Editar</button>
+          <button class="btn btn-sm btn-danger" onclick="excluirGrade('${g.id}')">×</button>
+        </td>
+      </tr>
+    `).join('') : '<tr><td colspan="6" class="table-empty">Nenhuma faixa cadastrada.</td></tr>';
+  }
+
+  function editarGrade(id) {
+    const g = _gradesCache.find(x => x.id === id);
+    if (!g) return;
+    novaGrade(g);
+  }
+
+  async function novaGrade(existente = null) {
+    const positions = await api('/positions?active=true');
+    const opts = positions.map(p => `<option value="${p.id}" ${p.id === existente?.position_id ? 'selected' : ''}>${p.titulo}</option>`).join('');
+    const html = `<form id="gradeForm">
+      <div class="form-grid">
+        <div class="field"><label>Cargo<span class="req">*</span></label><select name="position_id" required>${opts}</select></div>
+        <div class="field"><label>Faixa (nível)<span class="req">*</span></label><input name="grade_nivel" placeholder="Ex: Júnior I, Pleno II, Sênior" required value="${existente?.grade_nivel || ''}"></div>
+        <div class="field"><label>Salário base (R$)<span class="req">*</span></label><input type="number" name="salario_base" step="0.01" required value="${existente?.salario_base || ''}"></div>
+        <div class="field"><label>Ordem</label><input type="number" name="ordem" value="${existente?.ordem ?? 0}"></div>
+        <div class="field"><label>Tempo mínimo (meses)</label><input type="number" name="tempo_minimo_meses" value="${existente?.tempo_minimo_meses || ''}"></div>
+      </div>
+      <div class="field mt-3"><label>Competências</label><textarea name="descricao_competencias" placeholder="O que precisa saber/saber fazer pra ocupar essa faixa">${existente?.descricao_competencias || ''}</textarea></div>
+      <div class="field mt-3"><label>Requisitos</label><textarea name="requisitos" placeholder="Formação, certificações, experiência mínima">${existente?.requisitos || ''}</textarea></div>
+    </form>`;
+    showFormModal(existente ? 'Editar faixa salarial' : 'Nova faixa salarial', html, async () => {
+      const f = document.getElementById('gradeForm');
+      if (!validateForm(f)) return;
+      const d = formToObject(f);
+      d.salario_base = parseFloat(d.salario_base);
+      d.ordem = parseInt(d.ordem) || 0;
+      if (d.tempo_minimo_meses) d.tempo_minimo_meses = parseInt(d.tempo_minimo_meses);
+      else delete d.tempo_minimo_meses;
+      try {
+        if (existente?.id) {
+          await api(`/salary-plan/grades/${existente.id}`, { method: 'PUT', body: d });
+          toast('Faixa atualizada.', 'success');
+        } else {
+          await api('/salary-plan/grades', { method: 'POST', body: d });
+          toast('Faixa criada.', 'success');
+        }
+        closeFormModal();
+        loadGrades();
+      } catch (err) { toast(err.message, 'error'); }
+    });
+  }
+
+  async function excluirGrade(id) {
+    if (!confirm('Desativar esta faixa?')) return;
+    await api(`/salary-plan/grades/${id}`, { method: 'DELETE' });
+    toast('Desativada.', 'success'); loadGrades();
+  }
+
+  let _movsCache = [];
+  async function loadMovs() {
+    _movsCache = await api('/salary-plan/movements');
+    document.getElementById('tbody-movs').innerHTML = _movsCache.length ? _movsCache.map(m => `
+      <tr>
+        <td>${fmt.data(m.data_movimento)}</td>
+        <td><strong>${m.employees?.nome_completo}</strong></td>
+        <td><span class="badge ativo">${m.tipo}</span></td>
+        <td>${fmt.brl(m.salario_anterior)}</td>
+        <td><strong>${fmt.brl(m.salario_novo)}</strong></td>
+        <td style="color:${m.percentual_aumento > 0 ? 'var(--brand-700)' : 'var(--ink-3)'}">${m.percentual_aumento > 0 ? '+' : ''}${m.percentual_aumento || 0}%</td>
+        <td>
+          <button class="btn btn-sm" onclick="editarMovimentacao('${m.id}')">Editar</button>
+          <button class="btn btn-sm btn-danger" onclick="excluirMovimentacao('${m.id}')">×</button>
+        </td>
+      </tr>
+    `).join('') : '<tr><td colspan="7" class="table-empty">Nenhuma movimentação registrada.</td></tr>';
+  }
+
+  function editarMovimentacao(id) {
+    const m = _movsCache.find(x => x.id === id);
+    if (!m) return;
+    novaMovimentacao(m);
+  }
+
+  async function excluirMovimentacao(id) {
+    if (!confirm('Excluir esta movimentação? O cargo/salário do funcionário NÃO será revertido automaticamente.')) return;
+    try { await api(`/salary-plan/movements/${id}`, { method: 'DELETE' }); toast('Movimentação excluída.', 'success'); loadMovs(); }
+    catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function novaMovimentacao(existente = null) {
+    const [emps, positions] = await Promise.all([
+      api('/employees?status=ativo&limit=300'),
+      api('/positions?active=true'),
+    ]);
+    const empOpts = (emps.data || []).map(e => `<option value="${e.id}" data-sal="${e.salario_base}" ${e.id === existente?.employee_id ? 'selected' : ''}>${e.nome_completo}</option>`).join('');
+    const posOpts = positions.map(p => `<option value="${p.id}" ${p.id === existente?.position_nova_id ? 'selected' : ''}>${p.titulo}${p.departments?.nome ? ' · ' + p.departments.nome : ''}</option>`).join('');
+    const tipos = ['promocao','transferencia','reclassificacao','mudanca_cargo','aumento_merito','dissidio','enquadramento'];
+    const tiposOpts = tipos.map(t => `<option value="${t}" ${t === existente?.tipo ? 'selected' : ''}>${t.replace('_', ' ')}</option>`).join('');
+    const html = `<form id="movForm">
+      <div class="form-grid">
+        <div class="field" style="grid-column:span 2"><label>Funcionário<span class="req">*</span></label><select name="employee_id" required>${empOpts}</select></div>
+        <div class="field"><label>Tipo<span class="req">*</span></label><select name="tipo" required>${tiposOpts}</select></div>
+        <div class="field"><label>Data<span class="req">*</span></label><input type="date" name="data_movimento" required value="${existente?.data_movimento || ''}"></div>
+        <div class="field"><label>Cargo novo</label><select name="position_nova_id"><option value="">— manter atual —</option>${posOpts}</select></div>
+        <div class="field"><label>Salário anterior (R$)</label><input type="number" name="salario_anterior" step="0.01" value="${existente?.salario_anterior || ''}"></div>
+        <div class="field"><label>Salário novo (R$)</label><input type="number" name="salario_novo" step="0.01" value="${existente?.salario_novo || ''}"></div>
+      </div>
+      <div style="background:var(--brand-50);border-left:3px solid var(--brand-500);padding:10px 14px;border-radius:var(--r-sm);margin-top:14px;font-size:12px;color:var(--ink-2)">
+        Quando você muda o <strong>cargo</strong>, o <strong>departamento</strong> do funcionário é atualizado automaticamente para o departamento associado àquele cargo.
+      </div>
+      <div class="field mt-3"><label>Motivo</label><textarea name="motivo">${existente?.motivo || ''}</textarea></div>
+    </form>`;
+    showFormModal(existente ? 'Editar movimentação de carreira' : 'Nova movimentação de carreira', html, async () => {
+      const f = document.getElementById('movForm');
+      if (!validateForm(f)) return;
+      const d = formToObject(f);
+      if (d.salario_anterior) d.salario_anterior = parseFloat(d.salario_anterior);
+      if (d.salario_novo) d.salario_novo = parseFloat(d.salario_novo);
+      if (!d.position_nova_id) delete d.position_nova_id;
+      try {
+        if (existente?.id) {
+          await api(`/salary-plan/movements/${existente.id}`, { method: 'PUT', body: d });
+          toast('Movimentação atualizada.', 'success');
+        } else {
+          await api('/salary-plan/movements', { method: 'POST', body: d });
+          toast('Movimentação registrada.', 'success');
+        }
+        closeFormModal();
+        loadMovs();
+      } catch (err) { toast(err.message, 'error'); }
+    });
+  }
+
+  /* ════════════════ EPIs ════════════════ */
+  const CATS_EPI = {
+    protecao_cabeca:'Cabeça', protecao_olhos_face:'Olhos/Face', protecao_auditiva:'Auditiva',
+    protecao_respiratoria:'Respiratória', protecao_tronco:'Tronco',
+    protecao_membros_superiores:'Mem. Superiores', protecao_membros_inferiores:'Mem. Inferiores',
+    protecao_corpo:'Corpo', protecao_queda:'Queda', outros:'Outros'
+  };
+
+  async function loadEpis() {
+    const list = await api('/epis?ativo=true');
+    document.getElementById('tbody-epis').innerHTML = list.length ? list.map(e => `
+      <tr>
+        <td><strong>${e.nome}</strong>${e.fabricante ? `<br><small class="text-muted">${e.fabricante}</small>` : ''}</td>
+        <td><code>${e.ca || '—'}</code></td>
+        <td><small>${CATS_EPI[e.categoria] || e.categoria}</small></td>
+        <td>${e.validade_meses || '—'} meses</td>
+        <td>${e.estoque_atual ?? 0}</td>
+        <td><button class="btn btn-sm btn-danger" onclick="excluirEpi('${e.id}')">×</button></td>
+      </tr>
+    `).join('') : '<tr><td colspan="6" class="table-empty">Nenhum EPI no catálogo.</td></tr>';
+  }
+
+  async function novoEpi() {
+    const catOpts = Object.entries(CATS_EPI).map(([k,v]) => `<option value="${k}">${v}</option>`).join('');
+    const html = `<form id="epiForm">
+      <div class="form-grid">
+        <div class="field" style="grid-column:span 2"><label>Nome<span class="req">*</span></label><input name="nome" required placeholder="Ex: Capacete classe A"></div>
+        <div class="field"><label>CA (Certif. Aprovação)</label><input name="ca" placeholder="Ex: 12345"></div>
+        <div class="field"><label>Categoria<span class="req">*</span></label><select name="categoria" required>${catOpts}</select></div>
+        <div class="field"><label>Fabricante</label><input name="fabricante"></div>
+        <div class="field"><label>Validade (meses)</label><input type="number" name="validade_meses" value="12"></div>
+        <div class="field"><label>Vida útil (meses)</label><input type="number" name="vida_util_meses" value="6"></div>
+        <div class="field"><label>Custo unitário (R$)</label><input type="number" name="custo_unitario" step="0.01"></div>
+        <div class="field"><label>Estoque mínimo</label><input type="number" name="estoque_minimo" value="0"></div>
+        <div class="field"><label>Estoque atual</label><input type="number" name="estoque_atual" value="0"></div>
+      </div>
+      <div class="field mt-3"><label>Descrição</label><textarea name="descricao"></textarea></div>
+    </form>`;
+    showFormModal('Novo EPI', html, async () => {
+      const f = document.getElementById('epiForm');
+      if (!validateForm(f)) return;
+      const d = formToObject(f);
+      ['validade_meses','vida_util_meses','estoque_minimo','estoque_atual'].forEach(k => d[k] = parseInt(d[k]) || 0);
+      if (d.custo_unitario) d.custo_unitario = parseFloat(d.custo_unitario);
+      try { await api('/epis', { method: 'POST', body: d }); toast('EPI cadastrado.', 'success'); closeFormModal(); loadEpis(); }
+      catch (err) { toast(err.message, 'error'); }
+    });
+  }
+
+  async function excluirEpi(id) {
+    if (!confirm('Desativar este EPI?')) return;
+    await api(`/epis/${id}`, { method: 'DELETE' });
+    toast('Desativado.', 'success'); loadEpis();
+  }
+
+  let _entregasCache = [];
+  async function loadEntregas() {
+    _entregasCache = await api('/epis/deliveries/all');
+    renderEntregas(_entregasCache);
+  }
+
+  function filtrarEntregas() {
+    const q = document.getElementById('busca-entregas').value.toLowerCase().trim();
+    if (!q) { renderEntregas(_entregasCache); return; }
+    const filt = _entregasCache.filter(d =>
+      (d.employees?.nome_completo || '').toLowerCase().includes(q) ||
+      String(d.employees?.matricula || '').includes(q)
+    );
+    renderEntregas(filt);
+  }
+
+  function renderEntregas(list) {
+    document.getElementById('tbody-entregas').innerHTML = list.length ? list.map(d => {
+      const vencido = d.data_vencimento && new Date(d.data_vencimento) < new Date();
+      return `<tr ${vencido ? 'style="background:var(--danger-bg)"' : ''}>
+        <td><strong>${d.employees?.nome_completo}</strong><br><small class="text-muted">${fmt.matricula(d.employees?.matricula)}</small></td>
+        <td>${d.epis?.nome}</td>
+        <td>${d.quantidade}</td>
+        <td>${fmt.data(d.data_entrega)}</td>
+        <td>${d.data_vencimento ? fmt.data(d.data_vencimento) + (vencido ? ' (vencido)' : '') : '—'}</td>
+        <td>${d.ciencia_funcionario ? 'Sim' : 'Não'}</td>
+      </tr>`;
+    }).join('') : '<tr><td colspan="6" class="table-empty">Nenhuma entrega encontrada.</td></tr>';
+  }
+
+  async function novaEntrega() {
+    const [emps, epis] = await Promise.all([
+      api('/employees?status=ativo&limit=300'),
+      api('/epis?ativo=true'),
+    ]);
+    const empOpts = (emps.data || []).map(e => `<option value="${e.id}">${e.nome_completo}</option>`).join('');
+    const epiOpts = epis.map(e => `<option value="${e.id}">${e.nome}${e.ca ? ' (CA ' + e.ca + ')' : ''}</option>`).join('');
+    const html = `<form id="entForm">
+      <div class="form-grid">
+        <div class="field" style="grid-column:span 2"><label>Funcionário<span class="req">*</span></label><select name="employee_id" required>${empOpts}</select></div>
+        <div class="field" style="grid-column:span 2"><label>EPI<span class="req">*</span></label><select name="epi_id" required>${epiOpts}</select></div>
+        <div class="field"><label>Quantidade</label><input type="number" name="quantidade" value="1" min="1"></div>
+        <div class="field"><label>Data entrega<span class="req">*</span></label><input type="date" name="data_entrega" required value="${new Date().toISOString().split('T')[0]}"></div>
+        <div class="field"><label>Motivo</label>
+          <select name="motivo">
+            <option value="admissao">Admissão</option>
+            <option value="substituicao_periodica">Substituição periódica</option>
+            <option value="substituicao_avaria">Substituição por avaria</option>
+            <option value="perda">Perda</option>
+            <option value="obrigatorio_funcao">Obrigatório à função</option>
+            <option value="outros">Outros</option>
+          </select></div>
+      </div>
+      <label class="toggle mt-3"><input type="checkbox" name="ciencia_funcionario"><span class="slider"></span> Funcionário ciente / assinou</label>
+      <div class="field mt-3"><label>Observações</label><textarea name="observacoes"></textarea></div>
+    </form>`;
+    showFormModal('Nova entrega de EPI', html, async () => {
+      const f = document.getElementById('entForm');
+      if (!validateForm(f)) return;
+      const d = formToObject(f);
+      d.quantidade = parseInt(d.quantidade) || 1;
+      d.ciencia_funcionario = !!d.ciencia_funcionario;
+      try { await api('/epis/deliveries', { method: 'POST', body: d }); toast('Entrega registrada.', 'success'); closeFormModal(); loadEntregas(); loadEpis(); }
+      catch (err) { toast(err.message, 'error'); }
+    });
+  }
+
+  /* Modal helper */
+  function showFormModal(title, html, onSave) {
+    let m = document.getElementById('form-modal');
+    if (!m) { m = document.createElement('div'); m.id = 'form-modal'; m.className = 'modal-overlay'; m.onclick = (e) => { if (e.target === m) closeFormModal(); }; document.body.appendChild(m); }
+    m.innerHTML = `<div class="modal modal-lg"><div class="modal-header"><h2>${title}</h2><button class="modal-close" onclick="closeFormModal()">×</button></div><div class="modal-body">${html}</div><div class="modal-footer"><button class="btn" onclick="closeFormModal()">Cancelar</button><button class="btn btn-primary" id="form-save">Salvar</button></div></div>`;
+    m.classList.remove('hidden');
+    initMasks(m);
+    document.getElementById('form-save').onclick = onSave;
+  }
+  function closeFormModal() { document.getElementById('form-modal')?.remove(); }
+
+  loadAudit();
+  loadAuditStats();
+</script>
+</body>
+</html>
