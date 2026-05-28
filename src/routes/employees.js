@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const { supabase } = require('../config/supabase');
-const { requireAuth, requireRole } = require('../middleware/auth');
+const { requireAuth, requireRole, authorize, hasPermission } = require('../middleware/auth');
 const multer = require('multer');
 
 const upload = multer({
@@ -114,11 +114,22 @@ router.post('/', requireAuth, async (req, res) => {
 });
 
 // PUT /api/employees/:id
-router.put('/:id', requireAuth, async (req, res) => {
+router.put('/:id', requireAuth, authorize('employees.update'), async (req, res) => {
   const motivoReajuste = req.body.motivo_reajuste;
   const payload = sanitize({ ...req.body, updated_by: req.user.id });
   delete payload.id; delete payload.created_at; delete payload.created_by;
   delete payload.departments; delete payload.positions;
+
+  // Bloqueia alteração de salário sem permissão financeira
+  if (payload.salario_base !== undefined && !hasPermission(req.user, 'salary.update')) {
+    const { data: cur } = await supabase.from('employees').select('salario_base').eq('id', req.params.id).single();
+    if (cur && parseFloat(cur.salario_base || 0) !== parseFloat(payload.salario_base || 0)) {
+      return res.status(403).json({
+        error: 'Sem permissão para alterar salário. Necessária a permissão "salary.update" (Financeiro).',
+        code: 'INSUFFICIENT_PERMISSIONS',
+      });
+    }
+  }
 
   if (payload.salario_base && payload.carga_horaria_semanal) {
     const hm = Math.round((parseInt(payload.carga_horaria_semanal) * 52) / 12);
@@ -145,7 +156,7 @@ router.put('/:id', requireAuth, async (req, res) => {
 });
 
 // DELETE /api/employees/:id — desativa
-router.delete('/:id', requireAuth, requireRole('admin', 'rh'), async (req, res) => {
+router.delete('/:id', requireAuth, authorize('employees.delete'), async (req, res) => {
   const { motivo_demissao, data_demissao } = req.body;
   const { error } = await supabase.from('employees').update({
     status: 'demitido',

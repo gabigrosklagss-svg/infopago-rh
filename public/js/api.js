@@ -6,12 +6,51 @@ const API_BASE = '';
 
 function getToken() { return localStorage.getItem('rh_token'); }
 function setToken(t) { localStorage.setItem('rh_token', t); }
+function getRefreshToken() { return localStorage.getItem('rh_refresh'); }
+function setRefreshToken(t) { localStorage.setItem('rh_refresh', t); }
 function getUser()  { try { return JSON.parse(localStorage.getItem('rh_user') || 'null'); } catch { return null; } }
 function setUser(u) { localStorage.setItem('rh_user', JSON.stringify(u)); }
-function logout() {
+function hasPermission(perm) {
+  const u = getUser();
+  if (!u) return false;
+  if ((u.roles || []).includes('super_admin')) return true;
+  return (u.permissions || []).includes(perm);
+}
+async function logout() {
+  try {
+    if (getToken()) await fetch(`${API_BASE}/api/auth/logout`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${getToken()}` },
+    });
+  } catch {}
   localStorage.removeItem('rh_token');
+  localStorage.removeItem('rh_refresh');
   localStorage.removeItem('rh_user');
   location.href = '/login.html';
+}
+
+/* Tenta renovar o token via refresh_token */
+let _refreshPromise = null;
+async function tryRefresh() {
+  if (_refreshPromise) return _refreshPromise;
+  const refresh = getRefreshToken();
+  if (!refresh) return false;
+  _refreshPromise = (async () => {
+    try {
+      const r = await fetch(`${API_BASE}/api/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refresh }),
+      });
+      if (!r.ok) return false;
+      const d = await r.json();
+      setToken(d.token);
+      if (d.refresh_token) setRefreshToken(d.refresh_token);
+      return true;
+    } catch { return false; }
+    finally { _refreshPromise = null; }
+  })();
+  return _refreshPromise;
 }
 
 async function api(endpoint, options = {}) {
@@ -19,14 +58,22 @@ async function api(endpoint, options = {}) {
   const token = getToken();
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const res = await fetch(`${API_BASE}/api${endpoint}`, {
+  let res = await fetch(`${API_BASE}/api${endpoint}`, {
     ...options,
     headers,
     body: options.body && typeof options.body === 'object' && !(options.body instanceof FormData)
       ? JSON.stringify(options.body) : options.body,
   });
 
-  if (res.status === 401) { logout(); throw new Error('Sessão expirada.'); }
+  // Tenta renovar 1x se 401 não for de credencial inválida
+  if (res.status === 401 && token && !options._retried) {
+    const errBody = await res.clone().json().catch(() => ({}));
+    if (errBody.code !== 'INVALID_CREDENTIALS' && await tryRefresh()) {
+      return api(endpoint, { ...options, _retried: true });
+    }
+    logout();
+    throw new Error('Sessão expirada.');
+  }
 
   const ct = res.headers.get('content-type') || '';
   const data = ct.includes('application/json') ? await res.json() : await res.text();

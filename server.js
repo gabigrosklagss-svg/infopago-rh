@@ -24,12 +24,58 @@ const { auditLogger } = require('./src/middleware/audit');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(helmet({ contentSecurityPolicy: false }));
-app.use(cors({ origin: true, credentials: true }));
-app.use('/api/auth', rateLimit({ windowMs: 15 * 60 * 1000, max: 20 }));
-app.use('/api', rateLimit({ windowMs: 60 * 1000, max: 200 }));
+// Helmet com CSP customizada (permite Chart.js CDN, Google Fonts, Supabase Storage)
+app.use(helmet({
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
+      imgSrc: ["'self'", "data:", "blob:", "https:"],
+      connectSrc: ["'self'", "https://*.supabase.co", "https://viacep.com.br"],
+      frameAncestors: ["'none'"],
+      objectSrc: ["'none'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  hsts: { maxAge: 31536000, includeSubDomains: true, preload: false },
+}));
+
+// CORS: apenas origens permitidas
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:3001')
+  .split(',').map(o => o.trim()).filter(Boolean);
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true); // requests same-origin / cli
+    if (ALLOWED_ORIGINS.includes(origin) || ALLOWED_ORIGINS.includes('*')) return cb(null, true);
+    cb(new Error('Origem não permitida: ' + origin));
+  },
+  credentials: true,
+  methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization'],
+}));
+
+// Rate limits granulares por endpoint
+const limitLogin   = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, message: { error: 'Muitas tentativas de login. Aguarde 15 minutos.', code: 'RATE_LIMITED' } });
+const limitRefresh = rateLimit({ windowMs: 60 * 1000,      max: 30 });
+const limitWrite   = rateLimit({ windowMs: 60 * 1000,      max: 60 });
+const limitGeral   = rateLimit({ windowMs: 60 * 1000,      max: 300, standardHeaders: true });
+const limitIA      = rateLimit({ windowMs: 60 * 1000,      max: 20 });
+const limitEmail   = rateLimit({ windowMs: 60 * 1000,      max: 30 });
+
+app.use('/api/auth/login',   limitLogin);
+app.use('/api/auth/refresh', limitRefresh);
+app.use('/api/agent',        limitIA);
+app.use('/api/recruitment/parse-cv', limitIA);
+app.use('/api/email',        limitEmail);
+app.use('/api',              limitGeral);
+
 app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Middleware de auditoria — registra todas as ações de escrita
 app.use(auditLogger());
@@ -65,6 +111,7 @@ app.use('/api/backup',      require('./src/routes/backup'));
 app.use('/api/performance', require('./src/routes/performance'));
 app.use('/api/recruitment', require('./src/routes/recruitment'));
 app.use('/api/collective-vacations', require('./src/routes/collectiveVacations'));
+app.use('/api/permissions', require('./src/routes/permissions'));
 
 // Endpoint público para confirmação de recebimento de holerite
 app.get('/confirmar/:token', async (req, res) => {

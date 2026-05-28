@@ -27,6 +27,8 @@
       <button class="tab-btn" onclick="goTab(1, this)">Backups</button>
       <button class="tab-btn" onclick="goTab(2, this)">Plano de Cargos</button>
       <button class="tab-btn" onclick="goTab(3, this)">EPIs</button>
+      <button class="tab-btn" onclick="goTab(4, this)">Usuários &amp; Permissões</button>
+      <button class="tab-btn" onclick="goTab(5, this)">Segurança</button>
     </div>
 
     <!-- AUDITORIA -->
@@ -128,6 +130,43 @@
       </table>
     </div>
 
+    <!-- USUÁRIOS & PERMISSÕES -->
+    <div class="tab-content card">
+      <div class="flex justify-between items-center mb-4">
+        <div>
+          <h3 style="margin:0">Usuários do sistema</h3>
+          <p class="text-muted text-sm" style="margin:4px 0 0">Quem tem acesso ao InfoPago RH e quais permissões cada um possui</p>
+        </div>
+        <button class="btn btn-primary" onclick="novoUsuario()">+ Novo usuário</button>
+      </div>
+      <table class="table">
+        <thead><tr><th>Nome</th><th>Cargo(s)</th><th>Departamento</th><th>Status</th><th></th></tr></thead>
+        <tbody id="tbody-users"></tbody>
+      </table>
+
+      <h3 class="card-title mt-5">Cargos &amp; permissões</h3>
+      <p class="text-muted text-sm">Clique num cargo para ver/editar as permissões atribuídas. <strong>Super Administrador</strong> tem acesso total e não pode ser editado.</p>
+      <div id="roles-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-top:10px"></div>
+    </div>
+
+    <!-- SEGURANÇA -->
+    <div class="tab-content card">
+      <h3 style="margin:0 0 6px">Segurança e tokens</h3>
+      <p class="text-muted text-sm">Controles avançados de segurança. Use com cuidado.</p>
+
+      <div class="card mt-3" style="border-left:3px solid var(--danger,#b91c1c);background:#fef3f2">
+        <h4 style="margin:0 0 4px;color:#b42318">Kill switch — revogar TODOS os tokens</h4>
+        <p class="text-sm" style="margin:0 0 12px;color:#7a2e23">Invalida todas as sessões ativas do sistema imediatamente. Todos os usuários (inclusive você) precisarão fazer login novamente. Use em caso de suspeita de vazamento de credenciais.</p>
+        <button class="btn btn-danger" onclick="killSwitch()">Revogar todos os tokens agora</button>
+      </div>
+
+      <h3 class="card-title mt-5">Tokens revogados recentemente <small>últimos 100</small></h3>
+      <table class="table">
+        <thead><tr><th>Usuário</th><th>Motivo</th><th>Revogado em</th><th>Expira em</th></tr></thead>
+        <tbody id="tbody-revoked"></tbody>
+      </table>
+    </div>
+
   </main>
 </div>
 
@@ -145,7 +184,158 @@
     if (idx === 1) loadBackups();
     if (idx === 2) { loadGrades(); loadMovs(); }
     if (idx === 3) { loadEpis(); loadEntregas(); }
+    if (idx === 4) { loadUsers(); loadRoles(); }
+    if (idx === 5) loadRevoked();
   }
+
+  /* ════════════════ USUÁRIOS & PERMISSÕES ════════════════ */
+  let _users = [], _roles = [], _permsCatalogo = null;
+
+  async function loadUsers() {
+    _users = await api('/auth/users').catch(() => []);
+    const tb = document.getElementById('tbody-users');
+    if (!_users.length) { tb.innerHTML = '<tr><td colspan="5" class="table-empty">Nenhum usuário.</td></tr>'; return; }
+    tb.innerHTML = _users.map(u => `
+      <tr>
+        <td><strong>${u.full_name}</strong><br><small class="text-muted">${u.id?.slice(0,8)}</small></td>
+        <td>${(u.new_roles || []).length ? (u.new_roles || []).map(r => `<span class="badge">${r.nome || r.slug}</span>`).join(' ') : `<small class="text-muted">${u.role || '—'}</small>`}</td>
+        <td>${u.department || '—'}</td>
+        <td><span class="badge ${u.active === false ? 'inativo' : 'ativo'}">${u.active === false ? 'inativo' : 'ativo'}</span></td>
+        <td>
+          <button class="btn btn-sm" onclick="editarUsuario('${u.id}')">Editar</button>
+          <button class="btn btn-sm" onclick="resetSenha('${u.id}','${u.full_name.replace(/'/g,"\\'")}')">Resetar senha</button>
+        </td>
+      </tr>`).join('');
+  }
+
+  async function loadRoles() {
+    _roles = await api('/permissions/roles').catch(() => []);
+    document.getElementById('roles-grid').innerHTML = _roles.map(r => `
+      <div class="card" style="cursor:pointer;padding:14px" onclick="editarRolePermissoes('${r.slug}')">
+        <h4 style="margin:0 0 4px;font-size:14px">${r.nome}</h4>
+        <p class="text-muted text-sm" style="margin:0 0 6px;min-height:32px">${r.descricao || '—'}</p>
+        <div class="flex justify-between items-center">
+          <small class="text-muted">Nível ${r.nivel}</small>
+          ${r.protegido ? '<small style="color:var(--warn,#a16207)">protegido</small>' : ''}
+        </div>
+      </div>`).join('');
+  }
+
+  async function editarRolePermissoes(slug) {
+    if (slug === 'super_admin') { toast('Super Admin tem acesso total e não pode ser editado.', 'warning'); return; }
+    if (!_permsCatalogo) _permsCatalogo = await api('/permissions/permissions');
+    const role = await api(`/permissions/roles/${slug}`);
+    const ativas = new Set((role.permissions || []).map(p => p.slug));
+
+    const grupos = _permsCatalogo.grupos;
+    const html = `<form id="permForm">
+      <p class="text-muted">Marque as permissões que o cargo <strong>${role.nome}</strong> deve possuir.</p>
+      ${Object.entries(grupos).map(([modulo, perms]) => `
+        <fieldset style="border:1px solid var(--border);border-radius:6px;padding:10px 14px;margin-bottom:10px">
+          <legend style="font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.06em;padding:0 6px">${modulo}</legend>
+          ${perms.map(p => `<label style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px;cursor:pointer">
+            <input type="checkbox" name="${p.slug}" ${ativas.has(p.slug) ? 'checked' : ''} style="margin:0">
+            <span><strong>${p.nome}</strong> ${p.descricao ? `<small style="color:var(--ink-4)">· ${p.descricao}</small>` : ''}</span>
+          </label>`).join('')}
+        </fieldset>`).join('')}
+    </form>`;
+    showFormModal(`Permissões de ${role.nome}`, html, async () => {
+      const checked = [...document.querySelectorAll('#permForm input[type="checkbox"]:checked')].map(i => i.name);
+      try {
+        await api(`/permissions/roles/${slug}/permissions`, { method: 'PUT', body: { permission_slugs: checked } });
+        toast('Permissões atualizadas.', 'success');
+        closeFormModal();
+      } catch (err) { toast(err.message, 'error'); }
+    });
+  }
+
+  async function novoUsuario() { await editarUsuario(null); }
+
+  async function editarUsuario(id) {
+    if (!_roles.length) _roles = await api('/permissions/roles').catch(() => []);
+    const u = id ? _users.find(x => x.id === id) : { full_name:'', email:'', department:'', active:true, new_roles:[] };
+    const ativos = new Set((u.new_roles || []).map(r => r.slug));
+    const html = `<form id="userForm">
+      <div class="form-grid">
+        <div class="field" style="grid-column:span 2"><label>Nome completo<span class="req">*</span></label>
+          <input name="full_name" value="${(u.full_name||'').replace(/"/g,'&quot;')}" required></div>
+        ${!id ? `<div class="field"><label>E-mail<span class="req">*</span></label><input type="email" name="email" required></div>
+        <div class="field"><label>Senha inicial<span class="req">*</span></label><input type="password" name="password" required minlength="8" placeholder="mín. 8 caracteres"></div>` : ''}
+        <div class="field"><label>Departamento</label><input name="department" value="${(u.department||'').replace(/"/g,'&quot;')}"></div>
+        <div class="field"><label>Status</label>
+          <select name="active">
+            <option value="true" ${u.active!==false?'selected':''}>Ativo</option>
+            <option value="false" ${u.active===false?'selected':''}>Inativo</option>
+          </select>
+        </div>
+      </div>
+      <div class="field mt-3">
+        <label>Cargos atribuídos</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${_roles.map(r => `<label style="display:flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--border);border-radius:99px;font-size:12px;cursor:pointer">
+            <input type="checkbox" name="role_${r.slug}" ${ativos.has(r.slug)?'checked':''}> ${r.nome}
+          </label>`).join('')}
+        </div>
+      </div>
+    </form>`;
+    showFormModal(id ? `Editar ${u.full_name}` : 'Novo usuário', html, async () => {
+      const f = document.getElementById('userForm');
+      const d = formToObject(f);
+      d.active = d.active === 'true';
+      const role_slugs = _roles.filter(r => d['role_' + r.slug]).map(r => r.slug);
+      Object.keys(d).forEach(k => { if (k.startsWith('role_')) delete d[k]; });
+      d.role_slugs = role_slugs;
+      try {
+        if (id) await api(`/auth/users/${id}`, { method:'PUT', body: d });
+        else await api('/auth/users', { method:'POST', body: d });
+        toast('Salvo.', 'success');
+        closeFormModal();
+        loadUsers();
+      } catch (err) { toast(err.message, 'error'); }
+    });
+  }
+
+  async function resetSenha(id, nome) {
+    const senha = prompt(`Nova senha para ${nome} (mín. 8 caracteres):`);
+    if (!senha) return;
+    if (senha.length < 8) { toast('Senha muito curta.', 'warning'); return; }
+    try {
+      await api(`/auth/users/${id}/reset-password`, { method:'POST', body: { nova_senha: senha } });
+      toast('Senha redefinida. Usuário precisará usar a nova senha.', 'success');
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  /* ════════════════ SEGURANÇA ════════════════ */
+  async function killSwitch() {
+    const conf = prompt('Esta ação invalidará TODOS os tokens ativos. Digite "REVOGAR" pra confirmar:');
+    if (conf !== 'REVOGAR') return;
+    try {
+      await api('/auth/security/revoke-all', { method:'POST', body: { motivo: 'admin_panel' } });
+      toast('Todos os tokens foram revogados. Você será deslogado.', 'success');
+      setTimeout(() => logout(), 2000);
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function loadRevoked() {
+    const list = await api('/permissions/revoked-tokens').catch(() => []);
+    const tb = document.getElementById('tbody-revoked');
+    if (!list.length) { tb.innerHTML = '<tr><td colspan="4" class="table-empty">Nenhum token revogado.</td></tr>'; return; }
+    tb.innerHTML = list.map(t => `<tr>
+      <td><small class="text-muted">${(t.user_id || '').slice(0,8)}</small></td>
+      <td>${t.reason || '—'}</td>
+      <td>${fmt.dataHora(t.revoked_at)}</td>
+      <td>${fmt.dataHora(t.expires_at)}</td>
+    </tr>`).join('');
+  }
+
+  function showFormModal(title, html, onSave) {
+    let m = document.getElementById('form-modal');
+    if (!m) { m = document.createElement('div'); m.id = 'form-modal'; m.className = 'modal-overlay'; m.onclick = (e) => { if (e.target === m) closeFormModal(); }; document.body.appendChild(m); }
+    m.innerHTML = `<div class="modal" style="max-width:680px"><div class="modal-header"><h2>${title}</h2><button class="modal-close" onclick="closeFormModal()">×</button></div><div class="modal-body">${html}</div><div class="modal-footer"><button class="btn" onclick="closeFormModal()">Cancelar</button><button class="btn btn-primary" id="form-save">Salvar</button></div></div>`;
+    m.classList.remove('hidden');
+    document.getElementById('form-save').onclick = onSave;
+  }
+  function closeFormModal() { document.getElementById('form-modal')?.remove(); }
 
   /* ════════════════ AUDITORIA ════════════════ */
   /* Fallback pra logs antigos sem metadata.descricao */

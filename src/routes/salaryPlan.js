@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const { supabase } = require('../config/supabase');
-const { requireAuth, requireRole } = require('../middleware/auth');
+const { requireAuth, authorize } = require('../middleware/auth');
 
 /* ── GRADES por cargo ─────────────────────────────────── */
 router.get('/grades', requireAuth, async (req, res) => {
@@ -14,7 +14,7 @@ router.get('/grades', requireAuth, async (req, res) => {
   res.json(data || []);
 });
 
-router.post('/grades', requireAuth, requireRole('admin', 'rh'), async (req, res) => {
+router.post('/grades', requireAuth, authorize('salary.plan.manage'), async (req, res) => {
   const payload = { ...req.body };
   if (!payload.position_id || !payload.grade_nivel || !payload.salario_base) {
     return res.status(400).json({ error: 'position_id, grade_nivel e salario_base são obrigatórios.' });
@@ -24,14 +24,14 @@ router.post('/grades', requireAuth, requireRole('admin', 'rh'), async (req, res)
   res.status(201).json(data);
 });
 
-router.put('/grades/:id', requireAuth, requireRole('admin', 'rh'), async (req, res) => {
+router.put('/grades/:id', requireAuth, authorize('salary.plan.manage'), async (req, res) => {
   const payload = { ...req.body }; delete payload.id; delete payload.created_at; delete payload.positions;
   const { data, error } = await supabase.from('position_grades').update(payload).eq('id', req.params.id).select().single();
   if (error) return res.status(400).json({ error: error.message });
   res.json(data);
 });
 
-router.delete('/grades/:id', requireAuth, requireRole('admin'), async (req, res) => {
+router.delete('/grades/:id', requireAuth, authorize('salary.plan.manage'), async (req, res) => {
   await supabase.from('position_grades').update({ ativo: false }).eq('id', req.params.id);
   res.json({ success: true });
 });
@@ -66,7 +66,7 @@ async function resolverDepartamentoDoCargo(payload) {
   return payload;
 }
 
-router.post('/movements', requireAuth, requireRole('admin', 'rh'), async (req, res) => {
+router.post('/movements', requireAuth, authorize('salary.plan.manage'), async (req, res) => {
   const payload = await resolverDepartamentoDoCargo({ ...req.body, aprovado_por: req.user.id });
   if (!payload.employee_id || !payload.tipo || !payload.data_movimento) {
     return res.status(400).json({ error: 'employee_id, tipo e data_movimento são obrigatórios.' });
@@ -94,7 +94,7 @@ router.post('/movements', requireAuth, requireRole('admin', 'rh'), async (req, r
   res.status(201).json(data);
 });
 
-router.put('/movements/:id', requireAuth, requireRole('admin', 'rh'), async (req, res) => {
+router.put('/movements/:id', requireAuth, authorize('salary.plan.manage'), async (req, res) => {
   const payload = await resolverDepartamentoDoCargo({ ...req.body });
   delete payload.id;
   delete payload.created_at;
@@ -123,7 +123,7 @@ router.put('/movements/:id', requireAuth, requireRole('admin', 'rh'), async (req
   res.json(data);
 });
 
-router.delete('/movements/:id', requireAuth, requireRole('admin'), async (req, res) => {
+router.delete('/movements/:id', requireAuth, authorize('salary.plan.manage'), async (req, res) => {
   await supabase.from('career_movements').delete().eq('id', req.params.id);
   res.json({ success: true });
 });

@@ -64,6 +64,7 @@
     try {
       const r = await api('/auth/login', { method: 'POST', body: { email: f.email.value, password: f.password.value } });
       setToken(r.token);
+      if (r.refresh_token) setRefreshToken(r.refresh_token);
       setUser(r.user);
       toast('Sessão iniciada com sucesso.', 'success', 'Bem-vindo');
       setTimeout(() => location.href = '/dashboard.html', 400);
