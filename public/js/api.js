@@ -4,6 +4,42 @@
 
 const API_BASE = '';
 
+/* ── Premium layer: injeta CSS e inicializa tema antes de tudo ── */
+(function injectPremium() {
+  if (!document.querySelector('link[href="/css/premium.css"]')) {
+    const l = document.createElement('link');
+    l.rel = 'stylesheet';
+    l.href = '/css/premium.css';
+    document.head.appendChild(l);
+  }
+  // Tema: localStorage 'rh_theme' = 'light' | 'dark' | 'auto' (default)
+  const pref = localStorage.getItem('rh_theme') || 'auto';
+  const sysDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const apply = (mode) => {
+    const dark = mode === 'dark' || (mode === 'auto' && sysDark);
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  };
+  apply(pref);
+  // Reage a mudança no SO se estiver em auto
+  if (window.matchMedia) {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      if ((localStorage.getItem('rh_theme') || 'auto') === 'auto') apply('auto');
+    });
+  }
+})();
+
+function setTheme(mode) {
+  localStorage.setItem('rh_theme', mode);
+  const sysDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const dark = mode === 'dark' || (mode === 'auto' && sysDark);
+  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  document.getElementById('cmdk-overlay')?.remove();
+}
+function toggleTheme() {
+  const cur = document.documentElement.getAttribute('data-theme');
+  setTheme(cur === 'dark' ? 'light' : 'dark');
+}
+
 function getToken() { return localStorage.getItem('rh_token'); }
 function setToken(t) { localStorage.setItem('rh_token', t); }
 function getUser()  { try { return JSON.parse(localStorage.getItem('rh_user') || 'null'); } catch { return null; } }
@@ -386,18 +422,25 @@ function renderSidebar(active) {
   </aside>`;
 }
 
-/* ── Top Navbar (busca + atalhos) ─────────────────────── */
+/* ── Top Navbar Premium (busca + tema + notif + perfil) ─────── */
+const ICON_SUN = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>`;
+const ICON_MOON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
+
 function renderTopbar() {
   return `<header class="topbar">
-    <div class="topbar-search">
-      <input id="globalSearch" placeholder="Buscar funcionário, CPF, matrícula, holerite…" autocomplete="off">
+    <div class="topbar-search" onclick="abrirCommandPalette()">
+      <input id="globalSearch" placeholder="Buscar página, funcionário, ação…  (Ctrl+K)" autocomplete="off" readonly style="cursor:pointer">
       <span class="kbd">⌘K</span>
     </div>
 
     <div class="topbar-actions">
+      <button class="topbar-btn theme-toggle" title="Alternar tema (claro/escuro)" onclick="toggleTheme()">
+        <span class="sun">${ICON_SUN}</span>
+        <span class="moon">${ICON_MOON}</span>
+      </button>
       <a href="/help.html" class="topbar-btn" title="Central de ajuda" style="text-decoration:none">${ICONS.help}</a>
-      <button class="topbar-btn" title="Notificações" onclick="abrirNotificacoes()">
-        ${ICONS.bell}<span class="dot"></span>
+      <button class="topbar-btn" title="Notificações" onclick="abrirNotificacoes(event)">
+        ${ICONS.bell}<span class="dot" id="notif-dot" style="display:none"></span>
       </button>
     </div>
   </header>`;
@@ -452,26 +495,161 @@ function mountShell(activeNav) {
     appMain.appendChild(ft.firstElementChild);
   }
 
-  // Ctrl/Cmd + K = focar busca
+  // Ctrl/Cmd + K = abrir command palette
   document.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
       e.preventDefault();
-      document.getElementById('globalSearch')?.focus();
+      abrirCommandPalette();
+    }
+    if (e.key === 'Escape') {
+      document.getElementById('cmdk-overlay')?.remove();
+      document.getElementById('notif-panel')?.remove();
     }
   });
+
+  // Busca de notificações em background
+  carregarNotificacoes();
+}
+
+/* ── Command Palette (Cmd+K) ────────────────────── */
+function abrirCommandPalette() {
+  if (document.getElementById('cmdk-overlay')) return;
+  const u = getUser();
+  const ACTIONS = [
+    { lbl: 'Dashboard', sub: 'Painel executivo', href: '/dashboard.html', grp: 'Análise', ico: ICONS.dashboard },
+    { lbl: 'Relatórios analíticos', sub: 'KPIs e gráficos', href: '/analytics.html', grp: 'Análise', ico: ICONS.reports },
+    { lbl: 'Funcionários', sub: 'Cadastro e edição', href: '/employees.html', grp: 'Cadastros', ico: ICONS.employees },
+    { lbl: 'Agente IA · Ingrid', sub: 'Cadastro por chat', href: '/agent.html', grp: 'Cadastros', ico: ICONS.agent },
+    { lbl: 'Recrutamento & Seleção', sub: 'Vagas e candidatos', href: '/recruitment.html', grp: 'Gente', ico: ICONS.recruit },
+    { lbl: 'Avaliação de desempenho', sub: 'Ciclos e notas', href: '/performance.html', grp: 'Gente', ico: ICONS.perf },
+    { lbl: 'Custo Total de Contratação', sub: 'Calculadora CTC', href: '/ctc.html', grp: 'Gente', ico: ICONS.ctc },
+    { lbl: 'Controle de ponto', sub: 'Jornada e HE', href: '/time.html', grp: 'Jornada', ico: ICONS.time },
+    { lbl: 'Solicitações de férias', sub: 'Inclui coletivas', href: '/vacations.html', grp: 'Jornada', ico: ICONS.vacation },
+    { lbl: 'Holerites e Folha', sub: 'Geração e envio', href: '/payslips.html', grp: 'Folha', ico: ICONS.payslips },
+    { lbl: 'Rescisão e 13º Salário', sub: 'TRCT e décimo', href: '/hr-docs.html', grp: 'Folha', ico: ICONS.hrdocs },
+    { lbl: 'Envios e Agendamentos', sub: 'E-mail de holerites', href: '/email-send.html', grp: 'Folha', ico: ICONS.email },
+    { lbl: 'Departamentos e Cargos', sub: 'Configuração', href: '/settings.html', grp: 'Folha', ico: ICONS.settings },
+    { lbl: 'Tema: alternar claro/escuro', sub: 'Visual', action: 'toggleTheme()', grp: 'Configuração', ico: ICON_MOON },
+    { lbl: 'Tema: seguir o sistema', sub: 'Automático', action: "setTheme('auto')", grp: 'Configuração', ico: ICON_SUN },
+    { lbl: 'Meu perfil', sub: 'Foto e nome', action: 'abrirPerfilUsuario()', grp: 'Conta', ico: ICONS.employees },
+    { lbl: 'Sair do sistema', sub: 'Logout', action: 'logout()', grp: 'Conta', ico: ICONS.logout },
+  ];
+  if (u?.role === 'admin') ACTIONS.push({ lbl: 'Administração', sub: 'Auditoria · Backup · EPIs', href: '/admin.html', grp: 'Admin', ico: ICONS.admin });
+
+  const overlay = document.createElement('div');
+  overlay.id = 'cmdk-overlay';
+  overlay.className = 'cmdk-overlay';
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  overlay.innerHTML = `<div class="cmdk">
+    <input class="cmdk-input" id="cmdk-input" placeholder="Buscar página, ação..." autocomplete="off">
+    <div class="cmdk-list" id="cmdk-list"></div>
+  </div>`;
+  document.body.appendChild(overlay);
+
+  const input = document.getElementById('cmdk-input');
+  const list = document.getElementById('cmdk-list');
+  let idx = 0;
+  function render(q) {
+    const norm = (q || '').toLowerCase().trim();
+    const matches = !norm ? ACTIONS : ACTIONS.filter(a => (a.lbl + ' ' + a.sub + ' ' + a.grp).toLowerCase().includes(norm));
+    if (!matches.length) { list.innerHTML = `<div class="cmdk-empty">Nada encontrado pra "${q}"</div>`; return; }
+    list.innerHTML = matches.map((a, i) => `<div class="cmdk-item ${i === idx ? 'active' : ''}" data-i="${i}" data-href="${a.href || ''}" data-action="${a.action || ''}">
+      ${a.ico} <div><div>${a.lbl}</div><div style="font-size:11px;color:var(--ink-4)">${a.sub}</div></div>
+      <span class="grp">${a.grp}</span>
+    </div>`).join('');
+    list.querySelectorAll('.cmdk-item').forEach(el => {
+      el.onclick = () => exec(matches[parseInt(el.dataset.i)]);
+    });
+  }
+  function exec(a) {
+    overlay.remove();
+    if (a.href) location.href = a.href;
+    else if (a.action) try { eval(a.action); } catch (e) { console.error(e); }
+  }
+  render('');
+  input.focus();
+  input.oninput = () => { idx = 0; render(input.value); };
+  input.onkeydown = (e) => {
+    const items = list.querySelectorAll('.cmdk-item');
+    if (e.key === 'ArrowDown') { e.preventDefault(); idx = Math.min(idx + 1, items.length - 1); render(input.value); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); idx = Math.max(idx - 1, 0); render(input.value); }
+    else if (e.key === 'Enter') {
+      e.preventDefault();
+      const el = items[idx];
+      if (el) el.click();
+    }
+  };
+}
+
+/* ── Notificações inteligentes ───────────────────── */
+async function carregarNotificacoes() {
+  try {
+    const [fer, dat] = await Promise.all([
+      api('/reports/vacation-alerts').catch(() => ({ vencidas: [], vence_30dias: [] })),
+      api('/reports/key-dates').catch(() => ({ aniversariantes_mes: [], contratos_experiencia: [] })),
+    ]);
+    const hoje = new Date();
+    const dia = hoje.getDate();
+    const itens = [];
+
+    fer.vencidas.forEach(f => itens.push({
+      tipo: 'danger', titulo: `Férias vencidas: ${f.nome}`,
+      sub: 'Risco de multa em dobro. Agende imediatamente.',
+      href: '/vacations.html',
+    }));
+    fer.vence_30dias.slice(0, 5).forEach(f => itens.push({
+      tipo: 'warn', titulo: `Férias vencem em ${f.dias_ate_vencimento}d: ${f.nome}`,
+      sub: 'Próximo do limite de 12 meses do período aquisitivo.',
+      href: '/vacations.html',
+    }));
+    dat.contratos_experiencia.slice(0, 5).forEach(c => itens.push({
+      tipo: 'warn', titulo: `Contrato de experiência: ${c.nome_completo}`,
+      sub: `${c.etapa} em ${fmt.data(c.data_evento)}. Decisão: efetivar ou desligar.`,
+      href: '/employees.html',
+    }));
+    dat.aniversariantes_mes.filter(a => a.dia === dia).forEach(a => itens.push({
+      tipo: 'info', titulo: `🎂 Aniversário hoje: ${a.nome_completo}`,
+      sub: `${a.idade} anos. Lembre o time!`,
+    }));
+
+    window._notifs = itens;
+    document.getElementById('notif-dot') && (document.getElementById('notif-dot').style.display = itens.length ? 'block' : 'none');
+  } catch (e) {
+    // silent
+  }
+}
+
+function abrirNotificacoes(ev) {
+  ev?.stopPropagation();
+  const old = document.getElementById('notif-panel');
+  if (old) { old.remove(); return; }
+  const itens = window._notifs || [];
+  const html = `<div class="notif-panel" id="notif-panel">
+    <div class="notif-header"><h3>Notificações</h3><small style="color:var(--ink-4)">${itens.length} ativa(s)</small></div>
+    <div class="notif-body">
+      ${itens.length ? itens.map(n => `<div class="notif-item ${n.tipo}" ${n.href ? `onclick="location.href='${n.href}'"` : ''}>
+        <div class="ico">${n.tipo === 'danger' ? '!' : n.tipo === 'warn' ? '⚠' : 'i'}</div>
+        <div class="body"><strong>${n.titulo}</strong><small>${n.sub}</small></div>
+      </div>`).join('')
+      : `<div class="empty-state" style="padding:32px 16px"><div class="ill">${ICONS.bell}</div><h3>Tudo em ordem</h3><p>Sem alertas no momento.</p></div>`}
+    </div>
+  </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+  setTimeout(() => document.addEventListener('click', closeNotifOnce), 50);
+}
+function closeNotifOnce(e) {
+  if (!e.target.closest('.notif-panel') && !e.target.closest('.topbar-btn')) {
+    document.getElementById('notif-panel')?.remove();
+    document.removeEventListener('click', closeNotifOnce);
+  }
 }
 
 /* Compatibilidade retro: páginas antigas usam renderSidebar como innerHTML.
    Vamos detectar e migrar — se renderSidebar for chamada como string-assign,
    ela ainda retorna a sidebar; mas o ideal é a página chamar mountShell(). */
 
-/* Handlers básicos das ações da topbar (stubs que podem evoluir) */
-function abrirAjuda() {
-  toast('Central de ajuda em breve. Consulte SETUP.md por enquanto.', 'info', 'Ajuda');
-}
-function abrirNotificacoes() {
-  toast('Sem notificações novas.', 'info', 'Notificações');
-}
+/* Handlers básicos das ações da topbar (legados) */
+function abrirAjuda() { location.href = '/help.html'; }
 function abrirMenuUsuario(ev) {
   ev?.stopPropagation();
   const old = document.getElementById('user-menu');
