@@ -1,0 +1,549 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relatórios Analíticos — InfoPago RH</title>
+<link rel="stylesheet" href="/css/main.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  .kpi-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap:12px; margin-bottom:20px; }
+  .kpi { background:#fff; border:1px solid var(--border); border-radius:var(--r); padding:14px 16px; }
+  .kpi .lbl { font-size:10.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-4); font-weight:600; }
+  .kpi .val { font-size:26px; font-weight:700; font-family:'JetBrains Mono', monospace; letter-spacing:-.02em; margin-top:4px; }
+  .kpi .sub { font-size:11px; color:var(--ink-3); margin-top:2px; }
+  .kpi.danger .val { color:#b91c1c; }
+  .kpi.warn .val { color:#a16207; }
+  .kpi.ok .val { color:#15803d; }
+  .kpi.primary { background:linear-gradient(135deg, var(--brand-800), var(--brand-500)); color:#fff; border:0; }
+  .kpi.primary .lbl, .kpi.primary .sub { color:rgba(255,255,255,.8); }
+  .kpi.primary .val { color:#fff; }
+
+  .report-section { margin-top:28px; padding-top:18px; border-top:2px solid var(--paper-3); }
+  .report-section h2 { font-size:14px; text-transform:uppercase; letter-spacing:.08em; margin:0 0 4px; color:var(--ink-2); }
+  .report-section p.sub { color:var(--ink-3); font-size:12px; margin:0 0 16px; }
+
+  .charts-grid { display:grid; grid-template-columns: 1fr 1fr; gap:16px; }
+  @media (max-width: 1100px) { .charts-grid { grid-template-columns: 1fr; } }
+  .chart-card { background:#fff; border:1px solid var(--border); border-radius:var(--r); padding:14px; }
+  .chart-card h3 { margin:0 0 10px; font-size:13px; }
+  .chart-wrap { height: 260px; position:relative; }
+
+  .badge-trend.up { background:#dcfce7; color:#15803d; }
+  .badge-trend.down { background:#fee2e2; color:#b91c1c; }
+  .badge-trend.flat { background:#f1f5f9; color:#475569; }
+
+  .mini-table { width:100%; font-size:12px; }
+  .mini-table td { padding:6px 4px; border-bottom:1px dashed var(--border); }
+  .mini-table td.num { text-align:right; font-family:'JetBrains Mono', monospace; font-weight:600; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div id="sidebar"></div>
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <h1>Relatórios Analíticos</h1>
+        <p class="subtitle">Visão estratégica de RH em tempo real · 10 dimensões</p>
+      </div>
+      <div class="flex gap-2">
+        <button class="btn" onclick="exportarTudo()">Exportar CSV</button>
+        <button class="btn" onclick="window.print()">Imprimir / PDF</button>
+      </div>
+    </div>
+
+    <!-- ── FILTROS GLOBAIS ─────────────────────── -->
+    <div class="card" style="display:flex;gap:12px;align-items:end;flex-wrap:wrap">
+      <div class="field" style="margin:0">
+        <label>De</label><input type="date" id="f-from">
+      </div>
+      <div class="field" style="margin:0">
+        <label>Até</label><input type="date" id="f-to">
+      </div>
+      <div class="field" style="margin:0">
+        <label>Departamento</label>
+        <select id="f-dep"><option value="">Todos</option></select>
+      </div>
+      <button class="btn btn-primary" onclick="carregarTudo()">Aplicar</button>
+      <span class="spacer" style="flex:1"></span>
+      <span class="text-sm text-muted" id="last-update">—</span>
+    </div>
+
+    <!-- ── KPIs PRINCIPAIS ──────────────────────── -->
+    <div class="kpi-grid" id="main-kpis" style="margin-top:18px"></div>
+
+    <!-- ── 1. HEADCOUNT ─────────────────────────── -->
+    <div class="report-section">
+      <h2>1 · Headcount — Composição da Força de Trabalho</h2>
+      <p class="sub">Quantas pessoas trabalham hoje e como estão distribuídas</p>
+      <div class="charts-grid">
+        <div class="chart-card"><h3>Por departamento</h3><div class="chart-wrap"><canvas id="ch-hc-dep"></canvas></div></div>
+        <div class="chart-card"><h3>Por nível de cargo</h3><div class="chart-wrap"><canvas id="ch-hc-nivel"></canvas></div></div>
+        <div class="chart-card"><h3>Por faixa etária</h3><div class="chart-wrap"><canvas id="ch-hc-idade"></canvas></div></div>
+        <div class="chart-card"><h3>Por tempo de casa</h3><div class="chart-wrap"><canvas id="ch-hc-tempo"></canvas></div></div>
+      </div>
+    </div>
+
+    <!-- ── 2. TURNOVER ──────────────────────────── -->
+    <div class="report-section">
+      <h2>2 · Turnover — Rotatividade</h2>
+      <p class="sub">Admissões, desligamentos e taxa de saída</p>
+      <div class="kpi-grid" id="kpi-turn"></div>
+      <div class="charts-grid">
+        <div class="chart-card"><h3>Evolução mensal</h3><div class="chart-wrap"><canvas id="ch-turn-evo"></canvas></div></div>
+        <div class="chart-card"><h3>Desligamentos por departamento</h3><div class="chart-wrap"><canvas id="ch-turn-dep"></canvas></div></div>
+      </div>
+    </div>
+
+    <!-- ── 3. CUSTO DE PESSOAL ──────────────────── -->
+    <div class="report-section">
+      <h2>3 · Custo de Pessoal</h2>
+      <p class="sub">Folha + encargos + provisões — custo real da força de trabalho</p>
+      <div class="kpi-grid" id="kpi-cost"></div>
+      <div class="charts-grid">
+        <div class="chart-card"><h3>Evolução da folha (mês a mês)</h3><div class="chart-wrap"><canvas id="ch-cost-evo"></canvas></div></div>
+        <div class="chart-card"><h3>Composição do custo</h3><div class="chart-wrap"><canvas id="ch-cost-comp"></canvas></div></div>
+      </div>
+      <div class="card mt-3">
+        <h3 style="margin-top:0">Top 10 funcionários por salário</h3>
+        <table class="mini-table" id="t-top-caros"></table>
+      </div>
+    </div>
+
+    <!-- ── 4. ABSENTEÍSMO ───────────────────────── -->
+    <div class="report-section">
+      <h2>4 · Absenteísmo</h2>
+      <p class="sub">Faltas, atestados e atrasos no período</p>
+      <div class="kpi-grid" id="kpi-abs"></div>
+      <div class="charts-grid">
+        <div class="chart-card"><h3>Por tipo</h3><div class="chart-wrap"><canvas id="ch-abs-tipo"></canvas></div></div>
+        <div class="chart-card"><h3>Sazonalidade mensal</h3><div class="chart-wrap"><canvas id="ch-abs-mes"></canvas></div></div>
+      </div>
+      <div class="card mt-3">
+        <h3 style="margin-top:0">Top 10 com mais dias de ausência</h3>
+        <table class="mini-table" id="t-abs-top"></table>
+      </div>
+    </div>
+
+    <!-- ── 5. HORAS EXTRAS ──────────────────────── -->
+    <div class="report-section">
+      <h2>5 · Horas Extras</h2>
+      <p class="sub">HE 50% (sábados) e HE 100% (dom/feriados)</p>
+      <div class="kpi-grid" id="kpi-he"></div>
+      <div class="card mt-3">
+        <h3 style="margin-top:0">Top 10 funcionários com mais HE</h3>
+        <table class="mini-table" id="t-he-top"></table>
+      </div>
+    </div>
+
+    <!-- ── 6. FÉRIAS ────────────────────────────── -->
+    <div class="report-section">
+      <h2>6 · Férias — Alertas e Passivo</h2>
+      <p class="sub">Compliance: férias vencidas (multa em dobro), próximos vencimentos e passivo trabalhista</p>
+      <div class="kpi-grid" id="kpi-fer"></div>
+      <div class="charts-grid" style="grid-template-columns:1fr 1fr 1fr">
+        <div class="chart-card" style="border-left:4px solid #b91c1c"><h3>Vencidas (CRÍTICO)</h3><div id="lst-fer-venc"></div></div>
+        <div class="chart-card" style="border-left:4px solid #a16207"><h3>Vencem em 30 dias</h3><div id="lst-fer-30"></div></div>
+        <div class="chart-card" style="border-left:4px solid #15803d"><h3>Vencem em 60 dias</h3><div id="lst-fer-60"></div></div>
+      </div>
+    </div>
+
+    <!-- ── 7. DATAS-CHAVE ───────────────────────── -->
+    <div class="report-section">
+      <h2>7 · Datas-Chave do Mês</h2>
+      <p class="sub">Aniversários, datas de empresa e contratos de experiência</p>
+      <div class="charts-grid" style="grid-template-columns:1fr 1fr 1fr">
+        <div class="chart-card"><h3>Aniversariantes</h3><div id="lst-aniv"></div></div>
+        <div class="chart-card"><h3>Aniversário de empresa</h3><div id="lst-emp"></div></div>
+        <div class="chart-card" style="border-left:4px solid #a16207"><h3>Contratos de experiência ⚠</h3><div id="lst-exp"></div></div>
+      </div>
+    </div>
+
+    <!-- ── 8. DISTRIBUIÇÃO SALARIAL ─────────────── -->
+    <div class="report-section">
+      <h2>8 · Distribuição Salarial &amp; Equidade</h2>
+      <p class="sub">Equidade de remuneração e quem está fora da faixa cadastrada (Lei 14.611/23)</p>
+      <div class="card">
+        <h3 style="margin-top:0">Tabela por cargo</h3>
+        <table class="mini-table" id="t-sal-cargo"></table>
+      </div>
+      <div class="charts-grid mt-3">
+        <div class="chart-card" style="border-left:4px solid #b91c1c">
+          <h3>Funcionários fora da faixa</h3>
+          <div id="lst-fora"></div>
+        </div>
+        <div class="chart-card" style="border-left:4px solid #a16207">
+          <h3>Gap salarial por gênero (mesmo cargo)</h3>
+          <div id="lst-gap"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 9. AVALIAÇÃO DE DESEMPENHO ───────────── -->
+    <div class="report-section">
+      <h2>9 · Avaliação de Desempenho — Consolidado</h2>
+      <p class="sub">Notas dos ciclos de avaliação (todos os ciclos no agregado)</p>
+      <div class="kpi-grid" id="kpi-perf"></div>
+      <div class="charts-grid">
+        <div class="chart-card"><h3>Ranking por departamento</h3><div class="chart-wrap"><canvas id="ch-perf-dep"></canvas></div></div>
+        <div class="chart-card"><h3>Distribuição das notas</h3><div class="chart-wrap"><canvas id="ch-perf-dist"></canvas></div></div>
+      </div>
+      <div class="charts-grid mt-3">
+        <div class="chart-card" style="border-left:4px solid #15803d"><h3>Top Performers</h3><div id="lst-top-perf"></div></div>
+        <div class="chart-card" style="border-left:4px solid #b91c1c"><h3>Low Performers (PIP)</h3><div id="lst-low-perf"></div></div>
+      </div>
+    </div>
+
+    <!-- ── 10. RECRUTAMENTO ─────────────────────── -->
+    <div class="report-section">
+      <h2>10 · Recrutamento — Funil &amp; Eficiência</h2>
+      <p class="sub">Desempenho do processo seletivo no período</p>
+      <div class="kpi-grid" id="kpi-rec"></div>
+      <div class="charts-grid">
+        <div class="chart-card"><h3>Funil de candidatos</h3><div class="chart-wrap"><canvas id="ch-rec-funil"></canvas></div></div>
+        <div class="chart-card"><h3>Origem dos contratados</h3><div class="chart-wrap"><canvas id="ch-rec-orig"></canvas></div></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+  requireAuth();
+  mountShell('reports');
+
+  const BRL = v => Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+  const NUM = v => Number(v||0).toLocaleString('pt-BR',{maximumFractionDigits:1});
+  const PCT = v => Number(v||0).toFixed(1) + '%';
+
+  // Default: últimos 12 meses
+  (function initPeriod() {
+    const to = new Date();
+    const from = new Date(to.getFullYear(), to.getMonth() - 11, 1);
+    document.getElementById('f-from').value = from.toISOString().slice(0,10);
+    document.getElementById('f-to').value = to.toISOString().slice(0,10);
+  })();
+
+  let _charts = {};
+  function chart(id, cfg) {
+    const ctx = document.getElementById(id);
+    if (!ctx) return;
+    _charts[id]?.destroy();
+    _charts[id] = new Chart(ctx, cfg);
+  }
+
+  const palette = ['#1FAB54','#0F2E1E','#39E175','#a16207','#b91c1c','#475569','#7c3aed','#0891b2','#db2777','#65a30d'];
+
+  function kpi(lbl, val, sub, cls) {
+    return `<div class="kpi ${cls||''}"><div class="lbl">${lbl}</div><div class="val">${val}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div>`;
+  }
+
+  async function carregarDeps() {
+    const deps = await api('/departments?active=true').catch(() => []);
+    document.getElementById('f-dep').innerHTML = '<option value="">Todos</option>' +
+      deps.map(d => `<option value="${d.id}">${d.nome}</option>`).join('');
+  }
+
+  function qs() {
+    const from = document.getElementById('f-from').value;
+    const to = document.getElementById('f-to').value;
+    const dep = document.getElementById('f-dep').value;
+    const u = new URLSearchParams();
+    if (from) u.set('from', from);
+    if (to) u.set('to', to);
+    if (dep) u.set('department_id', dep);
+    return u.toString();
+  }
+
+  async function carregarTudo() {
+    showLoading();
+    try {
+      const Q = qs();
+      const [hc, turn, cost, abs, he, fer, dat, sal, perf, rec] = await Promise.all([
+        api('/reports/headcount?' + Q),
+        api('/reports/turnover?' + Q),
+        api('/reports/payroll-cost?' + Q),
+        api('/reports/absenteeism?' + Q),
+        api('/reports/overtime?' + Q),
+        api('/reports/vacation-alerts'),
+        api('/reports/key-dates'),
+        api('/reports/salary-distribution'),
+        api('/reports/performance-summary'),
+        api('/reports/recruitment-funnel?' + Q),
+      ]);
+
+      window._data = { hc, turn, cost, abs, he, fer, dat, sal, perf, rec };
+
+      renderMainKPIs(hc, turn, cost, abs, fer);
+      renderHeadcount(hc);
+      renderTurnover(turn);
+      renderCost(cost);
+      renderAbs(abs);
+      renderHE(he);
+      renderFer(fer);
+      renderDatas(dat);
+      renderSal(sal);
+      renderPerf(perf);
+      renderRec(rec);
+
+      document.getElementById('last-update').textContent = 'Atualizado em ' + new Date().toLocaleString('pt-BR');
+    } catch (err) {
+      toast(err.message, 'error');
+    } finally {
+      hideLoading();
+    }
+  }
+
+  /* ── KPIs PRINCIPAIS ─────────────────────────── */
+  function renderMainKPIs(hc, turn, cost, abs, fer) {
+    document.getElementById('main-kpis').innerHTML =
+      kpi('Headcount', hc.total, 'funcionários ativos', 'primary') +
+      kpi('Turnover', PCT(turn.turnover_pct), `${turn.admissoes} adm · ${turn.desligamentos} desl`, turn.turnover_pct > 15 ? 'danger' : turn.turnover_pct > 10 ? 'warn' : 'ok') +
+      kpi('Custo total', BRL(cost.total_custo_real), 'no período · com encargos', '') +
+      kpi('Absenteísmo', PCT(abs.taxa_absenteismo_pct), `${abs.total_dias} dia(s)`, abs.taxa_absenteismo_pct > 5 ? 'danger' : abs.taxa_absenteismo_pct > 3 ? 'warn' : 'ok') +
+      kpi('Férias vencidas', fer.vencidas_count, 'risco multa em dobro', fer.vencidas_count > 0 ? 'danger' : 'ok') +
+      kpi('Passivo de férias', BRL(fer.passivo_trabalhista_estimado), 'estimativa', '');
+  }
+
+  /* ── 1. HEADCOUNT ────────────────────────────── */
+  function renderHeadcount(hc) {
+    const barConfig = (obj, title) => ({
+      type: 'bar',
+      data: { labels: Object.keys(obj), datasets: [{ label: title, data: Object.values(obj), backgroundColor: palette[0], borderRadius: 4 }] },
+      options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true } }, maintainAspectRatio: false },
+    });
+    chart('ch-hc-dep',   barConfig(hc.por_departamento, 'Pessoas'));
+    chart('ch-hc-nivel', barConfig(hc.por_nivel, 'Pessoas'));
+    chart('ch-hc-idade', barConfig(hc.por_faixa_etaria, 'Pessoas'));
+    chart('ch-hc-tempo', barConfig(hc.por_tempo_casa, 'Pessoas'));
+  }
+
+  /* ── 2. TURNOVER ─────────────────────────────── */
+  function renderTurnover(t) {
+    document.getElementById('kpi-turn').innerHTML =
+      kpi('Admissões', t.admissoes, 'no período') +
+      kpi('Desligamentos', t.desligamentos, `${t.voluntarios} voluntários · ${t.involuntarios} involuntários`) +
+      kpi('Taxa de Turnover', PCT(t.turnover_pct), 'meta < 10%', t.turnover_pct > 15 ? 'danger' : t.turnover_pct > 10 ? 'warn' : 'ok') +
+      kpi('Tempo médio até saída', NUM(t.tempo_medio_casa_meses) + ' meses', '');
+
+    chart('ch-turn-evo', {
+      type: 'line',
+      data: {
+        labels: t.evolucao_mensal.map(e => e.mes),
+        datasets: [
+          { label: 'Admissões', data: t.evolucao_mensal.map(e => e.admissoes), borderColor: '#15803d', backgroundColor: 'rgba(21,128,61,.1)', tension: .3, fill: true },
+          { label: 'Desligamentos', data: t.evolucao_mensal.map(e => e.desligamentos), borderColor: '#b91c1c', backgroundColor: 'rgba(185,28,28,.1)', tension: .3, fill: true },
+        ],
+      },
+      options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } },
+    });
+    chart('ch-turn-dep', {
+      type: 'bar',
+      data: { labels: Object.keys(t.desligamentos_por_depto), datasets: [{ label: 'Desligamentos', data: Object.values(t.desligamentos_por_depto), backgroundColor: '#b91c1c', borderRadius: 4 }] },
+      options: { indexAxis: 'y', plugins: { legend: { display: false } }, maintainAspectRatio: false },
+    });
+  }
+
+  /* ── 3. CUSTO ────────────────────────────────── */
+  function renderCost(c) {
+    document.getElementById('kpi-cost').innerHTML =
+      kpi('Folha bruta', BRL(c.total_bruto), `${c.qtd_holerites} holerites`) +
+      kpi('Encargos patronais', BRL(c.total_encargos), '~33% sobre bruta') +
+      kpi('Provisão 13º + Férias', BRL(c.provisoes.decimo_terceiro + c.provisoes.ferias_um_terco), 'mensal') +
+      kpi('Custo total real', BRL(c.total_custo_real), 'tudo incluso', 'primary') +
+      kpi('Custo médio/pessoa', BRL(c.custo_medio_funcionario), 'mensal estimado');
+
+    chart('ch-cost-evo', {
+      type: 'bar',
+      data: { labels: c.evolucao_mensal.map(e => e.mes), datasets: [{ label: 'Folha bruta', data: c.evolucao_mensal.map(e => e.total), backgroundColor: palette[0], borderRadius: 4 }] },
+      options: { maintainAspectRatio: false, plugins: { legend: { display: false } } },
+    });
+    chart('ch-cost-comp', {
+      type: 'doughnut',
+      data: {
+        labels: ['Salários', 'INSS patronal', 'FGTS', 'Sistema S', 'RAT', '13º', 'Férias + 1/3'],
+        datasets: [{ data: [c.total_bruto, c.detalhe_encargos.inss_patronal, c.detalhe_encargos.fgts, c.detalhe_encargos.sistema_s, c.detalhe_encargos.rat, c.provisoes.decimo_terceiro, c.provisoes.ferias_um_terco], backgroundColor: palette }],
+      },
+      options: { maintainAspectRatio: false, plugins: { legend: { position: 'right' } } },
+    });
+
+    document.getElementById('t-top-caros').innerHTML = `<tr><th>Pos</th><th>Funcionário</th><th>Cargo</th><th>Depto</th><th class="num">Salário</th></tr>` +
+      c.top10_caros.map((e, i) => `<tr><td>${i+1}</td><td><strong>${e.nome}</strong></td><td>${e.cargo || '—'}</td><td>${e.depto || '—'}</td><td class="num">${BRL(e.salario)}</td></tr>`).join('');
+  }
+
+  /* ── 4. ABSENTEÍSMO ──────────────────────────── */
+  function renderAbs(a) {
+    document.getElementById('kpi-abs').innerHTML =
+      kpi('Ocorrências', a.total_ocorrencias) +
+      kpi('Dias totais', a.total_dias) +
+      kpi('Taxa', PCT(a.taxa_absenteismo_pct), 'meta < 3%', a.taxa_absenteismo_pct > 5 ? 'danger' : a.taxa_absenteismo_pct > 3 ? 'warn' : 'ok') +
+      kpi('Custo (faltas descontadas)', BRL(a.custo_faltas_descontadas));
+
+    chart('ch-abs-tipo', {
+      type: 'doughnut',
+      data: { labels: Object.keys(a.por_tipo), datasets: [{ data: Object.values(a.por_tipo), backgroundColor: palette }] },
+      options: { maintainAspectRatio: false, plugins: { legend: { position: 'right' } } },
+    });
+    chart('ch-abs-mes', {
+      type: 'line',
+      data: { labels: a.sazonalidade_mensal.map(e => e.mes), datasets: [{ label: 'Dias', data: a.sazonalidade_mensal.map(e => e.dias), borderColor: palette[3], backgroundColor: 'rgba(161,98,7,.1)', tension: .3, fill: true }] },
+      options: { maintainAspectRatio: false },
+    });
+
+    document.getElementById('t-abs-top').innerHTML = a.top10_funcionarios.length
+      ? `<tr><th>Funcionário</th><th>Matrícula</th><th class="num">Dias</th></tr>` +
+        a.top10_funcionarios.map(f => `<tr><td><strong>${f.nome}</strong></td><td>${f.matricula || '—'}</td><td class="num">${f.dias}</td></tr>`).join('')
+      : '<tr><td class="table-empty">Sem ocorrências.</td></tr>';
+  }
+
+  /* ── 5. HE ──────────────────────────────────── */
+  function renderHE(h) {
+    document.getElementById('kpi-he').innerHTML =
+      kpi('HE 50% (sábados)', NUM(h.total_he50) + 'h') +
+      kpi('HE 100% (dom/feriado)', NUM(h.total_he100) + 'h') +
+      kpi('Total de horas', NUM(h.total_horas) + 'h') +
+      kpi('Custo total HE', BRL(h.custo_total), '', h.custo_total > 0 ? 'warn' : '');
+
+    document.getElementById('t-he-top').innerHTML = h.top10_funcionarios.length
+      ? `<tr><th>Funcionário</th><th class="num">HE 50%</th><th class="num">HE 100%</th><th class="num">Custo</th></tr>` +
+        h.top10_funcionarios.map(f => `<tr><td><strong>${f.nome}</strong></td><td class="num">${NUM(f.he50)}h</td><td class="num">${NUM(f.he100)}h</td><td class="num">${BRL(f.custo)}</td></tr>`).join('')
+      : '<tr><td class="table-empty">Sem HE no período.</td></tr>';
+  }
+
+  /* ── 6. FÉRIAS ──────────────────────────────── */
+  function renderFer(f) {
+    document.getElementById('kpi-fer').innerHTML =
+      kpi('Vencidas', f.vencidas.length, 'multa em dobro', f.vencidas.length > 0 ? 'danger' : 'ok') +
+      kpi('Vencem em 30 dias', f.vence_30dias.length, '', 'warn') +
+      kpi('Vencem em 60 dias', f.vence_60dias.length, '', '') +
+      kpi('Passivo total', BRL(f.passivo_trabalhista_estimado), 'estimativa');
+
+    const listaF = (arr) => arr.length ? arr.map(e => `<div style="padding:6px 0;border-bottom:1px dashed var(--border);font-size:12px"><strong>${e.nome}</strong> <small class="text-muted">(${e.depto || '—'})</small><br><small>Venc.: ${fmt.data(e.prox_vencimento)} · em ${e.dias_ate_vencimento}d</small></div>`).join('') : '<small class="text-muted">Nenhum.</small>';
+    document.getElementById('lst-fer-venc').innerHTML = listaF(f.vencidas);
+    document.getElementById('lst-fer-30').innerHTML = listaF(f.vence_30dias);
+    document.getElementById('lst-fer-60').innerHTML = listaF(f.vence_60dias);
+  }
+
+  /* ── 7. DATAS ───────────────────────────────── */
+  function renderDatas(d) {
+    document.getElementById('lst-aniv').innerHTML = d.aniversariantes_mes.length
+      ? d.aniversariantes_mes.map(e => `<div style="padding:6px 0;border-bottom:1px dashed var(--border);font-size:12px">Dia ${e.dia} · <strong>${e.nome_completo}</strong> <small class="text-muted">(${e.idade}a)</small></div>`).join('')
+      : '<small class="text-muted">Nenhum aniversariante.</small>';
+    document.getElementById('lst-emp').innerHTML = d.aniversarios_empresa.length
+      ? d.aniversarios_empresa.map(e => `<div style="padding:6px 0;border-bottom:1px dashed var(--border);font-size:12px">Dia ${e.dia} · <strong>${e.nome_completo}</strong> <small class="text-muted">${e.anos} ano(s)</small></div>`).join('')
+      : '<small class="text-muted">Nenhum.</small>';
+    document.getElementById('lst-exp').innerHTML = d.contratos_experiencia.length
+      ? d.contratos_experiencia.map(e => `<div style="padding:6px 0;border-bottom:1px dashed var(--border);font-size:12px"><strong>${e.nome_completo}</strong><br><small class="text-muted">${e.etapa} · ${fmt.data(e.data_evento)}</small></div>`).join('')
+      : '<small class="text-muted">Nenhum vencendo.</small>';
+  }
+
+  /* ── 8. SAL ────────────────────────────────── */
+  function renderSal(s) {
+    document.getElementById('t-sal-cargo').innerHTML = s.tabela_por_cargo.length
+      ? `<tr><th>Cargo</th><th class="num">Qtd</th><th class="num">Mínimo</th><th class="num">Média</th><th class="num">Mediana</th><th class="num">Máximo</th><th class="num">Faixa cadastrada</th></tr>` +
+        s.tabela_por_cargo.map(c => `<tr>
+          <td><strong>${c.cargo}</strong></td>
+          <td class="num">${c.qtd}</td>
+          <td class="num">${BRL(c.min)}</td>
+          <td class="num">${BRL(c.media)}</td>
+          <td class="num">${BRL(c.mediana)}</td>
+          <td class="num">${BRL(c.max)}</td>
+          <td class="num"><small>${c.min_faixa ? BRL(c.min_faixa) : '—'} a ${c.max_faixa ? BRL(c.max_faixa) : '—'}</small></td>
+        </tr>`).join('')
+      : '<tr><td class="table-empty">Sem dados.</td></tr>';
+
+    document.getElementById('lst-fora').innerHTML = s.fora_da_faixa.length
+      ? s.fora_da_faixa.map(f => `<div style="padding:6px 0;border-bottom:1px dashed var(--border);font-size:12px"><strong>${f.nome}</strong> <small class="text-muted">(${f.cargo})</small><br><small style="color:#b91c1c">${BRL(f.salario)} — ${f.lado}</small></div>`).join('')
+      : '<small class="text-muted">Todos dentro da faixa cadastrada.</small>';
+
+    document.getElementById('lst-gap').innerHTML = s.gap_genero.length
+      ? s.gap_genero.map(g => `<div style="padding:6px 0;border-bottom:1px dashed var(--border);font-size:12px"><strong>${g.cargo}</strong><br><small>H ${BRL(g.media_h)} (${g.qtd_h}) · M ${BRL(g.media_m)} (${g.qtd_m}) · <span style="color:${Math.abs(g.pct)>10?'#b91c1c':'var(--ink-3)'}">${g.pct>0?'+':''}${PCT(g.pct)} H>M</span></small></div>`).join('')
+      : '<small class="text-muted">Sem dados de gênero suficientes.</small>';
+  }
+
+  /* ── 9. PERF ───────────────────────────────── */
+  function renderPerf(p) {
+    document.getElementById('kpi-perf').innerHTML =
+      kpi('Total avaliações', p.total_avaliacoes) +
+      kpi('Nota média geral', NUM(p.media_geral) + ' / 5', '', p.media_geral >= 4 ? 'ok' : p.media_geral >= 2.5 ? 'warn' : 'danger') +
+      kpi('Top performers', p.top_performers.length, 'nota ≥ 4') +
+      kpi('Low performers', p.low_performers.length, 'nota ≤ 2', p.low_performers.length > 0 ? 'warn' : 'ok');
+
+    chart('ch-perf-dep', {
+      type: 'bar',
+      data: { labels: p.ranking_por_departamento.map(r => r.departamento), datasets: [{ label: 'Nota média', data: p.ranking_por_departamento.map(r => r.media.toFixed(2)), backgroundColor: palette[0], borderRadius: 4 }] },
+      options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { min: 0, max: 5 } }, maintainAspectRatio: false },
+    });
+    chart('ch-perf-dist', {
+      type: 'bar',
+      data: { labels: Object.keys(p.distribuicao), datasets: [{ label: 'Pessoas', data: Object.values(p.distribuicao), backgroundColor: ['#b91c1c','#dc2626','#a16207','#15803d','#1FAB54'], borderRadius: 4 }] },
+      options: { plugins: { legend: { display: false } }, maintainAspectRatio: false },
+    });
+
+    document.getElementById('lst-top-perf').innerHTML = p.top_performers.length
+      ? p.top_performers.map(e => `<div style="padding:6px 0;border-bottom:1px dashed var(--border);font-size:12px"><strong>${e.nome}</strong> <small class="text-muted">${e.cargo} · ${e.depto}</small><br><small style="color:#15803d;font-weight:600">${e.nota.toFixed(1)} / 5</small></div>`).join('')
+      : '<small class="text-muted">Sem top performers ainda.</small>';
+    document.getElementById('lst-low-perf').innerHTML = p.low_performers.length
+      ? p.low_performers.map(e => `<div style="padding:6px 0;border-bottom:1px dashed var(--border);font-size:12px"><strong>${e.nome}</strong> <small class="text-muted">${e.cargo} · ${e.depto}</small><br><small style="color:#b91c1c;font-weight:600">${e.nota.toFixed(1)} / 5</small></div>`).join('')
+      : '<small class="text-muted">Sem low performers.</small>';
+  }
+
+  /* ── 10. REC ───────────────────────────────── */
+  function renderRec(r) {
+    document.getElementById('kpi-rec').innerHTML =
+      kpi('Vagas abertas', r.vagas_abertas) +
+      kpi('Vagas preenchidas', r.vagas_preenchidas) +
+      kpi('Tempo médio fechamento', NUM(r.tempo_medio_fechamento_dias) + ' dias') +
+      kpi('Taxa de aceitação proposta', PCT(r.taxa_aceitacao_proposta_pct), '', r.taxa_aceitacao_proposta_pct > 80 ? 'ok' : r.taxa_aceitacao_proposta_pct > 50 ? 'warn' : 'danger') +
+      kpi('Total de candidatos', r.total_candidatos);
+
+    const ord = ['triagem','entrevista','teste_tecnico','proposta','contratado','reprovado','desistiu'];
+    chart('ch-rec-funil', {
+      type: 'bar',
+      data: { labels: ord.map(s => s.replace('_',' ')), datasets: [{ label: 'Candidatos', data: ord.map(s => r.funil[s] || 0), backgroundColor: palette[0], borderRadius: 4 }] },
+      options: { indexAxis: 'y', plugins: { legend: { display: false } }, maintainAspectRatio: false },
+    });
+    chart('ch-rec-orig', {
+      type: 'doughnut',
+      data: { labels: Object.keys(r.origens), datasets: [{ data: Object.values(r.origens), backgroundColor: palette }] },
+      options: { maintainAspectRatio: false, plugins: { legend: { position: 'right' } } },
+    });
+  }
+
+  /* ── EXPORTAR CSV ─────────────────────────── */
+  function exportarTudo() {
+    if (!window._data) { toast('Carregue os dados primeiro.', 'warning'); return; }
+    const d = window._data;
+    let csv = '';
+    const sec = (titulo, linhas) => { csv += `\n\n=== ${titulo} ===\n` + linhas.join('\n'); };
+
+    sec('HEADCOUNT', ['Categoria,Quantidade',
+      ...Object.entries(d.hc.por_departamento).map(([k,v]) => `${k},${v}`)]);
+    sec('TURNOVER', [`Métrica,Valor`,
+      `Admissões,${d.turn.admissoes}`,
+      `Desligamentos,${d.turn.desligamentos}`,
+      `Taxa de Turnover,${d.turn.turnover_pct}%`,
+      `Tempo médio até saída (meses),${d.turn.tempo_medio_casa_meses}`]);
+    sec('CUSTO DE PESSOAL', [`Item,Valor`,
+      `Folha bruta,${d.cost.total_bruto}`,
+      `Encargos patronais,${d.cost.total_encargos}`,
+      `Provisão 13º,${d.cost.provisoes.decimo_terceiro}`,
+      `Provisão Férias,${d.cost.provisoes.ferias_um_terco}`,
+      `Custo total real,${d.cost.total_custo_real}`]);
+    sec('FÉRIAS VENCIDAS', [`Nome,Departamento,Vencimento,Dias`,
+      ...d.fer.vencidas.map(f => `${f.nome},${f.depto || '—'},${f.prox_vencimento},${f.dias_ate_vencimento}`)]);
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `analytics_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  carregarDeps().then(carregarTudo);
+</script>
+</body>
+</html>
