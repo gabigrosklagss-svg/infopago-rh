@@ -12,29 +12,20 @@
   <main class="main">
     <div class="page-header">
       <div>
-        <h1>Painel Executivo</h1>
-        <p class="subtitle" id="competencia">Carregando…</p>
+        <h1>Dashboard</h1>
+        <p class="subtitle" id="competencia">—</p>
       </div>
-      <div class="flex gap-2">
-        <a href="/analytics.html" class="btn">Relatórios completos</a>
-        <a href="/payslips.html" class="btn btn-primary">Gerar holerites do mês</a>
+      <div>
+        <a href="/payslips.html" class="btn btn-primary"> Gerar holerites do mês</a>
       </div>
     </div>
 
-    <!-- Insights inteligentes (alertas automáticos) -->
-    <div id="insights" class="mb-3"></div>
-
-    <div class="kpi-grid" id="kpis">
-      <div class="skeleton skeleton-card"></div>
-      <div class="skeleton skeleton-card"></div>
-      <div class="skeleton skeleton-card"></div>
-      <div class="skeleton skeleton-card"></div>
-    </div>
+    <div class="kpi-grid" id="kpis"></div>
 
     <div class="grid-2">
       <div class="card">
-        <h3 class="card-title">Folha — últimos 6 meses <small>evolução mensal</small></h3>
-        <canvas id="chart" height="240"></canvas>
+        <h3 class="card-title">Folha — últimos 6 meses</h3>
+        <canvas id="chart" width="600" height="240"></canvas>
       </div>
       <div class="card">
         <h3 class="card-title">Encargos do mês <small>INSS · IRRF · FGTS</small></h3>
@@ -44,11 +35,11 @@
 
     <div class="grid-2 mt-5">
       <div class="card">
-        <h3 class="card-title">Aniversariantes do mês <small>celebre o time</small></h3>
+        <h3 class="card-title"> Aniversariantes do mês</h3>
         <div id="aniversariantes"></div>
       </div>
       <div class="card">
-        <h3 class="card-title">Férias a vencer <small>evite multa em dobro</small></h3>
+        <h3 class="card-title"> Férias a vencer</h3>
         <div id="ferias-vencer"></div>
       </div>
     </div>
@@ -56,7 +47,6 @@
 </div>
 
 <script src="/js/api.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
   requireAuth();
   mountShell('dashboard');
@@ -119,10 +109,7 @@
             <div class="ts-meta">${f.employees?.matricula || ''} · Período: ${fmt.data(f.periodo_aquisitivo_inicio)}</div></li>`).join('') + '</ul>'
         : '<p class="text-muted">Nenhuma férias a vencer nos próximos 60 dias.</p>';
 
-      // Insights automáticos
-      gerarInsights(d);
-
-      // Gráfico premium
+      // Gráfico
       drawChart(d.historico_folha);
     } catch (err) {
       toast(err.message, 'error');
@@ -131,89 +118,34 @@
     }
   }
 
-  function gerarInsights(d) {
-    const ins = [];
-    const k = d.folha_do_mes;
-    const ativos = d.funcionarios_ativos || 1;
-    const hist = d.historico_folha || [];
-    const fer = d.ferias_a_vencer || [];
-
-    // Variação da folha
-    if (hist.length >= 2) {
-      const atual = hist[hist.length - 1].total;
-      const anterior = hist[hist.length - 2].total;
-      const variacao = anterior > 0 ? ((atual - anterior) / anterior) * 100 : 0;
-      if (Math.abs(variacao) > 5) {
-        ins.push({
-          tipo: variacao > 0 ? 'warn' : 'success',
-          titulo: variacao > 0 ? `Folha cresceu ${variacao.toFixed(1)}% vs mês anterior` : `Folha reduziu ${Math.abs(variacao).toFixed(1)}% vs mês anterior`,
-          texto: variacao > 0 ? 'Variação relevante — verifique novas contratações, reajustes ou HE.' : 'Redução pode indicar desligamentos. Confira o módulo de turnover.',
-        });
-      }
-    }
-    // Holerites pendentes de envio
-    if (k.qtd_holerites > 0 && d.holerites_enviados < k.qtd_holerites) {
-      ins.push({ tipo: 'warn',
-        titulo: `${k.qtd_holerites - d.holerites_enviados} holerite(s) ainda não enviado(s)`,
-        texto: 'Envie pelos canais cadastrados em Envios e Agendamentos.' });
-    }
-    // Férias vencidas/perto do limite
-    if (fer.length > 0) {
-      ins.push({ tipo: 'danger',
-        titulo: `${fer.length} funcionário(s) com férias a vencer`,
-        texto: 'Programe os próximos gozos pra evitar passivo trabalhista (multa em dobro).' });
-    }
-    // Custo médio
-    if (ativos > 0 && k.total_liquido > 0) {
-      const medio = k.total_liquido / ativos;
-      ins.push({ tipo: 'info',
-        titulo: `Folha líquida média por funcionário: ${fmt.brl(medio)}`,
-        texto: `${ativos} funcionário(s) ativo(s) · ${k.qtd_holerites} holerites no mês.` });
-    }
-    document.getElementById('insights').innerHTML = ins.length
-      ? ins.map(i => `<div class="insight ${i.tipo}"><div class="ico">${i.tipo === 'danger' ? '!' : i.tipo === 'warn' ? '⚠' : i.tipo === 'success' ? '✓' : 'i'}</div><div class="body"><h4>${i.titulo}</h4><p>${i.texto}</p></div></div>`).join('')
-      : '';
-  }
-
-  let _chart;
   function drawChart(data) {
-    if (!data?.length || !window.Chart) return;
-    const ctx = document.getElementById('chart');
-    _chart?.destroy();
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    const styles = getComputedStyle(document.documentElement);
-    const brand = styles.getPropertyValue('--brand-500').trim() || '#1FAB54';
-    const ink = isDark ? '#C9D1D9' : '#425466';
-    const grid = isDark ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.06)';
-    _chart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: data.map(d => d.label),
-        datasets: [{
-          label: 'Folha bruta',
-          data: data.map(d => d.total),
-          backgroundColor: brand,
-          borderRadius: 6,
-          maxBarThickness: 48,
-        }],
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => fmt.brl(c.parsed.y) } } },
-        scales: {
-          x: { grid: { display: false }, ticks: { color: ink } },
-          y: { grid: { color: grid }, ticks: { color: ink, callback: v => 'R$ ' + (v/1000).toFixed(0) + 'k' } },
-        },
-      },
+    const c = document.getElementById('chart');
+    const ctx = c.getContext('2d');
+    ctx.clearRect(0, 0, c.width, c.height);
+    if (!data?.length) return;
+    const max = Math.max(...data.map(d => d.total)) || 1;
+    const padding = 40;
+    const w = (c.width - 2 * padding) / data.length;
+
+    // Eixo
+    ctx.strokeStyle = '#e2e8f0';
+    ctx.beginPath(); ctx.moveTo(padding, 10); ctx.lineTo(padding, c.height - 30); ctx.lineTo(c.width - 10, c.height - 30); ctx.stroke();
+
+    // Barras
+    data.forEach((d, i) => {
+      const x = padding + i * w + 10;
+      const h = ((d.total / max) * (c.height - 60));
+      const y = c.height - 30 - h;
+      ctx.fillStyle = '#1f3a8a';
+      ctx.fillRect(x, y, w - 20, h);
+      ctx.fillStyle = '#4a5568';
+      ctx.font = '11px Plus Jakarta Sans, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(d.label, x + (w - 20) / 2, c.height - 12);
+      ctx.fillText(fmt.brl(d.total).replace('R$', '').trim(), x + (w - 20) / 2, y - 4);
     });
   }
 
-  // Redraw em mudança de tema
-  new MutationObserver(() => { drawChart(window._lastHist); })
-    .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-
-  const _origLoad = load;
-  load = async function() { await _origLoad(); };
   load();
 </script>
 </body>
