@@ -46,7 +46,10 @@
           <div class="table-toolbar">
             <span class="count" id="cnt">0 avaliações</span>
             <span class="spacer"></span>
-            <button class="btn btn-sm" onclick="popularCiclo()" id="btnSeed" style="display:none">Gerar lista de funcionários</button>
+            <select id="f-dep" onchange="filtrarPorDepto()" style="margin-right:8px;font-size:12px;padding:6px 10px;border:1px solid var(--border);border-radius:6px">
+              <option value="">Todos departamentos</option>
+            </select>
+            <button class="btn btn-sm" onclick="popularCiclo()" id="btnSeed">Adicionar funcionários</button>
           </div>
           <table class="table">
             <thead><tr>
@@ -65,13 +68,24 @@
   requireAuth();
   mountShell('reports');
 
-  let _cycles = [], _activeCycleId = null, _evals = [];
+  let _cycles = [], _activeCycleId = null, _evals = [], _deps = [], _depFiltro = '';
 
   async function carregar() {
-    _cycles = await api('/performance/cycles');
+    [_cycles, _deps] = await Promise.all([
+      api('/performance/cycles'),
+      api('/departments?active=true').catch(() => []),
+    ]);
+    const selDep = document.getElementById('f-dep');
+    selDep.innerHTML = '<option value="">Todos departamentos</option>' +
+      _deps.map(d => `<option value="${d.id}">${d.nome}</option>`).join('');
     renderCycles();
     if (!_activeCycleId && _cycles.length) selecionarCiclo(_cycles[0].id);
     else if (_activeCycleId) carregarEvals();
+  }
+
+  function filtrarPorDepto() {
+    _depFiltro = document.getElementById('f-dep').value;
+    renderEvalsTable();
   }
 
   function renderCycles() {
@@ -113,21 +127,50 @@
         <div class="text-sm text-muted" style="margin-top:4px"><strong>Critérios:</strong> ${(c.criterios || []).join(' · ') || '—'}</div>
       </div>`;
     _evals = await api(`/performance/evaluations?cycle_id=${_activeCycleId}`);
-    document.getElementById('cnt').textContent = `${_evals.length} avaliação(ões)`;
-    document.getElementById('btnSeed').style.display = _evals.length === 0 ? 'inline-flex' : 'none';
+    renderEvalsTable();
+  }
+
+  function renderEvalsTable() {
+    const filtrados = _depFiltro
+      ? _evals.filter(e => e.employees?.departments?.nome &&
+          _deps.find(d => d.id === _depFiltro && d.nome === e.employees.departments.nome))
+      : _evals;
+    // Ajuste: comparar id direto via employee.department_id seria mais preciso. Vamos buscar pelo nome do depto.
+    const filtrados2 = _depFiltro
+      ? _evals.filter(e => {
+          const depEmp = _deps.find(d => d.nome === e.employees?.departments?.nome);
+          return depEmp?.id === _depFiltro;
+        })
+      : _evals;
+    document.getElementById('cnt').textContent = `${filtrados2.length} de ${_evals.length} avaliação(ões)`;
     const tb = document.getElementById('tbody');
-    if (!_evals.length) { tb.innerHTML = '<tr><td colspan="6" class="table-empty">Nenhuma avaliação. Clique em "Gerar lista" pra começar.</td></tr>'; return; }
-    tb.innerHTML = _evals.map(e => {
-      const nf = e.nota_final;
-      const cls = nf == null ? '' : (nf >= 4 ? 'alto' : nf >= 2.5 ? 'medio' : 'baixo');
-      return `<tr>
-        <td><strong>${e.employees?.nome_completo}</strong><br><small class="text-muted">${fmt.matricula(e.employees?.matricula)}</small></td>
-        <td>${e.employees?.positions?.titulo || '—'}<br><small class="text-muted">${e.employees?.departments?.nome || ''}</small></td>
-        <td>${nf != null ? `<span class="nota-final-badge ${cls}">${nf.toFixed(1)}</span>` : '<small class="text-muted">—</small>'}</td>
-        <td>${e.data_avaliacao ? fmt.data(e.data_avaliacao) : '—'}</td>
-        <td><span class="badge ${e.status === 'concluida' ? 'ativo' : 'pendente'}">${e.status}</span></td>
-        <td><button class="btn btn-sm btn-primary" onclick="avaliar('${e.id}')">${e.status === 'concluida' ? 'Ver' : 'Avaliar'}</button></td>
-      </tr>`;
+    if (!filtrados2.length) {
+      tb.innerHTML = `<tr><td colspan="6" class="table-empty">${_evals.length === 0 ? 'Nenhuma avaliação. Clique em "Adicionar funcionários" pra começar.' : 'Nenhum funcionário desse departamento neste ciclo.'}</td></tr>`;
+      return;
+    }
+    // Agrupa por departamento
+    const grupos = {};
+    filtrados2.forEach(e => {
+      const dep = e.employees?.departments?.nome || 'Sem departamento';
+      if (!grupos[dep]) grupos[dep] = [];
+      grupos[dep].push(e);
+    });
+    const ordenados = Object.keys(grupos).sort();
+    tb.innerHTML = ordenados.map(dep => {
+      const linhas = grupos[dep].sort((a, b) => (a.employees?.nome_completo || '').localeCompare(b.employees?.nome_completo || ''));
+      return `<tr style="background:var(--paper-2)"><td colspan="6" style="font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-3);padding:8px 14px">${dep} · ${linhas.length} pessoa(s)</td></tr>` +
+        linhas.map(e => {
+          const nf = e.nota_final;
+          const cls = nf == null ? '' : (nf >= 4 ? 'alto' : nf >= 2.5 ? 'medio' : 'baixo');
+          return `<tr>
+            <td><strong>${e.employees?.nome_completo}</strong><br><small class="text-muted">${fmt.matricula(e.employees?.matricula)}</small></td>
+            <td>${e.employees?.positions?.titulo || '—'}</td>
+            <td>${nf != null ? `<span class="nota-final-badge ${cls}">${nf.toFixed(1)}</span>` : '<small class="text-muted">—</small>'}</td>
+            <td>${e.data_avaliacao ? fmt.data(e.data_avaliacao) : '—'}</td>
+            <td><span class="badge ${e.status === 'concluida' ? 'ativo' : 'pendente'}">${e.status}</span></td>
+            <td><button class="btn btn-sm btn-primary" onclick="avaliar('${e.id}')">${e.status === 'concluida' ? 'Ver' : 'Avaliar'}</button></td>
+          </tr>`;
+        }).join('');
     }).join('');
   }
 
@@ -187,12 +230,29 @@
   }
 
   async function popularCiclo() {
-    if (!confirm('Gerar avaliações pendentes pra todos funcionários ativos?')) return;
-    try {
-      const r = await api(`/performance/cycles/${_activeCycleId}/seed`, { method: 'POST' });
-      toast(`${r.inserted} avaliação(ões) criada(s).`, 'success');
-      carregarEvals();
-    } catch (err) { toast(err.message, 'error'); }
+    const depOpts = _deps.map(d => `<option value="${d.id}">${d.nome}</option>`).join('');
+    const html = `<form id="seedForm">
+      <p class="text-muted">Escolha o escopo: todos os funcionários ativos ou apenas de um departamento.</p>
+      <div class="field"><label>Departamento</label>
+        <select name="department_id">
+          <option value="">Todos os funcionários ativos</option>
+          ${depOpts}
+        </select>
+      </div>
+      <p class="text-sm text-muted mt-2">Já existentes neste ciclo não são duplicados.</p>
+    </form>`;
+    showFormModal('Adicionar funcionários ao ciclo', html, async () => {
+      const d = formToObject(document.getElementById('seedForm'));
+      try {
+        const r = await api(`/performance/cycles/${_activeCycleId}/seed`, {
+          method: 'POST',
+          body: { department_id: d.department_id || null },
+        });
+        toast(`${r.inserted} avaliação(ões) processada(s).`, 'success');
+        closeFormModal();
+        carregarEvals();
+      } catch (err) { toast(err.message, 'error'); }
+    });
   }
 
   async function avaliar(id) {

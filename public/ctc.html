@@ -65,10 +65,19 @@
 
           <h3 style="margin-top:20px;font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-4)">Benefícios mensais (R$)</h3>
           <div class="form-grid">
-            <div class="field"><label>Vale Transporte</label><input type="number" step="0.01" name="vt" value="220" oninput="calcular()"></div>
-            <div class="field"><label>Desconto de VT (6% do salário, máx)</label>
+            <div class="field"><label>Vale Transporte</label>
+              <select name="vt_modo" onchange="aplicarVTModo();calcular()">
+                <option value="usa">Funcionário usa VT</option>
+                <option value="nao_usa">Funcionário NÃO usa VT (recusa formal)</option>
+                <option value="combustivel">Auxílio combustível (carro próprio)</option>
+              </select>
+            </div>
+            <div class="field" id="vt-valor-wrap"><label>Valor do VT mensal (R$)</label>
+              <input type="number" step="0.01" name="vt" value="220" oninput="calcular()">
+            </div>
+            <div class="field" id="vt-desc-wrap"><label>Desconto do funcionário</label>
               <select name="vt_desconto" onchange="calcular()">
-                <option value="1">Aplicar desconto de 6%</option>
+                <option value="1">Aplicar desconto de até 6% (CLT art. 9º Lei 7.418/85)</option>
                 <option value="0">Empresa arca 100%</option>
               </select>
             </div>
@@ -127,11 +136,18 @@
         </div>
 
         <div class="card mt-4">
-          <p style="font-size:12px;color:var(--ink-3);margin:0;line-height:1.6">
-            <strong>Observação:</strong> simulação baseada em alíquotas CLT 2026 (INSS patronal 20%,
-            FGTS 8%, Sistema S ~5,8%, RAT 1–3%). Bases reais podem variar conforme convenção coletiva,
-            insalubridade, simples nacional ou regime tributário da empresa. Use como referência de planejamento.
-          </p>
+          <h3 style="margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-4)">Base legal e fontes (CLT 2026)</h3>
+          <div style="font-size:12px;color:var(--ink-3);line-height:1.7">
+            <p style="margin:0 0 8px"><strong>INSS patronal 20%</strong> — Lei 8.212/91 art. 22 I (empresas em geral; Simples Nacional substitui pela CPP do Anexo).</p>
+            <p style="margin:0 0 8px"><strong>FGTS 8%</strong> (2% aprendiz) — Lei 8.036/90 art. 15 · provisão de multa rescisória 40% sobre o saldo.</p>
+            <p style="margin:0 0 8px"><strong>RAT 1% a 3%</strong> — Risco de Acidente de Trabalho (leve/médio/grave) conforme CNAE da empresa, anexo V do Decreto 3.048/99.</p>
+            <p style="margin:0 0 8px"><strong>Sistema S ≈ 5,8%</strong> — sistema de contribuições "ao terceiro" sobre folha, repassado pela RFB às entidades de aprendizagem e assistência ligadas a setores produtivos:
+              <em>SESC, SENAC, SESI, SENAI, SEBRAE, SENAR, SEST, SENAT, SESCOOP</em>, Salário-Educação e INCRA.
+              A alíquota varia por FPAS (código de atividade): comércio/serviços ~5,8% · indústria ~5,8% · agronegócio ~5,7% · transporte ~5,8%. Empresas no Simples Nacional ficam <strong>isentas</strong>.</p>
+            <p style="margin:0 0 8px"><strong>Provisões</strong> — 13º salário 1/12 + Férias com 1/3 constitucional totalizam ~1/12 da remuneração x 1,3333 (art. 7º XVII CF).</p>
+            <p style="margin:0 0 8px"><strong>Vale Transporte</strong> — Lei 7.418/85 + Decreto 95.247/87. O funcionário pode <strong>recusar formalmente</strong> por escrito (não há custo pra empresa). Desconto máximo 6% do salário base, empresa cobre o excedente.</p>
+            <p style="margin:0;color:var(--ink-4);font-size:11px"><strong>Importante:</strong> alíquotas atualizadas em maio/2026. Convenções coletivas (CCT) podem majorar adicionais e benefícios obrigatórios. Para insalubridade/periculosidade use o campo "Adicionais".</p>
+          </div>
         </div>
       </div>
     </div>
@@ -147,6 +163,15 @@
   function s(name) { return document.querySelector(`[name="${name}"]`)?.value || ''; }
   const BRL = v => Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 
+  function aplicarVTModo() {
+    const modo = s('vt_modo');
+    const vtVal = document.getElementById('vt-valor-wrap');
+    const vtDesc = document.getElementById('vt-desc-wrap');
+    if (modo === 'nao_usa') { vtVal.style.display='none'; vtDesc.style.display='none'; document.querySelector('[name="vt"]').value = 0; }
+    else if (modo === 'combustivel') { vtVal.style.display='block'; vtDesc.style.display='none'; }
+    else { vtVal.style.display='block'; vtDesc.style.display='block'; }
+  }
+
   function calcular() {
     const tipo = s('tipo_contrato');
     const salario = n('salario');
@@ -155,8 +180,9 @@
     const remBruta = salario + adicionais;
 
     const rat = n('rat') / 100;
-    const vt = n('vt');
-    const vtDesconto = s('vt_desconto') === '1';
+    const vtModo = s('vt_modo');
+    const vt = vtModo === 'nao_usa' ? 0 : n('vt');
+    const vtDesconto = vtModo === 'usa' && s('vt_desconto') === '1';
     const vr = n('vr');
     const saude = n('saude');
     const odonto = n('odonto');
@@ -240,7 +266,8 @@
 
     if (totalBeneficios > 0) html += `
       <div class="breakdown-section"><h3>Benefícios e infraestrutura</h3>
-        ${vtEmpresa ? row(`Vale Transporte (empresa)${descVT ? ` — desconto de ${BRL(descVT)}` : ''}`, vtEmpresa) : ''}
+        ${vtEmpresa ? row(`${vtModo === 'combustivel' ? 'Auxílio combustível' : 'Vale Transporte'} (empresa)${descVT ? ` — desconto de ${BRL(descVT)}` : ''}`, vtEmpresa) : ''}
+        ${vtModo === 'nao_usa' ? row('Vale Transporte (funcionário recusou formalmente)', 0) : ''}
         ${vr ? row('Vale Refeição/Alimentação', vr) : ''}
         ${saude ? row('Plano de saúde', saude) : ''}
         ${odonto ? row('Plano odontológico', odonto) : ''}

@@ -1,6 +1,9 @@
 const router = require('express').Router();
+const multer = require('multer');
 const { supabase } = require('../config/supabase');
 const { requireAuth, requireRole } = require('../middleware/auth');
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 /* ── VAGAS ────────────────────────────────────────────── */
 router.get('/openings', requireAuth, async (req, res) => {
@@ -193,33 +196,82 @@ router.post('/candidates/:id/contratar', requireAuth, requireRole('admin', 'rh')
   res.status(201).json({ candidato: c, funcionario: emp });
 });
 
-/* Parse de currículo via Ingrid */
+/* Extrai dados via Ingrid (helper) */
+async function extrairCV(texto) {
+  const Anthropic = require('@anthropic-ai/sdk');
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const r = await client.messages.create({
+    model: 'claude-sonnet-4-5',
+    max_tokens: 2048,
+    messages: [{
+      role: 'user',
+      content: `Extraia dados do currículo abaixo e retorne SOMENTE um JSON válido (sem markdown, sem comentários) com as chaves:
+nome_completo, email, telefone (só dígitos), cpf (só dígitos), rg, data_nascimento (YYYY-MM-DD),
+cidade, estado (UF 2 letras), endereco, cep, linkedin_url,
+escolaridade (Ensino médio | Técnico | Superior incompleto | Superior completo | Pós-graduação | Mestrado | Doutorado),
+formacao (curso e instituição em 1 linha), experiencia_anos (número decimal),
+ultimo_cargo, ultima_empresa, pretensao_salarial (número ou null),
+estado_civil (solteiro | casado | divorciado | viuvo | uniao_estavel | null),
+nome_mae, nome_pai, nacionalidade (default: Brasileira), naturalidade,
+habilidades (string com competências separadas por vírgula),
+idiomas (string),
+observacoes (resumo profissional em 2-3 linhas).
+Se um campo não estiver no currículo, use null. NUNCA invente dados.
+
+CURRÍCULO:
+${texto.slice(0, 12000)}`
+    }]
+  });
+  const txt = r.content?.[0]?.text || '{}';
+  const json = txt.match(/\{[\s\S]*\}/)?.[0] || '{}';
+  return JSON.parse(json);
+}
+
+/* Parse de currículo via texto colado */
 router.post('/parse-cv', requireAuth, requireRole('admin', 'rh'), async (req, res) => {
   const { texto } = req.body;
   if (!texto) return res.status(400).json({ error: 'texto do currículo é obrigatório.' });
   try {
-    const Anthropic = require('@anthropic-ai/sdk');
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    const r = await client.messages.create({
-      model: 'claude-sonnet-4-5',
-      max_tokens: 2048,
-      messages: [{
-        role: 'user',
-        content: `Extraia dados do currículo abaixo e retorne SOMENTE um JSON válido (sem markdown, sem comentários) com as chaves:
-nome_completo, email, telefone, cpf, data_nascimento (YYYY-MM-DD), cidade, estado (UF), linkedin_url,
-escolaridade, experiencia_anos (número), pretensao_salarial (número ou null), observacoes (resumo de 2 linhas).
-Se um campo não estiver no currículo, use null.
-
-CURRÍCULO:
-${texto.slice(0, 8000)}`
-      }]
-    });
-    const txt = r.content?.[0]?.text || '{}';
-    const json = txt.match(/\{[\s\S]*\}/)?.[0] || '{}';
-    const parsed = JSON.parse(json);
+    const parsed = await extrairCV(texto);
     res.json(parsed);
   } catch (e) {
     res.status(500).json({ error: 'Falha ao processar currículo: ' + e.message });
+  }
+});
+
+/* Parse de currículo via UPLOAD (PDF, DOC, DOCX, TXT) */
+router.post('/parse-cv-file', requireAuth, requireRole('admin', 'rh'), upload.single('arquivo'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Arquivo não enviado.' });
+  const buf = req.file.buffer;
+  const nome = (req.file.originalname || '').toLowerCase();
+  let texto = '';
+  try {
+    if (nome.endsWith('.pdf') || req.file.mimetype === 'application/pdf') {
+      const pdfParse = require('pdf-parse');
+      const d = await pdfParse(buf);
+      texto = d.text || '';
+    } else if (nome.endsWith('.txt') || req.file.mimetype === 'text/plain') {
+      texto = buf.toString('utf8');
+    } else if (nome.endsWith('.docx') || nome.endsWith('.doc')) {
+      // Fallback: tenta extrair como texto bruto (não ideal mas funciona pra alguns CVs)
+      try {
+        const mammoth = require('mammoth');
+        const r = await mammoth.extractRawText({ buffer: buf });
+        texto = r.value || '';
+      } catch {
+        return res.status(400).json({ error: 'Para .docx instale o pacote "mammoth" (npm install mammoth) ou converta o CV para PDF.' });
+      }
+    } else {
+      return res.status(400).json({ error: 'Formato não suportado. Envie PDF, DOCX ou TXT.' });
+    }
+
+    if (!texto.trim()) return res.status(400).json({ error: 'Não foi possível extrair texto do arquivo. Tente outro formato.' });
+
+    const parsed = await extrairCV(texto);
+    parsed.curriculo_texto = texto.slice(0, 6000);
+    res.json(parsed);
+  } catch (e) {
+    res.status(500).json({ error: 'Falha ao processar arquivo: ' + e.message });
   }
 });
 

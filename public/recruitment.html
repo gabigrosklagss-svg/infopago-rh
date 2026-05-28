@@ -74,7 +74,9 @@
           </div>
         </div>
         <div class="flex gap-2">
-          <button class="btn" onclick="parseCV()">  Parsear CV (Ingrid)</button>
+          <button class="btn" onclick="parseCV()">CV em texto</button>
+          <button class="btn" onclick="document.getElementById('cv-file-input').click()">Upload CV (PDF/DOCX)</button>
+          <input type="file" id="cv-file-input" accept=".pdf,.docx,.doc,.txt,application/pdf" style="display:none" onchange="parseCVFile(this)">
           <button class="btn btn-primary" onclick="novoCandidato()">+ Novo candidato</button>
         </div>
       </div>
@@ -150,8 +152,8 @@
       <div class="form-grid">
         <div class="field" style="grid-column:span 2"><label>Título da vaga<span class="req">*</span></label>
           <input name="titulo" required placeholder="Ex: Desenvolvedor Pleno - React"></div>
-        <div class="field"><label>Cargo</label><select name="position_id"><option value="">—</option>${posOpts}</select></div>
-        <div class="field"><label>Departamento</label><select name="department_id"><option value="">—</option>${depOpts}</select></div>
+        <div class="field"><label>Cargo</label><select name="position_id" id="vaga-pos" onchange="aplicarCargoNaVaga()"><option value="">—</option>${posOpts}</select></div>
+        <div class="field"><label>Departamento</label><select name="department_id" id="vaga-dep"><option value="">—</option>${depOpts}</select></div>
         <div class="field"><label>Nº de vagas</label><input type="number" name="vagas" value="1" min="1"></div>
         <div class="field"><label>Prioridade</label>
           <select name="prioridade">
@@ -202,7 +204,23 @@
         carregarVagas();
       } catch (err) { toast(err.message, 'error'); }
     });
+    // Guarda lista de cargos em escopo global pra usar no auto-fill
+    window._cargosCache = poss || [];
     if (existente) setTimeout(() => fillForm(document.getElementById('vForm'), existente), 50);
+  }
+
+  /* Auto-preenche salário min/max e departamento ao escolher o cargo */
+  function aplicarCargoNaVaga() {
+    const posId = document.getElementById('vaga-pos').value;
+    const cargo = (window._cargosCache || []).find(p => p.id === posId);
+    if (!cargo) return;
+    const min = document.querySelector('[name="salario_min"]');
+    const max = document.querySelector('[name="salario_max"]');
+    if (min && !min.value && cargo.salario_minimo) min.value = cargo.salario_minimo;
+    if (max && !max.value && cargo.salario_maximo) max.value = cargo.salario_maximo;
+    // Auto-preenche departamento se ainda não escolheu
+    const dep = document.getElementById('vaga-dep');
+    if (dep && !dep.value && cargo.department_id) dep.value = cargo.department_id;
   }
 
   async function editarVaga(id) {
@@ -427,6 +445,30 @@
       } catch (err) { toast(err.message, 'error'); }
       finally { hideLoading(); }
     });
+  }
+
+  async function parseCVFile(input) {
+    const file = input.files?.[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('arquivo', file);
+    showLoading();
+    try {
+      const r = await fetch('/api/recruitment/parse-cv-file', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${getToken()}` },
+        body: fd,
+      });
+      if (!r.ok) throw new Error((await r.json()).error || 'Falha no upload');
+      const parsed = await r.json();
+      toast(`CV extraído: ${parsed.nome_completo || 'sem nome detectado'}`, 'success');
+      novoCandidato(null, parsed);
+    } catch (err) {
+      toast(err.message, 'error');
+    } finally {
+      hideLoading();
+      input.value = '';
+    }
   }
 
   function showFormModal(title, html, onSave) {
