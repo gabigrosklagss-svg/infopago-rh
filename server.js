@@ -31,6 +31,7 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
+      scriptSrcAttr: ["'unsafe-inline'"],  // permite onclick="...", onsubmit="..."
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
       imgSrc: ["'self'", "data:", "blob:", "https:"],
@@ -60,7 +61,7 @@ app.use(cors({
 }));
 
 // Rate limits granulares por endpoint
-const limitLogin   = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, message: { error: 'Muitas tentativas de login. Aguarde 15 minutos.', code: 'RATE_LIMITED' } });
+const limitLogin   = rateLimit({ windowMs: 15 * 60 * 1000, max: 30, message: { error: 'Muitas tentativas de login. Aguarde 15 minutos.', code: 'RATE_LIMITED' } });
 const limitRefresh = rateLimit({ windowMs: 60 * 1000,      max: 30 });
 const limitWrite   = rateLimit({ windowMs: 60 * 1000,      max: 60 });
 const limitGeral   = rateLimit({ windowMs: 60 * 1000,      max: 300, standardHeaders: true });
