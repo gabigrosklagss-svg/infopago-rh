@@ -245,16 +245,34 @@
   }
 
   async function lote13(parcela) {
-    const data_pagamento = prompt(`Data de pagamento da ${parcela}ª parcela do 13º/${anoAtual} (formato YYYY-MM-DD):`);
-    if (!data_pagamento) return;
-    if (!confirm(`Gerar 13º (${parcela}ª parcela) para TODOS os funcionários ativos?`)) return;
-    showLoading();
-    try {
-      const r = await api(`/thirteenth/lote/${anoAtual}/${parcela}`, { method: 'POST', body: { data_pagamento } });
-      toast(`${r.gerados} gerado(s), ${r.erros} erro(s)`, r.erros ? 'warning' : 'success');
-      loadList13();
-    } catch (err) { toast(err.message, 'error'); }
-    finally { hideLoading(); }
+    const sugestao = parcela === 1
+      ? `${anoAtual}-11-30`   // 1ª parcela: até 30/11
+      : `${anoAtual}-12-20`;  // 2ª parcela: até 20/12
+    const html = `<form id="lote13Form">
+      <div class="text-sm text-muted mb-3">
+        Esta ação vai gerar a <strong>${parcela}ª parcela do 13º salário de ${anoAtual}</strong> para
+        <strong>todos os funcionários ativos</strong>, com base no salário-base de cada um.
+        ${parcela === 1
+          ? 'A 1ª parcela corresponde a 50% do 13º, sem descontos de INSS/IRRF (legalmente devida até 30/11).'
+          : 'A 2ª parcela corresponde aos 50% restantes com descontos legais (INSS/IRRF), devida até 20/12.'}
+      </div>
+      <div class="field"><label>Data de pagamento<span class="req">*</span></label>
+        <input type="date" name="data_pagamento" value="${sugestao}" required>
+      </div>
+    </form>`;
+    showFormModal(`Gerar ${parcela}ª parcela do 13º (${anoAtual})`, html, async () => {
+      const f = document.getElementById('lote13Form');
+      if (!validateForm(f)) return;
+      const data_pagamento = f.data_pagamento.value;
+      closeFormModal();
+      showLoading();
+      try {
+        const r = await api(`/thirteenth/lote/${anoAtual}/${parcela}`, { method: 'POST', body: { data_pagamento } });
+        toast(`${r.gerados} gerado(s), ${r.erros} erro(s)`, r.erros ? 'warning' : 'success');
+        loadList13();
+      } catch (err) { toast(err.message, 'error'); }
+      finally { hideLoading(); }
+    });
   }
 
   async function gerarPdf13(id) {

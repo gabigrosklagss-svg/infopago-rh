@@ -106,6 +106,9 @@ router.post('/lote', requireAuth, requireRole('admin', 'rh'), async (req, res) =
         competencia_mes: parseInt(competencia_mes),
         competencia_ano: parseInt(competencia_ano),
         ...stripDB(calc),
+        pdf_path: null,           // invalida PDF antigo - força regeração
+        pdf_generated_at: null,
+        status: 'pendente',       // volta pra pendente até gerar PDF novo
         created_by: req.user.id,
       };
       const { data: ps } = await supabase.from('payslips')

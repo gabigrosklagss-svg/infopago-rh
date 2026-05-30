@@ -20,15 +20,36 @@ router.get('/logs', requireAuth, async (req, res) => {
   res.json({ data, total: count });
 });
 
-router.post('/send/:payslip_id', requireAuth, requireRole('admin', 'rh'), async (req, res) => {
-  const { data: ps } = await supabase.from('payslips')
-    .select('*, employees(*)').eq('id', req.params.payslip_id).single();
-  if (!ps) return res.status(404).json({ error: 'Holerite não encontrado.' });
-  if (!ps.pdf_path) return res.status(400).json({ error: 'Gere o PDF antes de enviar.' });
+/**
+ * Garante que o PDF do holerite está atualizado.
+ * Regenera se: pdf_path nulo OU pdf_generated_at < updated_at (cálculo mudou após geração).
+ */
+async function garantirPdfAtualizado(ps) {
+  const { gerarPDF } = require('../services/pdf');
+  const pdfDesatualizado = !ps.pdf_path
+    || (ps.updated_at && ps.pdf_generated_at && new Date(ps.pdf_generated_at) < new Date(ps.updated_at));
+  if (!pdfDesatualizado) return ps;
 
   const { data: company } = await supabase.from('company_settings').select('*').eq('id', 1).single();
+  const novoPath = await gerarPDF(ps, ps.employees, company || {});
+  await supabase.from('payslips').update({
+    pdf_path: novoPath,
+    pdf_generated_at: new Date().toISOString(),
+    status: 'gerado',
+  }).eq('id', ps.id);
+  ps.pdf_path = novoPath;
+  ps.pdf_generated_at = new Date().toISOString();
+  return ps;
+}
+
+router.post('/send/:payslip_id', requireAuth, requireRole('admin', 'rh'), async (req, res) => {
+  const { data: ps } = await supabase.from('payslips')
+    .select('*, employees(*, departments(nome), positions(titulo,cbo))').eq('id', req.params.payslip_id).single();
+  if (!ps) return res.status(404).json({ error: 'Holerite não encontrado.' });
 
   try {
+    await garantirPdfAtualizado(ps);
+    const { data: company } = await supabase.from('company_settings').select('*').eq('id', 1).single();
     const result = await enviarHolerite(ps, ps.employees, company || {}, req.user.id);
     res.json(result);
   } catch (err) {
@@ -38,17 +59,27 @@ router.post('/send/:payslip_id', requireAuth, requireRole('admin', 'rh'), async 
 
 router.post('/send-batch', requireAuth, requireRole('admin', 'rh'), async (req, res) => {
   const { competencia_mes, competencia_ano, payslip_ids } = req.body;
-  let q = supabase.from('payslips').select('*, employees(*)').not('pdf_path', 'is', null);
+  let q = supabase.from('payslips').select('*, employees(*, departments(nome), positions(titulo,cbo))');
   if (payslip_ids?.length) q = q.in('id', payslip_ids);
   else q = q.eq('competencia_mes', competencia_mes).eq('competencia_ano', competencia_ano);
 
   const { data: pss } = await q;
-  if (!pss?.length) return res.status(400).json({ error: 'Nenhum holerite com PDF gerado encontrado.' });
+  if (!pss?.length) return res.status(400).json({ error: 'Nenhum holerite encontrado.' });
+
+  // Regenera PDFs desatualizados antes do envio
+  const regerados = [];
+  for (const ps of pss) {
+    try {
+      await garantirPdfAtualizado(ps);
+      regerados.push(ps.id);
+    } catch (e) {
+      console.warn('[email send-batch] falha ao regerar PDF', ps.id, e.message);
+    }
+  }
 
   const { data: company } = await supabase.from('company_settings').select('*').eq('id', 1).single();
-
   const resultado = await enviarEmLote(pss, company || {}, req.user.id);
-  res.json(resultado);
+  res.json({ ...resultado, pdfs_regenerados: regerados.length });
 });
 
 router.get('/schedules', requireAuth, async (req, res) => {
