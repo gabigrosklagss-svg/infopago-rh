@@ -4,6 +4,40 @@
 
 const API_BASE = '';
 
+/* ── Carrega premium.css (dark mode) + inicializa tema ── */
+(function bootTheme() {
+  if (!document.querySelector('link[href="/css/premium.css"]')) {
+    const l = document.createElement('link');
+    l.rel = 'stylesheet';
+    l.href = '/css/premium.css';
+    document.head.appendChild(l);
+  }
+  // localStorage 'rh_theme' = 'light' | 'dark' | 'auto' (default)
+  const pref = localStorage.getItem('rh_theme') || 'auto';
+  const sysDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const apply = (mode) => {
+    const dark = mode === 'dark' || (mode === 'auto' && sysDark);
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  };
+  apply(pref);
+  if (window.matchMedia) {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      if ((localStorage.getItem('rh_theme') || 'auto') === 'auto') apply('auto');
+    });
+  }
+})();
+
+function setTheme(mode) {
+  localStorage.setItem('rh_theme', mode);
+  const sysDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const dark = mode === 'dark' || (mode === 'auto' && sysDark);
+  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+}
+function toggleTheme() {
+  const cur = document.documentElement.getAttribute('data-theme');
+  setTheme(cur === 'dark' ? 'light' : 'dark');
+}
+
 function getToken() { return localStorage.getItem('rh_token'); }
 function setToken(t) { localStorage.setItem('rh_token', t); }
 function getRefreshToken() { return localStorage.getItem('rh_refresh'); }
@@ -345,6 +379,9 @@ const ICONS = {
   ctc: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`,
   epis: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-3V4a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v3H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/><path d="M9 7V4h6v3"/></svg>`,
   cvpool: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><circle cx="10" cy="13" r="2"/><path d="M14 17a4 4 0 0 0-8 0"/></svg>`,
+  calendar: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
+  sun: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>`,
+  moon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`,
   chevron: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>`,
   logout: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>`,
 };
@@ -396,6 +433,14 @@ function renderSidebar(active) {
     </div>
 
     <div class="nav-group">
+      <div class="nav-label">Comunicação</div>
+      <nav>
+        ${item('calendar', '/calendar.html', 'Calendário &amp; Comunicados')}
+        ${item('help',     '/help.html',     'FAQ &amp; Ajuda')}
+      </nav>
+    </div>
+
+    <div class="nav-group">
       <div class="nav-label">Folha de pagamento</div>
       <nav>
         ${item('payslips', '/payslips.html', 'Holerites e Folha')}
@@ -443,7 +488,7 @@ function renderSidebar(active) {
   </aside>`;
 }
 
-/* ── Top Navbar (busca + atalhos) ─────────────────────── */
+/* ── Top Navbar (busca + tema + notif) ────────────────── */
 function renderTopbar() {
   return `<header class="topbar">
     <div class="topbar-search">
@@ -452,7 +497,11 @@ function renderTopbar() {
     </div>
 
     <div class="topbar-actions">
-      <a href="/help.html" class="topbar-btn" title="Central de ajuda" style="text-decoration:none">${ICONS.help}</a>
+      <button class="topbar-btn theme-toggle" title="Alternar claro/escuro" onclick="toggleTheme()">
+        <span class="sun">${ICONS.sun}</span>
+        <span class="moon">${ICONS.moon}</span>
+      </button>
+      <a href="/help.html" class="topbar-btn" title="FAQ &amp; Ajuda" style="text-decoration:none">${ICONS.help}</a>
       <button class="topbar-btn" title="Notificações" onclick="abrirNotificacoes()">
         ${ICONS.bell}<span class="dot"></span>
       </button>

@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calendário &amp; Comunicados — InfoPago RH</title>
+<link rel="stylesheet" href="/css/main.css">
+<style>
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    overflow: hidden;
+  }
+  .cal-head, .cal-cell { background: var(--paper); padding: 8px 10px; min-height: 96px; font-size: 11.5px; }
+  .cal-head { background: var(--paper-2); text-align: center; font-weight: 700; font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); min-height: auto; padding: 6px 8px; }
+  .cal-cell { display: flex; flex-direction: column; gap: 3px; }
+  .cal-cell.outside { background: var(--paper-3); color: var(--ink-5); }
+  .cal-cell.today { background: var(--brand-50, rgba(31,171,84,.08)); }
+  .cal-cell .day { font-weight: 700; color: var(--ink); font-size: 12px; }
+  .cal-cell.outside .day { color: var(--ink-5); font-weight: 500; }
+  .cal-event {
+    background: var(--paper-3); border-left: 2px solid var(--brand-500);
+    padding: 2px 5px; border-radius: 2px;
+    font-size: 10px; line-height: 1.25;
+    color: var(--ink-2);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    cursor: default;
+  }
+  .ann-card {
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 18px 22px;
+    background: var(--paper);
+    margin-bottom: 12px;
+  }
+  .ann-card.importante { border-left: 4px solid var(--danger, #b91c1c); }
+  .ann-card.fixado { border-left: 4px solid var(--brand-500); }
+  .ann-card .ann-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .ann-card h4 { margin: 0; font-size: 15px; }
+  .ann-card .ann-meta { font-size: 11px; color: var(--ink-4); margin-top: 8px; }
+  .ann-card .ann-conteudo { font-size: 13.5px; line-height: 1.6; color: var(--ink-2); white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div id="sidebar"></div>
+  <main class="main">
+    <div class="breadcrumb">
+      <a href="/dashboard.html">Painel</a>
+      <span class="sep">›</span>
+      <span>Calendário &amp; Comunicados</span>
+    </div>
+
+    <div class="page-header">
+      <div>
+        <h1>Calendário &amp; Comunicados</h1>
+        <p class="subtitle">Eventos do mês, feriados e avisos institucionais</p>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="goTab(0, this)">Calendário</button>
+      <button class="tab-btn" onclick="goTab(1, this)">Comunicados</button>
+    </div>
+
+    <!-- ── CALENDÁRIO ──────────────────────────────────── -->
+    <div class="tab-content card active">
+      <div class="flex justify-between items-center mb-4">
+        <h3 style="margin:0">Calendário RH</h3>
+        <div class="flex gap-2 items-center">
+          <button class="btn btn-sm" onclick="mudarMes(-1)">← Anterior</button>
+          <strong id="cal-titulo" style="font-size:14px;min-width:180px;text-align:center"></strong>
+          <button class="btn btn-sm" onclick="mudarMes(1)">Próximo →</button>
+        </div>
+      </div>
+      <div id="cal-container"></div>
+      <div style="margin-top:18px;font-size:11.5px;color:var(--ink-3);display:flex;gap:14px;flex-wrap:wrap">
+        <span>● Feriado nacional</span>
+        <span>● Aniversariante</span>
+        <span>● Aniversário de empresa</span>
+        <span>● Férias agendadas</span>
+        <span style="color:var(--danger,#b91c1c)">● Férias vencendo</span>
+        <span>● Documento vencendo</span>
+      </div>
+    </div>
+
+    <!-- ── COMUNICADOS ─────────────────────────────────── -->
+    <div class="tab-content">
+      <div class="flex justify-between items-center mb-4">
+        <div>
+          <h3 style="margin:0">Comunicados &amp; avisos</h3>
+          <p class="text-muted text-sm" style="margin:4px 0 0">Avisos institucionais para o time de RH</p>
+        </div>
+        <button class="btn btn-primary" onclick="abrirFormAnn()">+ Novo comunicado</button>
+      </div>
+      <div id="ann-list"></div>
+    </div>
+  </main>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+  requireAuth();
+  mountShell('calendar');
+
+  function goTab(idx, btn) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.tab-content')[idx].classList.add('active');
+    if (idx === 1) carregarAnnouncements();
+  }
+
+  /* ════════════════ CALENDÁRIO ════════════════ */
+  const MESES_NOMES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  let calMes = new Date().getMonth() + 1;
+  let calAno = new Date().getFullYear();
+
+  function mudarMes(delta) {
+    calMes += delta;
+    if (calMes < 1) { calMes = 12; calAno--; }
+    else if (calMes > 12) { calMes = 1; calAno++; }
+    carregarCalendario();
+  }
+
+  async function carregarCalendario() {
+    document.getElementById('cal-titulo').textContent = `${MESES_NOMES[calMes - 1]} / ${calAno}`;
+    let eventos = [];
+    try {
+      const r = await api(`/help/calendar?mes=${calMes}&ano=${calAno}`);
+      eventos = r.eventos || [];
+    } catch { /* segue sem eventos */ }
+
+    const eventosPorDia = {};
+    eventos.forEach(e => { (eventosPorDia[e.data] ||= []).push(e); });
+
+    const primeiroDia = new Date(calAno, calMes - 1, 1);
+    const ultimoDia = new Date(calAno, calMes, 0);
+    const dowInicio = primeiroDia.getDay();
+    const totalDias = ultimoDia.getDate();
+    const hoje = new Date().toISOString().split('T')[0];
+
+    const cells = [];
+    const prevMes = new Date(calAno, calMes - 2, 0).getDate();
+    for (let i = dowInicio - 1; i >= 0; i--) cells.push({ outside: true, day: prevMes - i });
+    for (let d = 1; d <= totalDias; d++) {
+      const dataIso = `${calAno}-${String(calMes).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      cells.push({ outside: false, day: d, dataIso, eventos: eventosPorDia[dataIso] || [] });
+    }
+    while (cells.length < 42) cells.push({ outside: true, day: cells.length - (totalDias + dowInicio - 1) });
+
+    const headers = ['DOM','SEG','TER','QUA','QUI','SEX','SÁB'].map(h => `<div class="cal-head">${h}</div>`).join('');
+    const cellsHTML = cells.map(c => {
+      const classes = ['cal-cell'];
+      if (c.outside) classes.push('outside');
+      if (c.dataIso === hoje) classes.push('today');
+      const events = (c.eventos || []).slice(0, 4).map(e =>
+        `<div class="cal-event" style="border-left-color:${e.cor || 'var(--brand-500)'}" title="${e.titulo}${e.subtitulo ? ' — ' + e.subtitulo : ''}">${e.titulo}</div>`
+      ).join('');
+      const mais = c.eventos?.length > 4 ? `<div class="cal-event" style="color:var(--ink-4)">+ ${c.eventos.length - 4} mais</div>` : '';
+      return `<div class="${classes.join(' ')}"><div class="day">${c.day}</div>${events}${mais}</div>`;
+    }).join('');
+
+    document.getElementById('cal-container').innerHTML = `<div class="cal-grid">${headers}${cellsHTML}</div>`;
+  }
+
+  /* ════════════════ COMUNICADOS ════════════════ */
+  const CAT_ANN = {
+    geral: 'Geral', urgente: 'Urgente', informativo: 'Informativo',
+    treinamento: 'Treinamento', beneficios: 'Benefícios', politicas: 'Políticas', eventos: 'Eventos'
+  };
+
+  async function carregarAnnouncements() {
+    const lista = await api('/help/announcements').catch(() => []);
+    const cont = document.getElementById('ann-list');
+    if (!lista.length) {
+      cont.innerHTML = '<div class="card text-muted text-center" style="padding:32px">Nenhum comunicado ativo.</div>';
+      return;
+    }
+    cont.innerHTML = lista.map(a => `
+      <div class="ann-card ${a.importante ? 'importante' : ''} ${a.fixado ? 'fixado' : ''}">
+        <div class="ann-head">
+          <h4>${a.fixado ? '📌 ' : ''}${a.titulo}</h4>
+          <div class="flex gap-2">
+            <span class="badge ${a.importante ? 'inativo' : 'ativo'}">${CAT_ANN[a.categoria] || a.categoria}</span>
+            <button class="btn btn-sm" onclick='abrirFormAnn(${JSON.stringify(a).replace(/'/g, "&#39;")})'>Editar</button>
+            <button class="btn btn-sm btn-danger" onclick="removerAnn('${a.id}')">×</button>
+          </div>
+        </div>
+        <div class="ann-conteudo">${a.conteudo}</div>
+        <div class="ann-meta">Publicado por <strong>${a.autor_nome || '—'}</strong> em ${fmt.dataHora(a.data_publicacao)}${a.data_expiracao ? ` · expira em ${fmt.data(a.data_expiracao)}` : ''}</div>
+      </div>
+    `).join('');
+  }
+
+  function abrirFormAnn(a = null) {
+    const opts = Object.entries(CAT_ANN).map(([k, v]) => `<option value="${k}" ${k === a?.categoria ? 'selected' : ''}>${v}</option>`).join('');
+    const html = `<form id="annForm">
+      <div class="form-grid">
+        <div class="field" style="grid-column:span 2"><label>Título<span class="req">*</span></label><input name="titulo" required value="${a?.titulo || ''}"></div>
+        <div class="field"><label>Categoria</label><select name="categoria">${opts}</select></div>
+        <div class="field"><label>Expiração (opcional)</label><input type="date" name="data_expiracao" value="${a?.data_expiracao ? a.data_expiracao.split('T')[0] : ''}"></div>
+      </div>
+      <div class="field mt-3"><label>Conteúdo<span class="req">*</span></label>
+        <textarea name="conteudo" required rows="6">${a?.conteudo || ''}</textarea></div>
+      <div class="flex gap-4 mt-3">
+        <label><input type="checkbox" name="importante" ${a?.importante ? 'checked' : ''}> Marcar como importante</label>
+        <label><input type="checkbox" name="fixado" ${a?.fixado ? 'checked' : ''}> Fixar no topo</label>
+      </div>
+    </form>`;
+    showFormModal(a ? 'Editar comunicado' : 'Novo comunicado', html, async () => {
+      const f = document.getElementById('annForm');
+      if (!validateForm(f)) return;
+      const d = formToObject(f);
+      d.importante = !!d.importante;
+      d.fixado = !!d.fixado;
+      try {
+        if (a?.id) await api(`/help/announcements/${a.id}`, { method: 'PUT', body: d });
+        else await api('/help/announcements', { method: 'POST', body: d });
+        toast('Comunicado salvo!', 'success');
+        closeFormModal();
+        carregarAnnouncements();
+      } catch (err) { toast(err.message, 'error'); }
+    });
+  }
+
+  async function removerAnn(id) {
+    if (!confirm('Remover este comunicado?')) return;
+    try { await api(`/help/announcements/${id}`, { method: 'DELETE' }); toast('Removido.', 'success'); carregarAnnouncements(); }
+    catch (err) { toast(err.message, 'error'); }
+  }
+
+  /* ════════════════ Modal helper ════════════════ */
+  function showFormModal(title, html, onSave) {
+    let m = document.getElementById('form-modal');
+    if (!m) { m = document.createElement('div'); m.id = 'form-modal'; m.className = 'modal-overlay'; m.onclick = (e) => { if (e.target === m) closeFormModal(); }; document.body.appendChild(m); }
+    m.innerHTML = `<div class="modal" style="max-width:680px"><div class="modal-header"><h2>${title}</h2><button class="modal-close" onclick="closeFormModal()">×</button></div><div class="modal-body">${html}</div><div class="modal-footer"><button class="btn" onclick="closeFormModal()">Cancelar</button><button class="btn btn-primary" id="form-save">Salvar</button></div></div>`;
+    m.classList.remove('hidden');
+    document.getElementById('form-save').onclick = onSave;
+  }
+  function closeFormModal() { document.getElementById('form-modal')?.remove(); }
+
+  carregarCalendario();
+</script>
+</body>
+</html>

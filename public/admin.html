@@ -26,9 +26,8 @@
       <button class="tab-btn active" onclick="goTab(0, this)">Auditoria</button>
       <button class="tab-btn" onclick="goTab(1, this)">Backups</button>
       <button class="tab-btn" onclick="goTab(2, this)">Plano de Cargos</button>
-      <button class="tab-btn" onclick="goTab(3, this)">EPIs</button>
-      <button class="tab-btn" onclick="goTab(4, this)">Usuários &amp; Permissões</button>
-      <button class="tab-btn" onclick="goTab(5, this)">Segurança</button>
+      <button class="tab-btn" onclick="goTab(3, this)">Usuários &amp; Permissões</button>
+      <button class="tab-btn" onclick="goTab(4, this)">Segurança</button>
     </div>
 
     <!-- AUDITORIA -->
@@ -108,28 +107,6 @@
       </table>
     </div>
 
-    <!-- EPIs -->
-    <div class="tab-content card">
-      <div class="flex justify-between items-center mb-4">
-        <h3 style="margin:0">Catálogo de EPIs</h3>
-        <button class="btn btn-primary" onclick="novoEpi()">+ Novo EPI</button>
-      </div>
-      <table class="table">
-        <thead><tr><th>EPI</th><th>CA</th><th>Categoria</th><th>Validade</th><th>Estoque</th><th></th></tr></thead>
-        <tbody id="tbody-epis"></tbody>
-      </table>
-
-      <h3 class="card-title mt-5">Entregas de EPI</h3>
-      <div class="flex gap-3 items-center mb-3">
-        <input type="search" id="busca-entregas" placeholder="Pesquisar por nome ou matrícula do funcionário..." oninput="filtrarEntregas()" style="flex:1;padding:8px 12px;border:1px solid var(--border-2);border-radius:var(--r-sm);font-family:inherit;font-size:13px">
-        <button class="btn btn-sm btn-primary" onclick="novaEntrega()">+ Nova entrega</button>
-      </div>
-      <table class="table">
-        <thead><tr><th>Funcionário</th><th>EPI</th><th>Qtd</th><th>Entrega</th><th>Vencimento</th><th>Ciente</th></tr></thead>
-        <tbody id="tbody-entregas"></tbody>
-      </table>
-    </div>
-
     <!-- USUÁRIOS & PERMISSÕES -->
     <div class="tab-content card">
       <div class="flex justify-between items-center mb-4">
@@ -183,9 +160,8 @@
     if (idx === 0) { loadAudit(); loadAuditStats(); }
     if (idx === 1) loadBackups();
     if (idx === 2) { loadGrades(); loadMovs(); }
-    if (idx === 3) { loadEpis(); loadEntregas(); }
-    if (idx === 4) { loadUsers(); loadRoles(); }
-    if (idx === 5) loadRevoked();
+    if (idx === 3) { loadUsers(); loadRoles(); }
+    if (idx === 4) loadRevoked();
   }
 
   /* ════════════════ USUÁRIOS & PERMISSÕES ════════════════ */

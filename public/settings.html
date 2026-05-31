@@ -14,10 +14,11 @@
     </div>
 
     <div class="tabs">
-      <button class="tab-btn active" onclick="goTab(0, this)"> Empresa</button>
-      <button class="tab-btn" onclick="goTab(1, this)"> E-mail (SMTP)</button>
-      <button class="tab-btn" onclick="goTab(2, this)"> Departamentos</button>
-      <button class="tab-btn" onclick="goTab(3, this)"> Cargos</button>
+      <button class="tab-btn active" onclick="goTab(0, this)">Empresa</button>
+      <button class="tab-btn" onclick="goTab(1, this)">E-mail (SMTP)</button>
+      <button class="tab-btn" onclick="goTab(2, this)">Departamentos</button>
+      <button class="tab-btn" onclick="goTab(3, this)">Cargos</button>
+      <button class="tab-btn" onclick="goTab(4, this)">Documentos da empresa</button>
     </div>
 
     <!-- ── Empresa ────────────────────────────────────── -->
@@ -83,6 +84,21 @@
         <tbody id="tbody-pos"></tbody>
       </table>
     </div>
+
+    <!-- ── Documentos da empresa ────────────────────────── -->
+    <div class="tab-content card">
+      <div class="flex justify-between items-center mb-4">
+        <div>
+          <h3 style="margin:0">Documentos da empresa</h3>
+          <p class="text-muted text-sm" style="margin:4px 0 0">Políticas, manuais, regulamentos e formulários institucionais</p>
+        </div>
+        <button class="btn btn-primary" onclick="abrirFormDoc()">+ Novo documento</button>
+      </div>
+      <table class="table">
+        <thead><tr><th>Categoria</th><th>Título</th><th>Versão</th><th>Vigência</th><th>Tamanho</th><th>Enviado em</th><th></th></tr></thead>
+        <tbody id="docs-tbody"></tbody>
+      </table>
+    </div>
   </main>
 </div>
 
@@ -98,6 +114,78 @@
     document.querySelectorAll('.tab-content')[idx].classList.add('active');
     if (idx === 2) loadDepts();
     if (idx === 3) loadPositions();
+    if (idx === 4) carregarDocs();
+  }
+
+  /* ════════════════ DOCUMENTOS DA EMPRESA ════════════════ */
+  const CAT_DOC = {
+    politica: 'Política', codigo_conduta: 'Código de Conduta', manual: 'Manual',
+    procedimento: 'Procedimento', regulamento: 'Regulamento', beneficios: 'Benefícios',
+    seguranca: 'Segurança', formulario: 'Formulário', outros: 'Outros'
+  };
+
+  async function carregarDocs() {
+    try {
+      const lista = await api('/help/documents');
+      const tb = document.getElementById('docs-tbody');
+      if (!lista.length) { tb.innerHTML = '<tr><td colspan="7" class="table-empty">Nenhum documento cadastrado.</td></tr>'; return; }
+      tb.innerHTML = lista.map(d => `
+        <tr>
+          <td><span class="badge ativo">${CAT_DOC[d.categoria] || d.categoria}</span></td>
+          <td><strong>${d.titulo}</strong>${d.descricao ? `<br><small class="text-muted">${d.descricao}</small>` : ''}</td>
+          <td>${d.versao || '—'}</td>
+          <td>${fmt.data(d.data_vigencia)}</td>
+          <td>${(d.tamanho_bytes / 1024).toFixed(0)} KB</td>
+          <td>${fmt.data(d.created_at)}</td>
+          <td>
+            <button class="btn btn-sm" onclick="baixarDoc('${d.id}')">Baixar</button>
+            <button class="btn btn-sm btn-danger" onclick="removerDoc('${d.id}')">×</button>
+          </td>
+        </tr>
+      `).join('');
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  function abrirFormDoc() {
+    const opts = Object.entries(CAT_DOC).map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
+    const html = `<form id="docForm">
+      <div class="form-grid">
+        <div class="field"><label>Categoria<span class="req">*</span></label><select name="categoria" required>${opts}</select></div>
+        <div class="field"><label>Versão</label><input name="versao" placeholder="1.0"></div>
+        <div class="field"><label>Vigência</label><input type="date" name="data_vigencia"></div>
+      </div>
+      <div class="field mt-3"><label>Título<span class="req">*</span></label><input name="titulo" required></div>
+      <div class="field mt-3"><label>Descrição</label><textarea name="descricao"></textarea></div>
+      <div class="field mt-3"><label>Arquivo<span class="req">*</span></label>
+        <input type="file" name="arquivo" required accept="application/pdf,image/jpeg,image/png,image/webp,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+      </div>
+    </form>`;
+    showFormModal('Novo documento da empresa', html, async () => {
+      const f = document.getElementById('docForm');
+      if (!validateForm(f)) return;
+      const fd = new FormData(f);
+      showLoading();
+      try {
+        const r = await fetch('/api/help/documents', {
+          method: 'POST', headers: { Authorization: `Bearer ${getToken()}` }, body: fd
+        });
+        if (!r.ok) throw new Error((await r.json()).error || 'Falha no upload');
+        toast('Documento enviado!', 'success');
+        closeFormModal();
+        carregarDocs();
+      } catch (err) { toast(err.message, 'error'); }
+      finally { hideLoading(); }
+    });
+  }
+
+  async function baixarDoc(id) {
+    try { const r = await api(`/help/documents/file/${id}`); window.open(r.url, '_blank'); }
+    catch (err) { toast(err.message, 'error'); }
+  }
+  async function removerDoc(id) {
+    if (!confirm('Excluir este documento permanentemente?')) return;
+    try { await api(`/help/documents/${id}`, { method: 'DELETE' }); toast('Removido.', 'success'); carregarDocs(); }
+    catch (err) { toast(err.message, 'error'); }
   }
 
   /* ── Empresa ─────────────────────────────────────── */
