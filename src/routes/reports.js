@@ -7,8 +7,8 @@ const { requireAuth } = require('../middleware/auth');
    ════════════════════════════════════════════════════════════ */
 router.get('/dashboard', requireAuth, async (req, res) => {
   const now = new Date();
-  const mes = now.getMonth() + 1;
-  const ano = now.getFullYear();
+  const mes = parseInt(req.query.mes) || (now.getMonth() + 1);
+  const ano = parseInt(req.query.ano) || now.getFullYear();
 
   const [empAtivos, folha, holEnviados, ferAVencer, aniversariantes, ultimas] = await Promise.all([
     supabase.from('employees').select('id', { count: 'exact', head: true }).eq('status', 'ativo'),

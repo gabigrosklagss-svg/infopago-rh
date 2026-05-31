@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Banco de Currículos — InfoPago RH</title>
+<link rel="stylesheet" href="/css/main.css">
+<style>
+  .cv-card { background:#fff; border:1px solid var(--border); border-radius:var(--r); padding:14px 16px; margin-bottom:10px; transition:.15s; }
+  .cv-card:hover { border-color:var(--brand-500); box-shadow:var(--sh-1); }
+  .cv-card .top { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+  .cv-card h4 { margin:0 0 4px; font-size:14px; }
+  .cv-card .meta { display:flex; gap:6px; margin-top:6px; flex-wrap:wrap; }
+  .cv-card .meta span { font-size:10.5px; padding:2px 8px; background:var(--paper-3); border-radius:99px; color:var(--ink-2); }
+  .area-tag { background:var(--brand-50, #e6f7ee); color:var(--brand-700); font-weight:600; }
+  .score-badge { display:inline-block; padding:2px 8px; background:var(--brand-500); color:#fff; border-radius:99px; font-size:11px; font-weight:700; font-family:'JetBrains Mono', monospace; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div id="sidebar"></div>
+  <main class="main">
+    <div class="breadcrumb">
+      <a href="/dashboard.html">Painel</a>
+      <span class="sep">›</span>
+      <span>Banco de Currículos</span>
+    </div>
+
+    <div class="page-header">
+      <div>
+        <h1>Banco de Currículos</h1>
+        <p class="subtitle">Currículos armazenados aguardando vaga compatível</p>
+      </div>
+      <div class="flex gap-2">
+        <button class="btn" onclick="document.getElementById('cv-upload').click()">Upload CV (PDF/DOCX)</button>
+        <input type="file" id="cv-upload" accept=".pdf,.docx,.doc,.txt,application/pdf" style="display:none" onchange="uploadCV(this)">
+        <button class="btn" onclick="colarTexto()">Colar texto</button>
+        <button class="btn btn-primary" onclick="novoCV()">+ Cadastrar manual</button>
+      </div>
+    </div>
+
+    <div class="filter-bar">
+      <div class="field" style="flex:1">
+        <label>Buscar (nome, e-mail, cargo, habilidades)</label>
+        <input type="search" id="f-q" placeholder="Ex: react, frontend, marketing..." oninput="filtrarDebounced()">
+      </div>
+      <div class="field">
+        <label>Área</label>
+        <select id="f-area" onchange="filtrar()">
+          <option value="">Todas</option>
+          <option value="TI">TI / Desenvolvimento</option>
+          <option value="Financeiro">Financeiro</option>
+          <option value="RH">RH</option>
+          <option value="Comercial">Comercial</option>
+          <option value="Marketing">Marketing</option>
+          <option value="Operacional">Operacional</option>
+          <option value="Administrativo">Administrativo</option>
+          <option value="Outros">Outros</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Status</label>
+        <select id="f-status" onchange="filtrar()">
+          <option value="">Todos</option>
+          <option value="disponivel" selected>Disponível</option>
+          <option value="em_processo">Em processo</option>
+          <option value="contratado">Contratado</option>
+          <option value="indisponivel">Indisponível</option>
+          <option value="arquivado">Arquivado</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="table-toolbar mt-3">
+      <span class="count" id="cnt">0 currículos</span>
+    </div>
+    <div id="cv-list"></div>
+  </main>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+  requireAuth();
+  mountShell('cvpool');
+
+  let _list = [];
+  document.getElementById('f-status').value = 'disponivel';
+  filtrar();
+
+  let _t;
+  function filtrarDebounced() { clearTimeout(_t); _t = setTimeout(filtrar, 300); }
+
+  async function filtrar() {
+    const q = document.getElementById('f-q').value.trim();
+    const area = document.getElementById('f-area').value;
+    const status = document.getElementById('f-status').value;
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    if (area) params.set('area', area);
+    if (status) params.set('status', status);
+    showLoading();
+    try {
+      _list = await api('/cv-pool?' + params);
+      render();
+    } catch (err) { toast(err.message, 'error'); }
+    finally { hideLoading(); }
+  }
+
+  function render() {
+    document.getElementById('cnt').textContent = `${_list.length} currículo(s)`;
+    const wrap = document.getElementById('cv-list');
+    if (!_list.length) {
+      wrap.innerHTML = '<div class="card text-muted text-center" style="padding:32px">Nenhum currículo encontrado.</div>';
+      return;
+    }
+    wrap.innerHTML = _list.map(cv => `
+      <div class="cv-card">
+        <div class="top">
+          <div style="flex:1">
+            <h4>${cv.nome_completo} ${cv.area_interesse ? `<span class="area-tag" style="font-size:10px;padding:2px 8px;border-radius:99px;margin-left:6px">${cv.area_interesse}</span>` : ''}</h4>
+            <div class="text-sm text-muted">
+              ${cv.ultimo_cargo || '—'} ${cv.ultima_empresa ? '· ' + cv.ultima_empresa : ''}
+              ${cv.cidade ? '· ' + cv.cidade + (cv.estado ? '/' + cv.estado : '') : ''}
+            </div>
+            <div class="meta">
+              ${cv.experiencia_anos ? `<span>${cv.experiencia_anos}a exp.</span>` : ''}
+              ${cv.escolaridade ? `<span>${cv.escolaridade}</span>` : ''}
+              ${cv.pretensao_salarial ? `<span>${fmt.brl(cv.pretensao_salarial)}</span>` : ''}
+              ${cv.email ? `<span>${cv.email}</span>` : ''}
+              ${cv.telefone ? `<span>${fmt.telefone(cv.telefone)}</span>` : ''}
+              <span class="badge ${cv.status === 'disponivel' ? 'ativo' : cv.status === 'em_processo' ? 'pendente' : 'inativo'}">${cv.status.replace('_',' ')}</span>
+            </div>
+            ${cv.habilidades ? `<div class="text-sm text-muted mt-2" style="font-size:11.5px"><strong>Habilidades:</strong> ${cv.habilidades.slice(0,200)}</div>` : ''}
+            ${cv.observacoes ? `<div class="text-sm text-muted mt-2" style="font-size:11.5px;font-style:italic">${cv.observacoes.slice(0,200)}</div>` : ''}
+          </div>
+          <div class="flex gap-1" style="flex-direction:column">
+            <button class="btn btn-sm btn-primary" onclick="candidatar('${cv.id}','${cv.nome_completo.replace(/'/g,"\\'")}')">Candidatar à vaga</button>
+            <button class="btn btn-sm" onclick="editarCV('${cv.id}')">Editar</button>
+            <button class="btn btn-sm btn-danger" onclick="excluirCV('${cv.id}')">×</button>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  async function uploadCV(input) {
+    const file = input.files?.[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('arquivo', file);
+    showLoading();
+    try {
+      const r = await fetch('/api/cv-pool/upload', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${getToken()}` },
+        body: fd,
+      });
+      if (!r.ok) throw new Error((await r.json()).error || 'Falha no upload');
+      const parsed = await r.json();
+      toast(`CV extraído: ${parsed.nome_completo || 'sem nome detectado'}`, 'success');
+      novoCV(parsed);
+    } catch (err) {
+      toast(err.message, 'error');
+    } finally {
+      hideLoading();
+      input.value = '';
+    }
+  }
+
+  function colarTexto() {
+    const html = `<form id="parseForm">
+      <p class="text-muted">Cole o texto do currículo. A Ingrid vai extrair os campos.</p>
+      <div class="field"><textarea name="texto" rows="14" required placeholder="Cole o currículo aqui..."></textarea></div>
+    </form>`;
+    showFormModal('Parsear currículo (texto)', html, async () => {
+      const t = document.querySelector('#parseForm [name="texto"]').value;
+      if (!t.trim()) { toast('Cole o texto.', 'warning'); return; }
+      showLoading();
+      try {
+        const parsed = await api('/cv-pool/parse', { method:'POST', body:{ texto: t } });
+        parsed.curriculo_texto = t.slice(0, 10000);
+        closeFormModal();
+        toast('Parseado!', 'success');
+        novoCV(parsed);
+      } catch (err) { toast(err.message, 'error'); }
+      finally { hideLoading(); }
+    });
+  }
+
+  async function novoCV(prefill, existente) {
+    const data = existente || prefill || {};
+    const areas = ['TI','Financeiro','RH','Comercial','Marketing','Operacional','Administrativo','Outros'];
+    const origens = ['linkedin','indicacao','site','evento','banco_proprio','outros'];
+    const status = ['disponivel','em_processo','contratado','indisponivel','arquivado'];
+    const html = `<form id="cvForm">
+      <div class="form-grid">
+        <div class="field" style="grid-column:span 2"><label>Nome completo<span class="req">*</span></label><input name="nome_completo" required></div>
+        <div class="field"><label>E-mail</label><input type="email" name="email"></div>
+        <div class="field"><label>Telefone</label><input name="telefone" data-mask="telefone"></div>
+        <div class="field"><label>CPF</label><input name="cpf" data-mask="cpf"></div>
+        <div class="field"><label>Data nasc.</label><input type="date" name="data_nascimento"></div>
+        <div class="field"><label>Cidade</label><input name="cidade"></div>
+        <div class="field"><label>Estado (UF)</label><input name="estado" maxlength="2"></div>
+        <div class="field"><label>LinkedIn</label><input name="linkedin_url" placeholder="https://linkedin.com/in/..."></div>
+        <div class="field"><label>Escolaridade</label><input name="escolaridade"></div>
+        <div class="field"><label>Formação (curso · instituição)</label><input name="formacao"></div>
+        <div class="field"><label>Último cargo</label><input name="ultimo_cargo"></div>
+        <div class="field"><label>Última empresa</label><input name="ultima_empresa"></div>
+        <div class="field"><label>Anos de experiência</label><input type="number" step="0.5" name="experiencia_anos"></div>
+        <div class="field"><label>Pretensão salarial</label><input type="number" step="0.01" name="pretensao_salarial"></div>
+        <div class="field"><label>Área de interesse</label>
+          <select name="area_interesse"><option value="">—</option>${areas.map(a => `<option value="${a}">${a}</option>`).join('')}</select>
+        </div>
+        <div class="field"><label>Status</label>
+          <select name="status">${status.map(s => `<option value="${s}" ${s==='disponivel'?'selected':''}>${s.replace('_',' ')}</option>`).join('')}</select>
+        </div>
+        <div class="field"><label>Origem</label>
+          <select name="origem"><option value="">—</option>${origens.map(o => `<option value="${o}">${o}</option>`).join('')}</select>
+        </div>
+      </div>
+      <div class="field mt-3"><label>Habilidades / competências</label><textarea name="habilidades" rows="2" placeholder="React, Node.js, SQL, gestão de equipe..."></textarea></div>
+      <div class="field mt-3"><label>Idiomas</label><input name="idiomas" placeholder="Português nativo, Inglês fluente..."></div>
+      <div class="field mt-3"><label>Tags (separadas por vírgula)</label><input name="tags" placeholder="remoto, frontend, senior"></div>
+      <div class="field mt-3"><label>Texto do currículo (para busca)</label><textarea name="curriculo_texto" rows="4"></textarea></div>
+      <div class="field mt-3"><label>Observações</label><textarea name="observacoes" rows="2"></textarea></div>
+    </form>`;
+    showFormModal(existente ? 'Editar currículo' : 'Cadastrar currículo', html, async () => {
+      const f = document.getElementById('cvForm');
+      if (!validateForm(f)) return;
+      const d = formToObject(f);
+      try {
+        if (existente?.id) await api(`/cv-pool/${existente.id}`, { method:'PUT', body: d });
+        else await api('/cv-pool', { method:'POST', body: d });
+        toast('Salvo!', 'success');
+        closeFormModal();
+        filtrar();
+      } catch (err) { toast(err.message, 'error'); }
+    });
+    setTimeout(() => {
+      initMasks(document.getElementById('cvForm'));
+      if (data && Object.keys(data).length) fillForm(document.getElementById('cvForm'), data);
+    }, 50);
+  }
+
+  async function editarCV(id) {
+    const cv = await api(`/cv-pool/${id}`);
+    novoCV(null, cv);
+  }
+
+  async function excluirCV(id) {
+    if (!confirm('Excluir este currículo definitivamente?')) return;
+    try { await api(`/cv-pool/${id}`, { method:'DELETE' }); toast('Excluído.', 'info'); filtrar(); }
+    catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function candidatar(cvId, nome) {
+    const vagas = await api('/recruitment/openings?status=aberta').catch(() => []);
+    if (!vagas.length) {
+      toast('Não há vagas abertas. Crie uma vaga primeiro em Recrutamento.', 'warning');
+      return;
+    }
+    const opts = vagas.map(v => `<option value="${v.id}">${v.titulo}${v.positions?.titulo ? ' · ' + v.positions.titulo : ''}</option>`).join('');
+    const html = `<form id="candForm">
+      <p class="text-muted">Candidatar <strong>${nome}</strong> a uma vaga aberta:</p>
+      <div class="field"><label>Vaga<span class="req">*</span></label><select name="job_opening_id" required>${opts}</select></div>
+      <div class="field mt-3"><label>Observação (opcional)</label><textarea name="observacao" rows="2"></textarea></div>
+    </form>`;
+    showFormModal('Candidatar à vaga', html, async () => {
+      const f = document.getElementById('candForm');
+      if (!validateForm(f)) return;
+      const d = formToObject(f);
+      try {
+        await api(`/cv-pool/${cvId}/candidatar`, { method:'POST', body: d });
+        toast('Candidatura criada com sucesso! Veja em Recrutamento → Pipeline.', 'success');
+        closeFormModal();
+        filtrar();
+      } catch (err) { toast(err.message, 'error'); }
+    });
+  }
+
+  function showFormModal(title, html, onSave) {
+    let m = document.getElementById('form-modal');
+    if (!m) { m = document.createElement('div'); m.id = 'form-modal'; m.className = 'modal-overlay'; m.onclick = (e) => { if (e.target === m) closeFormModal(); }; document.body.appendChild(m); }
+    m.innerHTML = `<div class="modal" style="max-width:720px"><div class="modal-header"><h2>${title}</h2><button class="modal-close" onclick="closeFormModal()">×</button></div><div class="modal-body">${html}</div><div class="modal-footer"><button class="btn" onclick="closeFormModal()">Cancelar</button><button class="btn btn-primary" id="form-save">Salvar</button></div></div>`;
+    m.classList.remove('hidden');
+    document.getElementById('form-save').onclick = onSave;
+  }
+  function closeFormModal() { document.getElementById('form-modal')?.remove(); }
+</script>
+</body>
+</html>

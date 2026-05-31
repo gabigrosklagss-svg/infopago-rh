@@ -197,16 +197,34 @@ router.post('/users', requireAuth, authorize('users.manage'), async (req, res) =
     return res.status(400).json({ error: 'E-mail, senha e nome completo são obrigatórios.' });
   }
   if (password.length < 8) return res.status(400).json({ error: 'Senha deve ter pelo menos 8 caracteres.' });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: 'E-mail inválido.' });
+  }
 
+  // Cria no Supabase Auth
   const { data: authData, error: authErr } = await supabase.auth.admin.createUser({
     email, password, email_confirm: true,
   });
-  if (authErr) return res.status(400).json({ error: authErr.message });
+  if (authErr) {
+    const msg = authErr.message || '';
+    if (/already.*registered|duplicate|already.*exists/i.test(msg)) {
+      return res.status(409).json({ error: `Já existe um usuário com o e-mail "${email}". Verifique a lista de usuários — se ele estiver lá, basta atribuir as permissões.`, code: 'EMAIL_EXISTS' });
+    }
+    if (/password/i.test(msg)) {
+      return res.status(400).json({ error: 'Senha não atende aos requisitos mínimos. Use no mínimo 8 caracteres com letras e números.', code: 'WEAK_PASSWORD' });
+    }
+    return res.status(400).json({ error: 'Falha ao criar conta: ' + msg });
+  }
 
+  // Cria perfil — se falhar, faz ROLLBACK do auth.user pra não deixar órfão
   const { data, error } = await supabase.from('user_profiles').insert({
-    id: authData.user.id, full_name, role: role || 'rh', department,
+    id: authData.user.id, full_name, role: role || 'rh', department: department || null,
   }).select().single();
-  if (error) return res.status(400).json({ error: error.message });
+  if (error) {
+    console.warn('[auth/users] user_profiles falhou — fazendo rollback do auth.user', authData.user.id);
+    await supabase.auth.admin.deleteUser(authData.user.id).catch(() => {});
+    return res.status(400).json({ error: 'Falha ao criar perfil: ' + error.message });
+  }
 
   // Atribui roles novos (slug array)
   const slugs = Array.isArray(role_slugs) && role_slugs.length ? role_slugs : [role || 'rh'];

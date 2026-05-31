@@ -343,6 +343,8 @@ const ICONS = {
   recruit: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>`,
   perf: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/></svg>`,
   ctc: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`,
+  epis: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-3V4a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v3H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/><path d="M9 7V4h6v3"/></svg>`,
+  cvpool: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><circle cx="10" cy="13" r="2"/><path d="M14 17a4 4 0 0 0-8 0"/></svg>`,
   chevron: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>`,
   logout: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>`,
 };
@@ -379,6 +381,7 @@ function renderSidebar(active) {
       <div class="nav-label">Gente &amp; Talentos</div>
       <nav>
         ${item('recruit', '/recruitment.html', 'Recrutamento &amp; Seleção')}
+        ${item('cvpool',  '/cv-pool.html',     'Banco de Currículos')}
         ${item('perf',    '/performance.html', 'Avaliação de desempenho')}
         ${item('ctc',     '/ctc.html',         'Custo de Contratação')}
       </nav>
@@ -398,14 +401,21 @@ function renderSidebar(active) {
         ${item('payslips', '/payslips.html', 'Holerites e Folha')}
         ${item('hrdocs',   '/hr-docs.html',  'Rescisão e 13º Salário')}
         ${item('email',    '/email-send.html', 'Envios e Agendamentos')}
-        ${item('settings', '/settings.html', 'Departamentos e Cargos')}
       </nav>
     </div>
 
-    ${getUser()?.role === 'admin' ? `<div class="nav-group">
+    <div class="nav-group">
+      <div class="nav-label">Operacional</div>
+      <nav>
+        ${item('epis', '/epis.html', 'EPIs')}
+      </nav>
+    </div>
+
+    ${(getUser()?.roles || []).includes('super_admin') ? `<div class="nav-group">
       <div class="nav-label">Administração</div>
       <nav>
-        ${item('admin', '/admin.html', 'Auditoria · Backup · EPIs')}
+        ${item('settings', '/settings.html', 'Departamentos e Cargos')}
+        ${item('admin', '/admin.html', 'Auditoria · Backup · Usuários')}
       </nav>
     </div>` : ''}
 

@@ -128,4 +128,42 @@ router.delete('/movements/:id', requireAuth, authorize('salary.plan.manage'), as
   res.json({ success: true });
 });
 
+/* ── BACKFILL: cria faixa salarial inicial pra cargos sem grade ───────── */
+router.post('/grades/backfill', requireAuth, authorize('salary.plan.manage'), async (req, res) => {
+  // Busca cargos sem grade ativa
+  const { data: positions } = await supabase
+    .from('positions').select('id, titulo, nivel, salario_minimo, salario_maximo, cbo_descricao, active');
+  if (!positions?.length) return res.json({ criadas: 0, mensagem: 'Nenhum cargo cadastrado.' });
+
+  const { data: grades } = await supabase.from('position_grades').select('position_id').eq('ativo', true);
+  const cargosComGrade = new Set((grades || []).map(g => g.position_id));
+
+  const semGrade = positions.filter(p => p.active !== false && !cargosComGrade.has(p.id));
+  if (!semGrade.length) return res.json({ criadas: 0, mensagem: 'Todos os cargos já possuem faixa.' });
+
+  let criadas = 0;
+  const erros = [];
+  for (const p of semGrade) {
+    try {
+      const nivelLabel = p.nivel
+        ? p.nivel.charAt(0).toUpperCase() + p.nivel.slice(1)
+        : 'Inicial';
+      const salario = p.salario_minimo || 0;
+      const { error } = await supabase.from('position_grades').insert({
+        position_id: p.id,
+        grade_nivel: nivelLabel,
+        salario_base: salario,
+        ordem: 1,
+        ativo: true,
+        descricao_competencias: p.cbo_descricao || null,
+      });
+      if (error) erros.push({ position: p.titulo, error: error.message });
+      else criadas++;
+    } catch (e) {
+      erros.push({ position: p.titulo, error: e.message });
+    }
+  }
+  res.json({ criadas, ja_existentes: positions.length - semGrade.length, erros });
+});
+
 module.exports = router;

@@ -15,8 +15,10 @@
         <h1>Dashboard</h1>
         <p class="subtitle" id="competencia">—</p>
       </div>
-      <div>
-        <a href="/payslips.html" class="btn btn-primary"> Gerar holerites do mês</a>
+      <div class="flex gap-2 items-center">
+        <select id="f-mes" onchange="load()" style="padding:7px 10px;border:1px solid var(--border-2);border-radius:var(--r-sm);font-family:inherit;font-size:13px"></select>
+        <select id="f-ano" onchange="load()" style="padding:7px 10px;border:1px solid var(--border-2);border-radius:var(--r-sm);font-family:inherit;font-size:13px"></select>
+        <a href="/payslips.html" class="btn btn-primary">Gerar holerites do mês</a>
       </div>
     </div>
 
@@ -51,10 +53,25 @@
   requireAuth();
   mountShell('dashboard');
 
+  // Selects mes/ano
+  (function initFiltros() {
+    const now = new Date();
+    const mes = now.getMonth() + 1;
+    const ano = now.getFullYear();
+    const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    document.getElementById('f-mes').innerHTML = meses.map((m, i) => `<option value="${i+1}" ${i+1 === mes ? 'selected' : ''}>${m}</option>`).join('');
+    const anos = [];
+    for (let a = ano + 1; a >= ano - 3; a--) anos.push(a);
+    document.getElementById('f-ano').innerHTML = anos.map(a => `<option value="${a}" ${a === ano ? 'selected' : ''}>${a}</option>`).join('');
+  })();
+
   async function load() {
     showLoading();
     try {
-      const d = await api('/reports/dashboard');
+      const mes = document.getElementById('f-mes')?.value;
+      const ano = document.getElementById('f-ano')?.value;
+      const qs = mes && ano ? `?mes=${mes}&ano=${ano}` : '';
+      const d = await api('/reports/dashboard' + qs);
       document.getElementById('competencia').textContent = `Competência: ${fmt.competencia(d.competencia.mes, d.competencia.ano)}`;
 
       // KPIs
