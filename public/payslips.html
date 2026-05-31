@@ -7,27 +7,28 @@
 <link rel="stylesheet" href="/css/main.css">
 <style>
   /* Tabela compacta para caber sem scroll horizontal */
+  .table-wrap.compact { overflow: visible; } /* permite dropdown sair da tabela */
   .table-wrap.compact .table { font-size: 12px; table-layout: fixed; width: 100%; }
   .table-wrap.compact .table th,
-  .table-wrap.compact .table td { padding: 8px 8px; vertical-align: middle; }
+  .table-wrap.compact .table td { padding: 8px 8px; vertical-align: middle; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .table-wrap.compact .table th:nth-child(1),
-  .table-wrap.compact .table td:nth-child(1) { width: 28px; padding: 8px 4px; }
+  .table-wrap.compact .table td:nth-child(1) { width: 32px; padding: 8px 4px; }
   .table-wrap.compact .table th:nth-child(2),
-  .table-wrap.compact .table td:nth-child(2) { width: 80px; }
+  .table-wrap.compact .table td:nth-child(2) { width: 100px; }
   .table-wrap.compact .table th:nth-child(3),
-  .table-wrap.compact .table td:nth-child(3) { width: auto; }
+  .table-wrap.compact .table td:nth-child(3) { width: auto; white-space: normal; }
   .table-wrap.compact .table th:nth-child(4),
   .table-wrap.compact .table td:nth-child(4),
   .table-wrap.compact .table th:nth-child(5),
-  .table-wrap.compact .table td:nth-child(5) { width: 90px; text-align: right; }
+  .table-wrap.compact .table td:nth-child(5) { width: 95px; text-align: right; }
   .table-wrap.compact .table th:nth-child(6),
-  .table-wrap.compact .table td:nth-child(6) { width: 140px; font-size: 11px; }
+  .table-wrap.compact .table td:nth-child(6) { width: 160px; font-size: 11px; white-space: normal; }
   .table-wrap.compact .table th:nth-child(7),
-  .table-wrap.compact .table td:nth-child(7) { width: 80px; }
+  .table-wrap.compact .table td:nth-child(7) { width: 88px; }
   .table-wrap.compact .table th:nth-child(8),
-  .table-wrap.compact .table td:nth-child(8) { width: 80px; }
+  .table-wrap.compact .table td:nth-child(8) { width: 90px; }
   .table-wrap.compact .table th:nth-child(9),
-  .table-wrap.compact .table td:nth-child(9) { width: 60px; padding: 4px; }
+  .table-wrap.compact .table td:nth-child(9) { width: 56px; padding: 4px; overflow: visible; }
 
   /* Botão de ações compacto: dropdown */
   .acoes-wrap { position: relative; display: inline-block; }
@@ -41,10 +42,10 @@
   }
   .btn-acoes:hover { background: var(--paper-3); border-color: var(--brand-500); color: var(--brand-700); }
   .acoes-menu {
-    position: absolute; right: 0; top: 100%;
+    position: fixed; /* fixed garante que aparece sobre tudo */
     background: var(--paper); border: 1px solid var(--border);
     border-radius: var(--r-sm); box-shadow: var(--sh-3);
-    min-width: 160px; z-index: 100;
+    min-width: 180px; z-index: 9999;
     padding: 4px;
     display: none;
   }
@@ -82,8 +83,8 @@
     </div>
 
     <div class="filter-bar">
-      <div class="field"><label>Mês</label><select id="f-mes"></select></div>
-      <div class="field"><label>Ano</label><select id="f-ano"></select></div>
+      <div class="field"><label>Mês</label><select id="f-mes" onchange="carregar()"></select></div>
+      <div class="field"><label>Ano</label><select id="f-ano" onchange="carregar()"></select></div>
       <div class="field"><label>Status</label>
         <select id="f-status" onchange="carregar()">
           <option value="">Todos</option>
@@ -93,9 +94,9 @@
           <option value="confirmado">Confirmado</option>
         </select>
       </div>
-      <button class="btn btn-primary" onclick="carregar()"> Filtrar</button>
-      <button class="btn" onclick="gerarPDFsLote()"> PDFs (selecionados)</button>
-      <button class="btn btn-success" onclick="enviarLote()"> Enviar (selecionados)</button>
+      <span style="flex:1"></span>
+      <button class="btn" onclick="gerarPDFsLote()">PDFs (selecionados)</button>
+      <button class="btn btn-success" onclick="enviarLote()">Enviar (selecionados)</button>
     </div>
 
     <div class="table-wrap compact">
@@ -200,6 +201,23 @@
     document.querySelectorAll('.acoes-wrap.open').forEach(w => w.classList.remove('open'));
     if (!wasOpen) {
       wrap.classList.add('open');
+      // Posiciona o menu (position:fixed) ancorado embaixo e à direita do botão
+      const menu = wrap.querySelector('.acoes-menu');
+      const rect = btn.getBoundingClientRect();
+      const menuW = 180;
+      let left = rect.right - menuW;
+      if (left < 8) left = 8; // não sai pela esquerda
+      const right = window.innerWidth - rect.right;
+      menu.style.left = ''; // reset
+      menu.style.right = right + 'px';
+      menu.style.top = (rect.bottom + 4) + 'px';
+      // Se ficar pra baixo demais (perto do fim da tela), exibe pra cima
+      setTimeout(() => {
+        const mr = menu.getBoundingClientRect();
+        if (mr.bottom > window.innerHeight - 8) {
+          menu.style.top = (rect.top - mr.height - 4) + 'px';
+        }
+      }, 0);
       // Fecha ao clicar fora
       setTimeout(() => document.addEventListener('click', () => wrap.classList.remove('open'), { once: true }), 0);
     }

@@ -44,3 +44,5 @@ build/
 
 # ── Claude / IA ──
 .claude/launch.json
+*.log
+*.err

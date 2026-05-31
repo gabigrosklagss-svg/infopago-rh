@@ -10,6 +10,19 @@ const fs = require('fs');
 const NAO_PERSISTE = ['lancamentos_detalhados', 'salario_familia', 'faixa_irrf', 'ano_tabela', 'vt_total_mes', 'vt_custo_empresa', 'valor_hora'];
 function stripDB(o) { const c = { ...o }; NAO_PERSISTE.forEach(k => delete c[k]); return c; }
 
+/** Sanitiza datas no formato YYYY-MM-DD com ano entre 1900 e 2100. Rejeita anos com 5+ dígitos. */
+function sanitizarData(v) {
+  if (!v) return null;
+  const m = String(v).match(/^(\d{4,})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  let ano = m[1];
+  // Se ano tem mais de 4 dígitos (ex: "62026"), pega apenas os últimos 4
+  if (ano.length > 4) ano = ano.slice(-4);
+  const anoNum = parseInt(ano);
+  if (anoNum < 1900 || anoNum > 2100) return null;
+  return `${ano}-${m[2]}-${m[3]}`;
+}
+
 router.get('/', requireAuth, async (req, res) => {
   const { mes, ano, status, employee_id, page = 1, limit = 50 } = req.query;
   const offset = (parseInt(page) - 1) * parseInt(limit);
@@ -51,7 +64,10 @@ router.post('/calcular', requireAuth, async (req, res) => {
 });
 
 router.post('/', requireAuth, async (req, res) => {
-  const { employee_id, competencia_mes, competencia_ano, lancamentos, data_pagamento } = req.body;
+  const { employee_id, competencia_mes, competencia_ano, lancamentos } = req.body;
+  const data_pagamento = sanitizarData(req.body.data_pagamento);
+  if (req.body.data_pagamento && !data_pagamento)
+    return res.status(400).json({ error: 'Data de pagamento inválida. Use formato YYYY-MM-DD com ano entre 1900 e 2100.' });
   if (!employee_id || !competencia_mes || !competencia_ano)
     return res.status(400).json({ error: 'employee_id, competencia_mes e competencia_ano são obrigatórios.' });
 
@@ -83,7 +99,10 @@ router.post('/', requireAuth, async (req, res) => {
 });
 
 router.post('/lote', requireAuth, requireRole('admin', 'rh'), async (req, res) => {
-  const { competencia_mes, competencia_ano, department_id, employee_ids, lancamentos_padrao, data_pagamento } = req.body;
+  const { competencia_mes, competencia_ano, department_id, employee_ids, lancamentos_padrao } = req.body;
+  const data_pagamento = sanitizarData(req.body.data_pagamento);
+  if (req.body.data_pagamento && !data_pagamento)
+    return res.status(400).json({ error: 'Data de pagamento inválida. Use formato YYYY-MM-DD com ano entre 1900 e 2100.' });
   let q = supabase.from('employees').select('*').eq('status', 'ativo');
   if (department_id) q = q.eq('department_id', department_id);
   if (employee_ids?.length) q = q.in('id', employee_ids);
