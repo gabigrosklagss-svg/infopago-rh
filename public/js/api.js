@@ -436,7 +436,6 @@ function renderSidebar(active) {
       <div class="nav-label">Comunicação</div>
       <nav>
         ${item('calendar', '/calendar.html', 'Calendário &amp; Comunicados')}
-        ${item('help',     '/help.html',     'FAQ &amp; Ajuda')}
       </nav>
     </div>
 

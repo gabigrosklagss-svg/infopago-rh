@@ -114,6 +114,7 @@ app.use('/api/recruitment', require('./src/routes/recruitment'));
 app.use('/api/collective-vacations', require('./src/routes/collectiveVacations'));
 app.use('/api/permissions', require('./src/routes/permissions'));
 app.use('/api/cv-pool', require('./src/routes/cvPool'));
+app.use('/api/events',  require('./src/routes/companyEvents'));
 
 // Endpoint público para confirmação de recebimento de holerite
 app.get('/confirmar/:token', async (req, res) => {

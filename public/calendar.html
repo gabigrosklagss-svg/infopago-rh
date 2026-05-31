@@ -17,8 +17,9 @@
   }
   .cal-head, .cal-cell { background: var(--paper); padding: 8px 10px; min-height: 96px; font-size: 11.5px; }
   .cal-head { background: var(--paper-2); text-align: center; font-weight: 700; font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); min-height: auto; padding: 6px 8px; }
-  .cal-cell { display: flex; flex-direction: column; gap: 3px; }
-  .cal-cell.outside { background: var(--paper-3); color: var(--ink-5); }
+  .cal-cell { display: flex; flex-direction: column; gap: 3px; cursor: pointer; transition: background-color .15s ease; position: relative; }
+  .cal-cell:hover:not(.outside) { background: var(--paper-3); }
+  .cal-cell.outside { background: var(--paper-3); color: var(--ink-5); cursor: default; }
   .cal-cell.today { background: var(--brand-50, rgba(31,171,84,.08)); }
   .cal-cell .day { font-weight: 700; color: var(--ink); font-size: 12px; }
   .cal-cell.outside .day { color: var(--ink-5); font-weight: 500; }
@@ -30,6 +31,55 @@
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     cursor: default;
   }
+  .cal-add-hint {
+    position: absolute; top: 6px; right: 6px;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--brand-500); color: #fff;
+    display: none; align-items: center; justify-content: center;
+    font-size: 14px; line-height: 0; font-weight: 600;
+  }
+  .cal-cell:hover:not(.outside) .cal-add-hint { display: flex; }
+
+  /* Lista de eventos do mês abaixo */
+  .events-list { margin-top: 20px; }
+  .events-day {
+    display: grid; grid-template-columns: 56px 1fr; gap: 14px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .events-day:last-child { border-bottom: 0; }
+  .ev-day-tag {
+    background: var(--paper-3); border-radius: var(--r-sm);
+    padding: 8px 10px;
+    text-align: center;
+    align-self: start;
+  }
+  .ev-day-tag .num { font-size: 18px; font-weight: 700; color: var(--ink); line-height: 1; }
+  .ev-day-tag .dow { font-size: 9.5px; color: var(--ink-4); text-transform: uppercase; letter-spacing: .08em; margin-top: 4px; }
+  .ev-items { display: flex; flex-direction: column; gap: 6px; }
+  .ev-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px;
+    background: var(--paper); border: 1px solid var(--border);
+    border-left: 3px solid var(--brand-500);
+    border-radius: var(--r-sm);
+    font-size: 13px;
+  }
+  .ev-item .titulo { font-weight: 600; color: var(--ink); }
+  .ev-item .sub { color: var(--ink-3); font-size: 12px; margin-left: 4px; }
+  .ev-item .cat-dot {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    background: var(--brand-500); flex-shrink: 0;
+  }
+  .ev-item.feriado { border-left-color: #b91c1c; }
+  .ev-item.aniv { border-left-color: #d946ef; }
+  .ev-item.empresa { border-left-color: #f59e0b; }
+  .ev-item.ferias { border-left-color: #3b82f6; }
+  .ev-item.ferias-vencendo { border-left-color: #b91c1c; background: rgba(248,113,113,.05); }
+  .ev-item .actions { margin-left: auto; display: flex; gap: 4px; }
+
+  /* Cards de comunicados */
   .ann-card {
     border: 1px solid var(--border);
     border-radius: var(--r);
@@ -58,7 +108,7 @@
     <div class="page-header">
       <div>
         <h1>Calendário &amp; Comunicados</h1>
-        <p class="subtitle">Eventos do mês, feriados e avisos institucionais</p>
+        <p class="subtitle">Eventos do mês, feriados, aniversariantes e avisos institucionais</p>
       </div>
     </div>
 
@@ -75,16 +125,23 @@
           <button class="btn btn-sm" onclick="mudarMes(-1)">← Anterior</button>
           <strong id="cal-titulo" style="font-size:14px;min-width:180px;text-align:center"></strong>
           <button class="btn btn-sm" onclick="mudarMes(1)">Próximo →</button>
+          <button class="btn btn-sm btn-primary" onclick="abrirFormEvento()">+ Novo evento</button>
         </div>
       </div>
       <div id="cal-container"></div>
-      <div style="margin-top:18px;font-size:11.5px;color:var(--ink-3);display:flex;gap:14px;flex-wrap:wrap">
-        <span>● Feriado nacional</span>
-        <span>● Aniversariante</span>
-        <span>● Aniversário de empresa</span>
-        <span>● Férias agendadas</span>
-        <span style="color:var(--danger,#b91c1c)">● Férias vencendo</span>
-        <span>● Documento vencendo</span>
+      <div style="margin-top:14px;font-size:11.5px;color:var(--ink-3);display:flex;gap:14px;flex-wrap:wrap">
+        <span><span class="cat-dot" style="background:#1FAB54;display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px"></span>Evento empresa</span>
+        <span><span style="background:#b91c1c;display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px"></span>Feriado nacional</span>
+        <span><span style="background:#d946ef;display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px"></span>Aniversariante</span>
+        <span><span style="background:#f59e0b;display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px"></span>Aniversário empresa</span>
+        <span><span style="background:#3b82f6;display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px"></span>Férias agendadas</span>
+        <span style="color:var(--danger,#b91c1c)">⚠ Férias vencendo</span>
+      </div>
+
+      <!-- ── Lista de eventos do mês ─────────────────── -->
+      <div class="events-list">
+        <h3 class="card-title" style="margin-top:24px">Todos os eventos do mês</h3>
+        <div id="events-list-container"></div>
       </div>
     </div>
 
@@ -117,8 +174,10 @@
 
   /* ════════════════ CALENDÁRIO ════════════════ */
   const MESES_NOMES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const DIAS_SEMANA = ['DOM','SEG','TER','QUA','QUI','SEX','SÁB'];
   let calMes = new Date().getMonth() + 1;
   let calAno = new Date().getFullYear();
+  let _eventosCache = [];
 
   function mudarMes(delta) {
     calMes += delta;
@@ -129,11 +188,32 @@
 
   async function carregarCalendario() {
     document.getElementById('cal-titulo').textContent = `${MESES_NOMES[calMes - 1]} / ${calAno}`;
-    let eventos = [];
+
+    // Carrega eventos do backend (sistema) + eventos custom da empresa
+    let eventosSistema = [];
+    let eventosEmpresa = [];
     try {
       const r = await api(`/help/calendar?mes=${calMes}&ano=${calAno}`);
-      eventos = r.eventos || [];
-    } catch { /* segue sem eventos */ }
+      eventosSistema = r.eventos || [];
+    } catch { /* segue sem eventos do sistema */ }
+    try {
+      eventosEmpresa = await api(`/events?mes=${calMes}&ano=${calAno}`);
+    } catch { /* segue sem eventos custom */ }
+
+    // Normaliza eventos custom pro mesmo shape
+    const eventosCustom = eventosEmpresa.map(e => ({
+      id: e.id,
+      data: e.data_inicio,
+      titulo: e.titulo,
+      subtitulo: e.descricao || '',
+      categoria: e.categoria,
+      cor: e.cor || '#1FAB54',
+      tipo: 'evento_empresa',
+      raw: e,
+    }));
+
+    const eventos = [...eventosSistema, ...eventosCustom];
+    _eventosCache = eventos;
 
     const eventosPorDia = {};
     eventos.forEach(e => { (eventosPorDia[e.data] ||= []).push(e); });
@@ -153,7 +233,7 @@
     }
     while (cells.length < 42) cells.push({ outside: true, day: cells.length - (totalDias + dowInicio - 1) });
 
-    const headers = ['DOM','SEG','TER','QUA','QUI','SEX','SÁB'].map(h => `<div class="cal-head">${h}</div>`).join('');
+    const headers = DIAS_SEMANA.map(h => `<div class="cal-head">${h}</div>`).join('');
     const cellsHTML = cells.map(c => {
       const classes = ['cal-cell'];
       if (c.outside) classes.push('outside');
@@ -162,10 +242,133 @@
         `<div class="cal-event" style="border-left-color:${e.cor || 'var(--brand-500)'}" title="${e.titulo}${e.subtitulo ? ' — ' + e.subtitulo : ''}">${e.titulo}</div>`
       ).join('');
       const mais = c.eventos?.length > 4 ? `<div class="cal-event" style="color:var(--ink-4)">+ ${c.eventos.length - 4} mais</div>` : '';
-      return `<div class="${classes.join(' ')}"><div class="day">${c.day}</div>${events}${mais}</div>`;
+      const click = c.outside ? '' : `onclick="abrirFormEvento(null, '${c.dataIso}')"`;
+      const hint = c.outside ? '' : `<span class="cal-add-hint">+</span>`;
+      return `<div class="${classes.join(' ')}" ${click}><div class="day">${c.day}</div>${events}${mais}${hint}</div>`;
     }).join('');
 
     document.getElementById('cal-container').innerHTML = `<div class="cal-grid">${headers}${cellsHTML}</div>`;
+
+    renderListaEventos();
+  }
+
+  function renderListaEventos() {
+    const cont = document.getElementById('events-list-container');
+    if (!_eventosCache.length) {
+      cont.innerHTML = '<p class="text-muted text-sm" style="padding:14px 0">Nenhum evento neste mês.</p>';
+      return;
+    }
+    // Agrupa por data
+    const grupos = {};
+    _eventosCache.forEach(e => { (grupos[e.data] ||= []).push(e); });
+    const datasOrdenadas = Object.keys(grupos).sort();
+
+    cont.innerHTML = datasOrdenadas.map(data => {
+      const d = new Date(data + 'T12:00:00');
+      const dia = d.getDate();
+      const dow = DIAS_SEMANA[d.getDay()];
+      const items = grupos[data].map(ev => renderEventItem(ev)).join('');
+      return `<div class="events-day">
+        <div class="ev-day-tag"><div class="num">${dia}</div><div class="dow">${dow}</div></div>
+        <div class="ev-items">${items}</div>
+      </div>`;
+    }).join('');
+  }
+
+  function renderEventItem(ev) {
+    let cls = '';
+    const tipo = ev.tipo || ev.categoria;
+    if (/feriado/i.test(tipo) || /feriado/i.test(ev.titulo)) cls = 'feriado';
+    else if (/aniversariante|aniv\b/i.test(tipo) || /🎂|aniversariante/i.test(ev.titulo)) cls = 'aniv';
+    else if (/empresa/i.test(tipo) || ev.tipo === 'aniv_empresa') cls = 'empresa';
+    else if (/ferias_vencendo|vencendo/i.test(tipo)) cls = 'ferias-vencendo';
+    else if (/ferias|férias/i.test(tipo)) cls = 'ferias';
+
+    const isCustom = ev.tipo === 'evento_empresa';
+    const actions = isCustom
+      ? `<div class="actions">
+          <button class="btn btn-sm" onclick="event.stopPropagation();editarEvento('${ev.id}')">Editar</button>
+          <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();excluirEvento('${ev.id}')">×</button>
+        </div>`
+      : '';
+    return `<div class="ev-item ${cls}">
+      <span class="cat-dot" style="background:${ev.cor || 'var(--brand-500)'}"></span>
+      <span class="titulo">${ev.titulo}</span>
+      ${ev.subtitulo ? `<span class="sub">${ev.subtitulo}</span>` : ''}
+      ${actions}
+    </div>`;
+  }
+
+  /* ════════════════ EVENTOS CUSTOM ════════════════ */
+  function abrirFormEvento(existente, dataPreenchida) {
+    const e = existente || {};
+    const data = dataPreenchida || e.data_inicio || new Date().toISOString().slice(0,10);
+    const cats = [
+      ['evento','Evento'], ['festa','Festa / Confraternização'],
+      ['reuniao','Reunião'], ['treinamento','Treinamento'],
+      ['prazo','Prazo'], ['feriado_empresa','Feriado/Folga empresa'], ['outros','Outros']
+    ];
+    const cores = ['#1FAB54','#3b82f6','#d946ef','#f59e0b','#b91c1c','#0891b2','#7c3aed','#475569'];
+    const html = `<form id="evForm">
+      <div class="form-grid">
+        <div class="field" style="grid-column:span 2"><label>Título<span class="req">*</span></label>
+          <input name="titulo" required value="${(e.titulo || '').replace(/"/g,'&quot;')}" placeholder="Ex: Confraternização de fim de ano">
+        </div>
+        <div class="field"><label>Data início<span class="req">*</span></label>
+          <input type="date" name="data_inicio" required value="${data}">
+        </div>
+        <div class="field"><label>Data fim (opcional)</label>
+          <input type="date" name="data_fim" value="${e.data_fim || ''}">
+        </div>
+        <div class="field"><label>Categoria</label>
+          <select name="categoria">${cats.map(([k,v]) => `<option value="${k}" ${k === e.categoria ? 'selected' : ''}>${v}</option>`).join('')}</select>
+        </div>
+        <div class="field"><label>Cor</label>
+          <select name="cor">${cores.map(c => `<option value="${c}" ${c === e.cor ? 'selected' : ''} style="background:${c};color:#fff">${c}</option>`).join('')}</select>
+        </div>
+        <div class="field"><label>Hora início (opcional)</label>
+          <input type="time" name="hora_inicio" value="${e.hora_inicio || ''}">
+        </div>
+        <div class="field"><label>Hora fim (opcional)</label>
+          <input type="time" name="hora_fim" value="${e.hora_fim || ''}">
+        </div>
+        <div class="field" style="grid-column:span 2"><label>Local</label>
+          <input name="local" value="${(e.local || '').replace(/"/g,'&quot;')}" placeholder="Ex: Auditório, online via Meet, etc">
+        </div>
+        <div class="field" style="grid-column:span 2"><label>Público alvo</label>
+          <input name="publico_alvo" value="${(e.publico_alvo || '').replace(/"/g,'&quot;')}" placeholder="Ex: Toda empresa, Time de TI, Gestores...">
+        </div>
+      </div>
+      <div class="field mt-3"><label>Descrição</label>
+        <textarea name="descricao" rows="3" placeholder="Detalhes, agenda, link da reunião...">${e.descricao || ''}</textarea>
+      </div>
+    </form>`;
+    showFormModal(existente ? 'Editar evento' : 'Novo evento', html, async () => {
+      const f = document.getElementById('evForm');
+      if (!validateForm(f)) return;
+      const d = formToObject(f);
+      d.dia_todo = !(d.hora_inicio || d.hora_fim);
+      try {
+        if (existente?.id) await api(`/events/${existente.id}`, { method:'PUT', body: d });
+        else await api('/events', { method:'POST', body: d });
+        toast('Evento salvo!', 'success');
+        closeFormModal();
+        carregarCalendario();
+      } catch (err) { toast(err.message, 'error'); }
+    });
+  }
+
+  async function editarEvento(id) {
+    try {
+      const e = await api(`/events/${id}`);
+      abrirFormEvento(e);
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function excluirEvento(id) {
+    if (!confirm('Excluir este evento?')) return;
+    try { await api(`/events/${id}`, { method:'DELETE' }); toast('Excluído.', 'info'); carregarCalendario(); }
+    catch (err) { toast(err.message, 'error'); }
   }
 
   /* ════════════════ COMUNICADOS ════════════════ */
