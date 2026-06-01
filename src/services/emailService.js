@@ -114,6 +114,12 @@ function buildComunicadoHTML(announcement, company) {
   const importanteBadge = announcement.importante
     ? '<span style="background:#fee2e2;color:#b91c1c;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:14px;display:inline-block">⚠ Importante</span>'
     : '';
+  const isImg = announcement.anexo_tipo && /^image\//.test(announcement.anexo_tipo);
+  const anexoBlock = announcement.anexo_url
+    ? (isImg
+        ? `<div style="margin:18px 0"><img src="${announcement.anexo_url}" alt="${announcement.anexo_nome || ''}" style="max-width:100%;border-radius:8px;border:1px solid #e3e8ee"></div>`
+        : `<div style="margin:18px 0;padding:14px 18px;background:#f5f7fb;border:1px solid #e3e8ee;border-radius:8px;font-size:13px"><strong>📎 Anexo:</strong> <a href="${announcement.anexo_url}" style="color:#1FAB54;text-decoration:none">${announcement.anexo_nome || 'arquivo'}</a></div>`)
+    : '';
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"></head>
 <body style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#f5f7fb;margin:0;padding:32px">
 <div style="max-width:600px;margin:auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.08)">
@@ -124,6 +130,7 @@ function buildComunicadoHTML(announcement, company) {
   <div style="padding:28px 32px;color:#1F2D3D">
     ${importanteBadge}
     <div style="font-size:14px;line-height:1.7;white-space:pre-wrap">${(announcement.conteudo || '').replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</div>
+    ${anexoBlock}
     <div style="margin-top:24px;padding-top:18px;border-top:1px solid #e3e8ee;font-size:12px;color:#697386">
       Enviado por <strong>${announcement.autor_nome || 'RH'}</strong>${announcement.data_expiracao ? ` · Válido até ${announcement.data_expiracao}` : ''}<br>
       Este é um e-mail automático do sistema InfoPago RH. Para dúvidas, responda este e-mail.
@@ -140,6 +147,22 @@ async function enviarComunicado(announcement, recipients, company, userId) {
   const html = buildComunicadoHTML(announcement, company);
   const subject = `${announcement.importante ? '[Importante] ' : ''}${announcement.titulo}`;
 
+  // Baixa o anexo (se houver) uma única vez pra reutilizar entre destinatários
+  let attachments = [];
+  if (announcement.anexo_url) {
+    try {
+      const r = await fetch(announcement.anexo_url);
+      if (r.ok) {
+        const buf = Buffer.from(await r.arrayBuffer());
+        attachments.push({
+          filename: announcement.anexo_nome || 'anexo',
+          content: buf,
+          contentType: announcement.anexo_tipo || 'application/octet-stream',
+        });
+      }
+    } catch { /* segue sem anexo */ }
+  }
+
   let enviados = 0, falhas = 0;
   const logs = [];
   for (const r of recipients) {
@@ -150,6 +173,7 @@ async function enviarComunicado(announcement, recipients, company, userId) {
         to: r.email,
         subject,
         html,
+        attachments,
       });
       enviados++;
       logs.push({ employee_id: r.id, email: r.email, success: true });

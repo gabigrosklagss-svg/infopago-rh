@@ -73,59 +73,71 @@
   const FAQ = [
     {
       q: 'Como cadastro um novo funcionário?',
-      a: `<p>Vá em <strong>Funcionários → + Novo funcionário</strong>. Preencha as 4 abas (Pessoal, Trabalho, Benefícios, Bancário). Campos com <strong style="color:var(--danger)">*</strong> são obrigatórios.</p><p>Depois de salvar, clique novamente no funcionário e use o botão "Selecionar foto" para enviar a foto 3x4.</p>`
+      a: `<p>Vá em <strong>Funcionários → + Novo funcionário</strong>. Preencha as 4 abas (Pessoal, Trabalho, Benefícios, Bancário). Os campos com <strong style="color:var(--danger)">*</strong> são obrigatórios.</p><p>Depois de salvar, clique novamente no funcionário e use o botão "Selecionar foto" para enviar a foto 3x4.</p>`
     },
     {
       q: 'Como gerar holerites em lote?',
       a: `<p>Em <strong>Holerites → + Gerar em lote</strong>. Escolha mês/ano, data de pagamento e opcionalmente um departamento.</p><p>As <strong>horas extras 50% e 100%</strong> são calculadas <strong>automaticamente</strong> a partir do controle de ponto:</p><ul><li>Sábado trabalhado → HE 50%</li><li>Domingo / feriado → HE 100%</li><li>Horas que excedem carga diária em dia útil → HE 50%</li></ul>`
     },
     {
-      q: 'O que é Senha de App do Gmail?',
-      a: `<p>É uma senha especial de 16 caracteres gerada no Google para apps externos (o Gmail não aceita mais sua senha normal). Para criar:</p><ul><li>Ative a Verificação em 2 etapas em <code>myaccount.google.com/security</code></li><li>Acesse <code>myaccount.google.com/apppasswords</code></li><li>Crie uma senha chamada "InfoPago RH"</li><li>Copie a senha SEM os espaços</li></ul>`
-    },
-    {
-      q: 'Onde os PDFs dos holerites ficam salvos?',
-      a: `<p>Localmente em <code>uploads/holerites/{ano}/{mês}/{matrícula}_{nome}.pdf</code>. Cada PDF tem 2 páginas: a primeira é o holerite tradicional CLT, a segunda é o espelho de ponto com dia-a-dia da competência.</p>`
-    },
-    {
       q: 'Como funciona o controle de ponto?',
-      a: `<p>Em <strong>Jornada & Férias → Controle de ponto</strong>. Selecione um funcionário, mês e ano, e edite os dias clicando no ✎. Para cada dia, registre as 4 marcações: entrada, almoço (saída), volta, saída fim.</p><p>O sistema calcula automaticamente:</p><ul><li>Horas trabalhadas</li><li>Horas extras (acima da carga diária)</li><li>Horas faltantes (abaixo da carga diária)</li><li>Banco de horas (acumulado)</li></ul>`
+      a: `<p>Em <strong>Jornada & Férias → Controle de ponto</strong>. Selecione um funcionário, mês e ano, e edite os dias. Para cada dia, registre as 4 marcações: entrada, almoço (saída), volta, saída fim.</p><p>O sistema calcula automaticamente as horas trabalhadas, horas extras, horas faltantes e o banco de horas acumulado.</p>`
     },
     {
       q: 'Como anexar documentos do funcionário?',
-      a: `<p>Clique no nome do funcionário na lista → aba <strong>Documentos</strong> → <strong>+ Adicionar documento</strong>. Escolha o tipo (RG, CTPS, exame, contrato, etc.) e faça upload de PDF, JPG, PNG ou WebP até 20 MB.</p><p>Os documentos ficam armazenados no Supabase Storage (privado) e são acessíveis via URL assinada com validade de 1 hora.</p>`
+      a: `<p>Clique no nome do funcionário na lista → aba <strong>Documentos</strong> → <strong>+ Adicionar documento</strong>. Escolha o tipo (RG, CTPS, exame, contrato, etc.) e faça upload de PDF, JPG, PNG ou WebP até 20 MB.</p>`
     },
     {
       q: 'Como solicitar e aprovar férias?',
       a: `<p><strong>Solicitar:</strong> Em <strong>Solicitações de Férias → + Nova solicitação</strong>. Informe período pretendido, dias vendidos e se vai adiantar o 13º.</p><p><strong>Aprovar:</strong> Vá em <strong>Solicitações de Férias</strong> e clique em ✓ Aprovar ou ✕ Negar. Quando aprovado, o sistema atualiza o período aquisitivo automaticamente.</p>`
     },
     {
-      q: 'Como iniciar processo de admissão (onboarding)?',
-      a: `<p>No pop-up do funcionário, aba "Admissão/Demissão" → "+ Iniciar admissão". O sistema cria automaticamente um checklist com 11 itens padrão CLT (documentos, exames, contrato, EPIs, e-mail, etc.).</p><p>Cada item tem um responsável (RH, Gestor, TI, Funcionário). Marque os itens conforme conclui. Quando todos obrigatórios são concluídos, o checklist é fechado automaticamente.</p>`
+      q: 'O que são férias coletivas e quando uso?',
+      a: `<p>Férias coletivas são períodos onde a empresa inteira (ou um setor) para juntos. Em <strong>Solicitações de Férias → aba Férias Coletivas → + Novo período</strong> você define data início/fim e escopo (toda empresa ou um departamento específico).</p><p>Ao clicar em "Aplicar", o sistema lança férias em massa pra todos os funcionários do escopo automaticamente.</p>`
     },
     {
-      q: 'Como excluir um holerite?',
-      a: `<p>Na lista de holerites, clique no botão de ações (3 pontos) → <strong>Excluir</strong>. Apenas usuários com permissão <code>payslips.delete</code> podem excluir. A exclusão é permanente e remove:</p><ul><li>O registro do banco</li><li>O PDF do disco</li><li>Os logs de envio associados</li></ul>`
+      q: 'Como iniciar processo de admissão (onboarding)?',
+      a: `<p>No pop-up do funcionário, aba <strong>Admissão/Demissão</strong> → <strong>+ Iniciar admissão</strong>. O sistema cria automaticamente um checklist com 11 itens padrão CLT (documentos, exames, contrato, EPIs, e-mail, etc.).</p><p>Cada item tem um responsável (RH, Gestor, TI, Funcionário). Marque conforme conclui. Quando todos obrigatórios são concluídos, o checklist fecha automaticamente.</p>`
+    },
+    {
+      q: 'Como demito um funcionário (rescisão)?',
+      a: `<p>Vá em <strong>Rescisão e 13º → + Nova rescisão</strong>. Escolha o funcionário, tipo de rescisão (pedido, sem justa causa, com justa causa, etc.), datas e o sistema calcula automaticamente saldo de salário, férias proporcionais, 13º proporcional, aviso prévio e FGTS.</p><p>Ao salvar, o funcionário sai da lista de ativos e fica armazenado na seção de rescisão com todas as informações preservadas.</p>`
     },
     {
       q: 'Como funciona o envio automático de holerites?',
       a: `<p>Em <strong>Envios → Agendar envio</strong>. Escolha competência, data e horário. O sistema executa o envio automaticamente nos horários 07:55 e 08:05 do dia agendado.</p><p>Cada funcionário recebe seu próprio PDF anexado + link de confirmação de recebimento.</p>`
     },
     {
-      q: 'Que tabelas tributárias o sistema usa?',
-      a: `<p>O sistema tem tabelas CLT 2025 e 2026 (INSS, IRRF, FGTS, salário-família, dependentes) e usa automaticamente a tabela do ano da competência do holerite.</p><p>Para atualizar quando o Governo publicar a tabela 2027, basta editar <code>src/services/payroll.js</code> e adicionar um novo bloco em <code>TABELAS_TRIBUTARIAS</code>.</p>`
+      q: 'Como crio um comunicado para os funcionários?',
+      a: `<p>Em <strong>Calendário & Comunicados → aba Comunicados → + Novo comunicado</strong>. Escreva título e conteúdo, anexe imagem ou arquivo se quiser, escolha o escopo (toda empresa, departamentos específicos ou funcionários específicos) e marque "Enviar por e-mail ao salvar".</p><p>O sistema dispara automaticamente o e-mail pra cada funcionário do escopo.</p>`
     },
     {
-      q: 'Como funciona o RBAC (cargos e permissões)?',
-      a: `<p>O sistema tem 5 cargos: <strong>Super Admin, Admin, RH, Financeiro, Gestor</strong>. Cada cargo possui um conjunto de permissões (ex: <code>employees.update</code>, <code>salary.update</code>).</p><p>Em <strong>Admin → Usuários & Permissões</strong>, o Super Admin pode atribuir múltiplos cargos a um mesmo usuário e editar as permissões de cada cargo (exceto Super Admin).</p>`
+      q: 'Como crio um evento (festa, reunião, treinamento)?',
+      a: `<p>Em <strong>Calendário & Comunicados → aba Calendário</strong>, clique em qualquer dia do mês ou no botão "+ Novo evento". Preencha título, data, horário (opcional), local, categoria e cor.</p><p>O evento aparece tanto no grid do calendário quanto na lista de eventos do mês abaixo. Notificações são enviadas automaticamente para o sino do header quando o evento estiver nos próximos 7 dias.</p>`
     },
     {
       q: 'Como funciona o Banco de Currículos?',
-      a: `<p>Em <strong>Gente & Talentos → Banco de Currículos</strong>, você armazena currículos enviados sem vaga específica. Pode subir PDF/DOCX que a Ingrid extrai os campos automaticamente.</p><p>Quando uma vaga compatível abrir, clique em <strong>Candidatar à vaga</strong> e o sistema cria o candidato no pipeline de Recrutamento.</p>`
+      a: `<p>Em <strong>Gente & Talentos → Banco de Currículos</strong>, você armazena currículos enviados sem vaga específica. Pode subir PDF/DOCX que a IA extrai os campos automaticamente.</p><p>Quando uma vaga compatível abrir, clique em <strong>Candidatar à vaga</strong> e o sistema cria o candidato no pipeline de Recrutamento.</p>`
     },
     {
-      q: 'Como alterar entre tema claro e escuro?',
+      q: 'O que é o Custo Total de Contratação (CTC)?',
+      a: `<p>É uma calculadora que estima quanto vai custar de verdade contratar alguém — não apenas o salário, mas todos os encargos da CLT (INSS patronal, FGTS, Sistema S, RAT), provisões (13º, férias + 1/3) e benefícios (VT, VR, plano de saúde, etc.).</p><p>Acesse em <strong>Gente & Talentos → Custo de Contratação</strong>. Útil pra orçar uma vaga antes de abrir.</p>`
+    },
+    {
+      q: 'Como funciona a avaliação de desempenho?',
+      a: `<p>Em <strong>Gente & Talentos → Avaliação de desempenho → + Novo ciclo</strong>. Defina nome, período e critérios (ex: Produtividade, Pontualidade, Trabalho em equipe).</p><p>Depois clique em "Adicionar funcionários" pra incluir todos ou só de um departamento. Cada avaliação ganha notas 0–5 por critério, pontos fortes/melhoria e plano de ação.</p>`
+    },
+    {
+      q: 'Como faço para alterar entre tema claro e escuro?',
       a: `<p>Clique no botão de sol/lua no canto superior direito do header. O sistema também respeita a preferência do seu sistema operacional automaticamente.</p>`
+    },
+    {
+      q: 'Onde encontro os relatórios analíticos?',
+      a: `<p>Em <strong>Análise → Relatórios analíticos</strong>. São 10 dimensões: Headcount, Turnover, Custo de Pessoal, Absenteísmo, Horas Extras, Férias (alertas), Datas-chave, Distribuição salarial, Avaliação e Recrutamento.</p><p>Todos com filtros de período e departamento, gráficos interativos e exportação para CSV.</p>`
+    },
+    {
+      q: 'Como troco minha senha?',
+      a: `<p>Clique no seu nome/foto na sidebar (canto inferior esquerdo) para abrir o perfil. A troca de senha é feita pelo painel de Usuários (acessível ao Super Admin) ou via reset de senha.</p>`
     },
   ];
 

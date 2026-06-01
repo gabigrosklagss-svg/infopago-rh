@@ -618,27 +618,70 @@ async function _carregarAlertas() {
       });
     });
   } catch {}
-  window._notifs = itens;
+  // Filtra dispensadas
+  const filtradas = itens.filter(n => !_isNotifDispensada(n));
+  window._notifs = filtradas;
   const dot = document.getElementById('notif-dot');
-  if (dot) dot.style.display = itens.length ? 'block' : 'none';
-  return { itens };
+  if (dot) dot.style.display = filtradas.length ? 'block' : 'none';
+  return { itens: filtradas };
 }
 setTimeout(() => _carregarAlertas(), 1500);
+
+/* Notificações dispensadas — chave por título no localStorage */
+function _isNotifDispensada(n) {
+  try {
+    const dispensadas = JSON.parse(localStorage.getItem('rh_notif_dismissed') || '[]');
+    return dispensadas.includes(n.titulo);
+  } catch { return false; }
+}
+function _dispensarNotif(titulo) {
+  try {
+    const arr = JSON.parse(localStorage.getItem('rh_notif_dismissed') || '[]');
+    if (!arr.includes(titulo)) arr.push(titulo);
+    localStorage.setItem('rh_notif_dismissed', JSON.stringify(arr.slice(-200)));
+  } catch {}
+}
+function dispensarNotificacao(idx) {
+  const itens = window._notifs || [];
+  const n = itens[idx];
+  if (!n) return;
+  _dispensarNotif(n.titulo);
+  window._notifs = itens.filter((_, i) => i !== idx);
+  const old = document.getElementById('notif-panel');
+  if (old) { old.remove(); abrirNotificacoes(); }
+  const dot = document.getElementById('notif-dot');
+  if (dot && !window._notifs.length) dot.style.display = 'none';
+}
+function limparTodasNotificacoes() {
+  (window._notifs || []).forEach(n => _dispensarNotif(n.titulo));
+  window._notifs = [];
+  document.getElementById('notif-panel')?.remove();
+  const dot = document.getElementById('notif-dot');
+  if (dot) dot.style.display = 'none';
+}
 
 function abrirNotificacoes(ev) {
   ev?.stopPropagation();
   const old = document.getElementById('notif-panel');
   if (old) { old.remove(); return; }
-  const itens = window._notifs || [];
-  const html = `<div class="notif-panel" id="notif-panel" style="position:fixed;top:54px;right:16px;width:360px;max-height:70vh;background:var(--paper);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--sh-3);overflow:hidden;display:flex;flex-direction:column;z-index:1000">
-    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+  // Filtra dispensadas
+  let itens = (window._notifs || []).filter(n => !_isNotifDispensada(n));
+  window._notifs = itens;
+  const html = `<div class="notif-panel" id="notif-panel" style="position:fixed;top:54px;right:16px;width:380px;max-height:70vh;background:var(--paper);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--sh-3);overflow:hidden;display:flex;flex-direction:column;z-index:1000">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:8px">
       <strong style="font-size:14px">Notificações</strong>
-      <small style="color:var(--ink-4)">${itens.length} ativa(s)</small>
+      <div style="display:flex;align-items:center;gap:8px">
+        <small style="color:var(--ink-4)">${itens.length} ativa(s)</small>
+        ${itens.length ? `<button class="btn btn-sm" onclick="limparTodasNotificacoes()" style="padding:3px 9px;font-size:11px">Limpar todas</button>` : ''}
+      </div>
     </div>
     <div style="overflow-y:auto;flex:1">
-      ${itens.length ? itens.map(n => `<div onclick="${n.href ? `location.href='${n.href}'` : ''}" style="padding:12px 16px;border-bottom:1px solid var(--border);${n.href ? 'cursor:pointer' : ''}">
-        <strong style="display:block;font-size:13px;color:var(--ink)">${n.titulo}</strong>
-        <small style="color:var(--ink-3);font-size:12px">${n.sub}</small>
+      ${itens.length ? itens.map((n, i) => `<div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:flex-start">
+        <div style="flex:1;${n.href ? 'cursor:pointer' : ''}" ${n.href ? `onclick="location.href='${n.href}'"` : ''}>
+          <strong style="display:block;font-size:13px;color:var(--ink)">${n.titulo}</strong>
+          <small style="color:var(--ink-3);font-size:12px">${n.sub}</small>
+        </div>
+        <button onclick="dispensarNotificacao(${i})" title="Apagar" style="background:transparent;border:0;color:var(--ink-4);cursor:pointer;font-size:16px;padding:0 6px;line-height:1">×</button>
       </div>`).join('') : '<div style="padding:40px 24px;text-align:center;color:var(--ink-4)">Tudo em ordem. Sem alertas no momento.</div>'}
     </div>
   </div>`;
@@ -725,7 +768,9 @@ function abrirPerfilUsuario() {
             </div>
             <div class="field" style="grid-column:span 2">
               <label>Departamento</label>
-              <input name="department" value="${(u.department || '').replace(/"/g, '&quot;')}" placeholder="Ex: Recursos Humanos">
+              <select name="department" id="profile-dept-select">
+                <option value="">Carregando...</option>
+              </select>
             </div>
           </div>
 
@@ -742,6 +787,21 @@ function abrirPerfilUsuario() {
     </div>
   `;
   document.body.appendChild(m);
+
+  // Popula select de departamentos
+  (async () => {
+    try {
+      const deps = await api('/departments?active=true');
+      const sel = document.getElementById('profile-dept-select');
+      if (!sel) return;
+      const opts = ['<option value="">—</option>']
+        .concat((deps || []).map(d => `<option value="${d.nome}" ${u.department === d.nome ? 'selected' : ''}>${d.nome}</option>`));
+      sel.innerHTML = opts.join('');
+    } catch (err) {
+      const sel = document.getElementById('profile-dept-select');
+      if (sel) sel.innerHTML = '<option value="">(falha ao carregar)</option>';
+    }
+  })();
 
   // Listener pra upload de foto
   document.getElementById('profile-photo-input').addEventListener('change', async (e) => {

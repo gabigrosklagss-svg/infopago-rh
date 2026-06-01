@@ -90,6 +90,45 @@ router.delete('/announcements/:id', requireAuth, requireRole('admin', 'rh'), asy
   res.json({ success: true });
 });
 
+/* Upload de anexo para comunicado */
+router.post('/announcements/:id/anexo', requireAuth, requireRole('admin', 'rh'), upload.single('arquivo'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Arquivo não enviado.' });
+  const id = req.params.id;
+  const ext = (req.file.originalname.split('.').pop() || 'bin').toLowerCase();
+  const storage_path = `comunicados/${id}/${Date.now()}.${ext}`;
+
+  // Remove anexo anterior se existir
+  const { data: ann } = await supabase.from('announcements').select('anexo_url').eq('id', id).maybeSingle();
+  if (ann?.anexo_url && ann.anexo_url.includes(`/${BUCKET}/`)) {
+    const oldPath = ann.anexo_url.split(`/${BUCKET}/`)[1];
+    if (oldPath) await supabase.storage.from(BUCKET).remove([oldPath]).catch(() => {});
+  }
+
+  const { error: upErr } = await supabase.storage.from(BUCKET)
+    .upload(storage_path, req.file.buffer, { contentType: req.file.mimetype, upsert: true });
+  if (upErr) return res.status(500).json({ error: upErr.message });
+
+  const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(storage_path);
+  const anexo_url = pub.publicUrl;
+  await supabase.from('announcements').update({
+    anexo_url, anexo_nome: req.file.originalname, anexo_tipo: req.file.mimetype, anexo_tamanho: req.file.size,
+  }).eq('id', id);
+
+  res.json({ anexo_url, anexo_nome: req.file.originalname });
+});
+
+router.delete('/announcements/:id/anexo', requireAuth, requireRole('admin', 'rh'), async (req, res) => {
+  const { data: ann } = await supabase.from('announcements').select('anexo_url').eq('id', req.params.id).maybeSingle();
+  if (ann?.anexo_url && ann.anexo_url.includes(`/${BUCKET}/`)) {
+    const oldPath = ann.anexo_url.split(`/${BUCKET}/`)[1];
+    if (oldPath) await supabase.storage.from(BUCKET).remove([oldPath]).catch(() => {});
+  }
+  await supabase.from('announcements').update({
+    anexo_url: null, anexo_nome: null, anexo_tipo: null, anexo_tamanho: null,
+  }).eq('id', req.params.id);
+  res.json({ success: true });
+});
+
 /* Envia o comunicado por e-mail aos destinatários definidos */
 router.post('/announcements/:id/enviar-email', requireAuth, requireRole('admin', 'rh'), async (req, res) => {
   const { enviarComunicado } = require('../services/emailService');
@@ -230,18 +269,19 @@ router.get('/calendar', requireAuth, async (req, res) => {
     };
   });
 
-  // Férias agendadas no mês
+  // Férias agendadas — apenas as que INICIAM no mês visualizado (evita duplicação)
   const inicioMes = `${ano}-${String(mes).padStart(2,'0')}-01`;
   const fimMes = new Date(ano, mes, 0).toISOString().split('T')[0];
   const { data: ferias } = await supabase.from('vacation_requests')
     .select('*, employees(nome_completo, matricula)')
     .eq('status', 'aprovada')
-    .or(`data_inicio_pretendida.lte.${fimMes},data_fim_pretendida.gte.${inicioMes}`);
+    .gte('data_inicio_pretendida', inicioMes)
+    .lte('data_inicio_pretendida', fimMes);
 
   const eventosFerias = (ferias || []).map(f => ({
     data: f.data_inicio_pretendida,
     tipo: 'ferias',
-    titulo: ` ${f.employees?.nome_completo}`,
+    titulo: `${f.employees?.nome_completo}`,
     subtitulo: `Férias até ${f.data_fim_pretendida}`,
     cor: '#1B4A78',
     icone: '',

@@ -132,33 +132,48 @@
 
   async function novaRescisao() {
     const emps = await api('/employees?status=ativo&limit=300');
-    const opts = (emps.data || []).map(e => `<option value="${e.id}" data-salario="${e.salario_base}" data-admissao="${e.data_admissao}">${fmt.matricula(e.matricula)} · ${e.nome_completo}</option>`).join('');
+    const opts = '<option value="">Selecione um funcionário...</option>' +
+      (emps.data || []).map(e => `<option value="${e.id}">${fmt.matricula(e.matricula)} · ${e.nome_completo}</option>`).join('');
     const tiposOpts = Object.entries(TIPOS).map(([k,v]) => `<option value="${k}">${v}</option>`).join('');
+    const hoje = new Date().toISOString().slice(0,10);
 
     const html = `<form id="rescForm">
       <div class="form-grid">
         <div class="field" style="grid-column:span 2"><label>Funcionário<span class="req">*</span></label>
-          <select name="employee_id" required>${opts}</select></div>
-        <div class="field"><label>Data demissão<span class="req">*</span></label><input type="date" name="data_demissao" required></div>
+          <select name="employee_id" required onchange="onSelectEmpRescisao(this.value)">${opts}</select></div>
+      </div>
+
+      <div id="emp-resumo" style="display:none;margin:14px 0;padding:14px 18px;background:var(--paper-3);border-radius:8px;border-left:3px solid var(--brand-500)">
+        <strong id="emp-nome" style="display:block;font-size:14px"></strong>
+        <div id="emp-detalhes" class="text-sm text-muted mt-2"></div>
+      </div>
+
+      <div class="form-grid mt-3">
+        <div class="field"><label>Data demissão<span class="req">*</span></label><input type="date" name="data_demissao" required value="${hoje}" onchange="atualizarPreviewRescisao()"></div>
         <div class="field"><label>Tipo de rescisão<span class="req">*</span></label>
-          <select name="tipo_rescisao" required>${tiposOpts}</select></div>
+          <select name="tipo_rescisao" required onchange="atualizarPreviewRescisao()">${tiposOpts}</select></div>
         <div class="field"><label>Aviso prévio</label>
-          <select name="aviso_previo_tipo">
+          <select name="aviso_previo_tipo" onchange="atualizarPreviewRescisao()">
             <option value="nao_aplica">Não se aplica</option>
             <option value="trabalhado">Trabalhado</option>
             <option value="indenizado">Indenizado</option>
             <option value="dispensado">Dispensado</option>
           </select></div>
-        <div class="field"><label>Saldo FGTS acumulado (R$)</label><input type="number" name="saldo_fgts_acumulado" value="0" step="0.01"></div>
-        <div class="field"><label>Outros proventos</label><input type="number" name="outros_proventos" value="0" step="0.01"></div>
+        <div class="field"><label>Saldo FGTS acumulado (R$)</label><input type="number" name="saldo_fgts_acumulado" value="0" step="0.01" onchange="atualizarPreviewRescisao()"></div>
+        <div class="field"><label>Outros proventos</label><input type="number" name="outros_proventos" value="0" step="0.01" onchange="atualizarPreviewRescisao()"></div>
         <div class="field" style="grid-column:span 2"><label>Descrição outros proventos</label><input name="outros_proventos_desc"></div>
-        <div class="field"><label>Pensão alimentícia</label><input type="number" name="pensao_alimenticia" value="0" step="0.01"></div>
-        <div class="field"><label>Adiantamentos</label><input type="number" name="adiantamentos" value="0" step="0.01"></div>
-        <div class="field"><label>Outros descontos</label><input type="number" name="outros_descontos" value="0" step="0.01"></div>
+        <div class="field"><label>Pensão alimentícia</label><input type="number" name="pensao_alimenticia" value="0" step="0.01" onchange="atualizarPreviewRescisao()"></div>
+        <div class="field"><label>Adiantamentos</label><input type="number" name="adiantamentos" value="0" step="0.01" onchange="atualizarPreviewRescisao()"></div>
+        <div class="field"><label>Outros descontos</label><input type="number" name="outros_descontos" value="0" step="0.01" onchange="atualizarPreviewRescisao()"></div>
         <div class="field"><label>Descrição outros descontos</label><input name="outros_descontos_desc"></div>
       </div>
-      <label class="toggle mt-3"><input type="checkbox" name="tem_ferias_vencidas"><span class="slider"></span> Tem período aquisitivo de férias não gozado</label>
+      <label class="toggle mt-3"><input type="checkbox" name="tem_ferias_vencidas" onchange="atualizarPreviewRescisao()"><span class="slider"></span> Tem período aquisitivo de férias não gozado</label>
       <div class="field mt-3"><label>Motivo / Observações</label><textarea name="motivo"></textarea></div>
+
+      <div id="resc-preview" style="display:none;margin-top:14px;padding:14px 18px;background:linear-gradient(135deg,var(--brand-700),var(--brand-500));color:#fff;border-radius:8px">
+        <h4 style="margin:0 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:.06em;opacity:.85">Prévia do cálculo</h4>
+        <div id="resc-preview-content" style="font-size:13px;line-height:1.7"></div>
+      </div>
     </form>`;
 
     showFormModal('Nova rescisão (TRCT)', html, async () => {
@@ -176,6 +191,70 @@
       } catch (err) { toast(err.message, 'error'); }
       finally { hideLoading(); }
     });
+  }
+
+  async function onSelectEmpRescisao(empId) {
+    const resumoBox = document.getElementById('emp-resumo');
+    if (!empId) { resumoBox.style.display = 'none'; document.getElementById('resc-preview').style.display = 'none'; return; }
+    try {
+      const e = await api(`/employees/${empId}`);
+      const meses = e.data_admissao ? Math.floor((new Date() - new Date(e.data_admissao)) / (1000*60*60*24*30.44)) : 0;
+      const anos = Math.floor(meses / 12);
+      const mesesRest = meses % 12;
+      document.getElementById('emp-nome').textContent = e.nome_completo;
+      document.getElementById('emp-detalhes').innerHTML = `
+        <strong>Matrícula:</strong> ${fmt.matricula(e.matricula)} ·
+        <strong>Cargo:</strong> ${e.positions?.titulo || '—'} ·
+        <strong>Depto:</strong> ${e.departments?.nome || '—'}<br>
+        <strong>Admissão:</strong> ${fmt.data(e.data_admissao)} (${anos}a ${mesesRest}m) ·
+        <strong>Salário base:</strong> ${fmt.brl(e.salario_base)} ·
+        <strong>Carga semanal:</strong> ${e.carga_horaria_semanal || 44}h
+        ${e.tem_vt ? ' · ✓ VT' : ''}${e.tem_vr ? ' · ✓ VR' : ''}${e.tem_plano_saude ? ' · ✓ Plano saúde' : ''}
+      `;
+      resumoBox.style.display = 'block';
+      window._empSelecionadoResc = e;
+      atualizarPreviewRescisao();
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  let _timerPrev;
+  async function atualizarPreviewRescisao() {
+    clearTimeout(_timerPrev);
+    _timerPrev = setTimeout(async () => {
+      const f = document.getElementById('rescForm');
+      if (!f) return;
+      const d = formToObject(f);
+      if (!d.employee_id || !d.data_demissao || !d.tipo_rescisao) return;
+      d.tem_ferias_vencidas = !!d.tem_ferias_vencidas;
+      ['saldo_fgts_acumulado','outros_proventos','pensao_alimenticia','adiantamentos','outros_descontos'].forEach(k => d[k] = parseFloat(d[k]) || 0);
+      try {
+        const r = await api('/terminations/calcular', { method: 'POST', body: d });
+        const box = document.getElementById('resc-preview');
+        const content = document.getElementById('resc-preview-content');
+        box.style.display = 'block';
+        const linha = (l, v, neg) => `<div style="display:flex;justify-content:space-between"><span>${l}</span><span style="font-family:'JetBrains Mono',monospace;font-weight:600;${neg ? 'opacity:.8' : ''}">${neg ? '−' : ''}${fmt.brl(Math.abs(v))}</span></div>`;
+        content.innerHTML = `
+          ${r.saldo_salario ? linha('Saldo de salário', r.saldo_salario) : ''}
+          ${r.ferias_proporcionais ? linha('Férias proporcionais', r.ferias_proporcionais) : ''}
+          ${r.ferias_vencidas ? linha('Férias vencidas', r.ferias_vencidas) : ''}
+          ${r.um_terco_ferias ? linha('1/3 constitucional', r.um_terco_ferias) : ''}
+          ${r.decimo_terceiro_proporcional ? linha('13º proporcional', r.decimo_terceiro_proporcional) : ''}
+          ${r.aviso_previo_indenizado ? linha('Aviso prévio indenizado', r.aviso_previo_indenizado) : ''}
+          ${r.fgts_a_liberar ? linha('FGTS a liberar', r.fgts_a_liberar) : ''}
+          ${r.multa_fgts ? linha('Multa FGTS (40%)', r.multa_fgts) : ''}
+          <div style="border-top:1px solid rgba(255,255,255,.3);margin-top:8px;padding-top:8px">
+            ${r.inss ? linha('INSS', r.inss, true) : ''}
+            ${r.irrf ? linha('IRRF', r.irrf, true) : ''}
+            ${d.pensao_alimenticia ? linha('Pensão alimentícia', d.pensao_alimenticia, true) : ''}
+            ${d.adiantamentos ? linha('Adiantamentos', d.adiantamentos, true) : ''}
+          </div>
+          <div style="font-size:16px;font-weight:700;border-top:2px solid #fff;margin-top:8px;padding-top:10px;display:flex;justify-content:space-between">
+            <span>Líquido a receber</span>
+            <span style="font-family:'JetBrains Mono',monospace">${fmt.brl(r.total_liquido || 0)}</span>
+          </div>
+        `;
+      } catch { /* ignora erro silencioso */ }
+    }, 300);
   }
 
   async function gerarPdfResc(id) {

@@ -151,7 +151,7 @@
       <div class="flex justify-between items-center mb-4">
         <div>
           <h3 style="margin:0">Comunicados &amp; avisos</h3>
-          <p class="text-muted text-sm" style="margin:4px 0 0">Avisos institucionais para o time de RH</p>
+          <p class="text-muted text-sm" style="margin:4px 0 0">Envie comunicados, avisos e novidades para os funcionários e toda a empresa</p>
         </div>
         <button class="btn btn-primary" onclick="abrirFormAnn()">+ Novo comunicado</button>
       </div>
@@ -450,6 +450,14 @@
       <div class="field mt-3"><label>Conteúdo<span class="req">*</span></label>
         <textarea name="conteudo" required rows="6">${a?.conteudo || ''}</textarea></div>
 
+      <div class="field mt-3"><label>Anexo (imagem ou arquivo · opcional)</label>
+        <input type="file" id="ann-anexo-input" accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt">
+        ${a?.anexo_url ? `<div id="anexo-atual" style="margin-top:8px;padding:8px 12px;background:var(--paper-3);border-radius:6px;font-size:12px">
+          📎 Anexo atual: <a href="${a.anexo_url}" target="_blank">${a.anexo_nome || 'arquivo'}</a>
+          <button type="button" class="btn btn-sm btn-danger" style="margin-left:8px" onclick="removerAnexoAnn('${a.id}')">Remover</button>
+        </div>` : ''}
+      </div>
+
       <h3 class="card-title" style="margin:18px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-4)">Destinatários do e-mail</h3>
       <div class="field"><label>Escopo</label>
         <select name="target_scope" onchange="document.getElementById('alvo-deps').style.display=this.value==='departamentos'?'block':'none';document.getElementById('alvo-emps').style.display=this.value==='funcionarios'?'block':'none'">
@@ -495,6 +503,22 @@
         const saved = a?.id
           ? await api(`/help/announcements/${a.id}`, { method: 'PUT', body: d })
           : await api('/help/announcements', { method: 'POST', body: d });
+
+        // Upload do anexo, se houver
+        const fileInput = document.getElementById('ann-anexo-input');
+        const file = fileInput?.files?.[0];
+        if (file) {
+          const fd = new FormData();
+          fd.append('arquivo', file);
+          const r = await fetch(`/api/help/announcements/${saved.id}/anexo`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${getToken()}` },
+            body: fd,
+          });
+          if (!r.ok) toast('Comunicado salvo, mas o anexo falhou: ' + ((await r.json()).error || 'erro'), 'warning');
+          else { Object.assign(saved, await r.json()); }
+        }
+
         toast('Comunicado salvo!', 'success');
         // Se marcou pra enviar e-mail, dispara
         if (d.enviar_email) {
@@ -509,6 +533,15 @@
         carregarAnnouncements();
       } catch (err) { toast(err.message, 'error'); }
     });
+  }
+
+  async function removerAnexoAnn(id) {
+    if (!confirm('Remover o anexo atual?')) return;
+    try {
+      await api(`/help/announcements/${id}/anexo`, { method: 'DELETE' });
+      toast('Anexo removido.', 'info');
+      document.getElementById('anexo-atual')?.remove();
+    } catch (err) { toast(err.message, 'error'); }
   }
 
   async function enviarEmailAnn(id) {
