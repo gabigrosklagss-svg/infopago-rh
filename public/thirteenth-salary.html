@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>13º Salário — InfoPago RH</title>
+<link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<div class="app">
+  <div id="sidebar"></div>
+  <main class="main">
+    <div class="breadcrumb">
+      <a href="/dashboard.html">Painel</a>
+      <span class="sep">›</span>
+      <span>13º Salário</span>
+    </div>
+
+    <div class="page-header">
+      <div>
+        <h1>13º Salário</h1>
+        <p class="subtitle">Geração da 1ª e 2ª parcelas (individual ou em lote) · CLT 2026</p>
+      </div>
+      <div class="flex gap-2">
+        <button class="btn" onclick="lote13(1)">+ Gerar 1ª parcela (lote)</button>
+        <button class="btn btn-primary" onclick="lote13(2)">+ Gerar 2ª parcela (lote)</button>
+        <button class="btn" onclick="novo13()">+ Individual</button>
+      </div>
+    </div>
+
+    <div class="filter-bar">
+      <div class="field"><label>Ano</label><select id="f13-ano" onchange="loadList13()"></select></div>
+      <div class="field"><label>Parcela</label>
+        <select id="f13-parc" onchange="loadList13()">
+          <option value="">Todas</option><option value="1">1ª</option><option value="2">2ª</option>
+        </select>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Funcionário</th><th>Ano</th><th>Parcela</th><th>Meses</th><th>Bruto</th><th>Líquido</th><th></th></tr></thead>
+        <tbody id="tbody-13"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+  requireAuth();
+  mountShell('thirteenth');
+
+  const anoAtual = new Date().getFullYear();
+  document.getElementById('f13-ano').innerHTML = [anoAtual, anoAtual-1, anoAtual-2].map(a => `<option value="${a}">${a}</option>`).join('');
+
+  async function loadList13() {
+    const ano = document.getElementById('f13-ano').value;
+    const parc = document.getElementById('f13-parc').value;
+    const q = new URLSearchParams({ ano }); if (parc) q.set('parcela', parc);
+    const list = await api(`/thirteenth?${q}`);
+    document.getElementById('tbody-13').innerHTML = list.length ? list.map(t => `
+      <tr>
+        <td><strong>${t.employees?.nome_completo}</strong><br><small class="text-muted">${fmt.matricula(t.employees?.matricula)}</small></td>
+        <td>${t.ano}</td>
+        <td>${t.parcela}ª</td>
+        <td>${t.meses_trabalhados}/12</td>
+        <td>${fmt.brl(t.valor_parcela)}</td>
+        <td><strong>${fmt.brl(t.valor_liquido)}</strong></td>
+        <td>
+          <button class="btn btn-sm" onclick="gerarPdf13('${t.id}')">PDF</button>
+          ${t.pdf_path ? `<button class="btn btn-sm" onclick="downloadAuth('/api/thirteenth/${t.id}/download','13o.pdf')">Baixar</button>` : ''}
+          <button class="btn btn-sm btn-danger" onclick="excluir13('${t.id}')">×</button>
+        </td>
+      </tr>
+    `).join('') : '<tr><td colspan="7" class="table-empty">Nenhum registro.</td></tr>';
+  }
+
+  async function novo13() {
+    const emps = await api('/employees?status=ativo&limit=300');
+    const opts = (emps.data || []).map(e => `<option value="${e.id}">${fmt.matricula(e.matricula)} · ${e.nome_completo}</option>`).join('');
+    const html = `<form id="t13Form">
+      <div class="form-grid">
+        <div class="field" style="grid-column:span 2"><label>Funcionário<span class="req">*</span></label><select name="employee_id" required>${opts}</select></div>
+        <div class="field"><label>Ano<span class="req">*</span></label><input type="number" name="ano" value="${anoAtual}" required></div>
+        <div class="field"><label>Parcela<span class="req">*</span></label>
+          <select name="parcela" required><option value="1">1ª (50% sem desconto)</option><option value="2">2ª (50% com INSS+IRRF)</option></select></div>
+        <div class="field"><label>Data pagamento</label><input type="date" name="data_pagamento"></div>
+        <div class="field"><label>Média HE (R$)</label><input type="number" name="media_he" value="0" step="0.01"></div>
+      </div>
+    </form>`;
+    showFormModal('Gerar 13º individual', html, async () => {
+      const f = document.getElementById('t13Form');
+      if (!validateForm(f)) return;
+      const d = formToObject(f);
+      d.ano = parseInt(d.ano); d.parcela = parseInt(d.parcela); d.media_he = parseFloat(d.media_he) || 0;
+      try {
+        const r = await api('/thirteenth', { method: 'POST', body: d });
+        toast(`13º gerado · líquido ${fmt.brl(r.valor_liquido)}`, 'success');
+        closeFormModal();
+        loadList13();
+      } catch (err) { toast(err.message, 'error'); }
+    });
+  }
+
+  async function lote13(parcela) {
+    const sugestao = parcela === 1 ? `${anoAtual}-11-30` : `${anoAtual}-12-20`;
+    const html = `<form id="lote13Form">
+      <div class="text-sm text-muted mb-3">
+        Esta ação vai gerar a <strong>${parcela}ª parcela do 13º salário de ${anoAtual}</strong> para
+        <strong>todos os funcionários ativos</strong>, com base no salário-base de cada um.
+        ${parcela === 1
+          ? 'A 1ª parcela corresponde a 50% do 13º, sem descontos de INSS/IRRF (legalmente devida até 30/11).'
+          : 'A 2ª parcela corresponde aos 50% restantes com descontos legais (INSS/IRRF), devida até 20/12.'}
+      </div>
+      <div class="field"><label>Data de pagamento<span class="req">*</span></label>
+        <input type="date" name="data_pagamento" value="${sugestao}" required>
+      </div>
+    </form>`;
+    showFormModal(`Gerar ${parcela}ª parcela do 13º (${anoAtual})`, html, async () => {
+      const f = document.getElementById('lote13Form');
+      if (!validateForm(f)) return;
+      const data_pagamento = f.data_pagamento.value;
+      closeFormModal();
+      showLoading();
+      try {
+        const r = await api(`/thirteenth/lote/${anoAtual}/${parcela}`, { method: 'POST', body: { data_pagamento } });
+        toast(`${r.gerados} gerado(s), ${r.erros} erro(s)`, r.erros ? 'warning' : 'success');
+        loadList13();
+      } catch (err) { toast(err.message, 'error'); }
+      finally { hideLoading(); }
+    });
+  }
+
+  async function gerarPdf13(id) {
+    try { await api(`/thirteenth/${id}/pdf`, { method: 'POST' }); toast('PDF gerado.', 'success'); loadList13(); }
+    catch (err) { toast(err.message, 'error'); }
+  }
+  async function excluir13(id) {
+    if (!confirm('Excluir este 13º?')) return;
+    try { await api(`/thirteenth/${id}`, { method: 'DELETE' }); toast('Excluído.', 'success'); loadList13(); }
+    catch (err) { toast(err.message, 'error'); }
+  }
+
+  function showFormModal(title, html, onSave) {
+    let m = document.getElementById('form-modal');
+    if (!m) { m = document.createElement('div'); m.id = 'form-modal'; m.className = 'modal-overlay'; m.onclick = (e) => { if (e.target === m) closeFormModal(); }; document.body.appendChild(m); }
+    m.innerHTML = `<div class="modal" style="max-width:600px"><div class="modal-header"><h2>${title}</h2><button class="modal-close" onclick="closeFormModal()">×</button></div><div class="modal-body">${html}</div><div class="modal-footer"><button class="btn" onclick="closeFormModal()">Cancelar</button><button class="btn btn-primary" id="form-save">Salvar</button></div></div>`;
+    m.classList.remove('hidden');
+    document.getElementById('form-save').onclick = onSave;
+  }
+  function closeFormModal() { document.getElementById('form-modal')?.remove(); }
+
+  loadList13();
+</script>
+</body>
+</html>

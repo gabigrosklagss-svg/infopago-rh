@@ -380,6 +380,7 @@ const ICONS = {
   epis: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-3V4a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v3H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/><path d="M9 7V4h6v3"/></svg>`,
   cvpool: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><circle cx="10" cy="13" r="2"/><path d="M14 17a4 4 0 0 0-8 0"/></svg>`,
   calendar: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
+  thirteenth: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><text x="12" y="17" text-anchor="middle" font-size="6" font-weight="700" fill="currentColor" stroke="none">13</text></svg>`,
   sun: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>`,
   moon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`,
   chevron: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>`,
@@ -427,8 +428,9 @@ function renderSidebar(active) {
     <div class="nav-group">
       <div class="nav-label">Jornada &amp; Férias</div>
       <nav>
-        ${item('time',     '/time.html',     'Controle de ponto')}
-        ${item('vacation', '/vacations.html','Solicitações de férias')}
+        ${item('time',       '/time.html',              'Controle de ponto')}
+        ${item('vacation',   '/vacations.html',         'Solicitações de férias')}
+        ${item('thirteenth', '/thirteenth-salary.html', '13º Salário')}
       </nav>
     </div>
 
@@ -443,7 +445,7 @@ function renderSidebar(active) {
       <div class="nav-label">Folha de pagamento</div>
       <nav>
         ${item('payslips', '/payslips.html', 'Holerites e Folha')}
-        ${item('hrdocs',   '/hr-docs.html',  'Rescisão e 13º Salário')}
+        ${item('hrdocs',   '/hr-docs.html',  'Rescisões (TRCT)')}
         ${item('email',    '/email-send.html', 'Envios e Agendamentos')}
       </nav>
     </div>

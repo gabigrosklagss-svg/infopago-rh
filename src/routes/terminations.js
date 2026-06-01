@@ -37,8 +37,20 @@ router.post('/calcular', requireAuth, requireRole('admin', 'rh'), async (req, re
   const { employee_id, ...params } = req.body;
   const { data: emp, error } = await supabase.from('employees').select('*').eq('id', employee_id).single();
   if (error || !emp) return res.status(404).json({ error: 'Funcionário não encontrado.' });
+
+  // Auto-calcula FGTS acumulado a partir dos holerites se não foi informado
+  let saldoFgtsAuto = 0;
+  if (!params.saldo_fgts_acumulado || parseFloat(params.saldo_fgts_acumulado) === 0) {
+    const { data: payslips } = await supabase.from('payslips')
+      .select('fgts_valor').eq('employee_id', employee_id);
+    saldoFgtsAuto = (payslips || []).reduce((s, p) => s + parseFloat(p.fgts_valor || 0), 0);
+    params.saldo_fgts_acumulado = saldoFgtsAuto;
+  }
+
   try {
     const calc = calcularRescisao(emp, params);
+    calc.saldo_fgts_acumulado_auto = saldoFgtsAuto;
+    calc.fonte_fgts = saldoFgtsAuto > 0 ? 'calculado_payslips' : 'manual';
     res.json(calc);
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
@@ -47,6 +59,13 @@ router.post('/', requireAuth, requireRole('admin', 'rh'), async (req, res) => {
   const { employee_id, ...params } = req.body;
   const { data: emp, error } = await supabase.from('employees').select('*').eq('id', employee_id).single();
   if (error || !emp) return res.status(404).json({ error: 'Funcionário não encontrado.' });
+
+  // Auto-calcula FGTS se não foi informado pelo cliente
+  if (!params.saldo_fgts_acumulado || parseFloat(params.saldo_fgts_acumulado) === 0) {
+    const { data: payslips } = await supabase.from('payslips')
+      .select('fgts_valor').eq('employee_id', employee_id);
+    params.saldo_fgts_acumulado = (payslips || []).reduce((s, p) => s + parseFloat(p.fgts_valor || 0), 0);
+  }
 
   try {
     const calc = calcularRescisao(emp, params);
