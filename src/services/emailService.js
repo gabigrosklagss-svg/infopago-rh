@@ -107,4 +107,58 @@ async function enviarEmLote(payslips, company, userId) {
   return { total: payslips.length, enviados: ok, erros: payslips.length - ok, resultados };
 }
 
-module.exports = { enviarHolerite, enviarEmLote };
+/* ──────────────────────────────────────────────────────
+   ENVIO DE COMUNICADO PARA MÚLTIPLOS FUNCIONÁRIOS
+   ────────────────────────────────────────────────────── */
+function buildComunicadoHTML(announcement, company) {
+  const importanteBadge = announcement.importante
+    ? '<span style="background:#fee2e2;color:#b91c1c;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:14px;display:inline-block">⚠ Importante</span>'
+    : '';
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"></head>
+<body style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#f5f7fb;margin:0;padding:32px">
+<div style="max-width:600px;margin:auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.08)">
+  <div style="background:linear-gradient(135deg,#0F2E1E,#1FAB54);color:#fff;padding:28px 32px">
+    <h1 style="margin:0;font-size:22px;letter-spacing:-.01em">${announcement.titulo}</h1>
+    <p style="margin:8px 0 0;opacity:.9;font-size:13px">${company.razao_social || 'Comunicado oficial'}</p>
+  </div>
+  <div style="padding:28px 32px;color:#1F2D3D">
+    ${importanteBadge}
+    <div style="font-size:14px;line-height:1.7;white-space:pre-wrap">${(announcement.conteudo || '').replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</div>
+    <div style="margin-top:24px;padding-top:18px;border-top:1px solid #e3e8ee;font-size:12px;color:#697386">
+      Enviado por <strong>${announcement.autor_nome || 'RH'}</strong>${announcement.data_expiracao ? ` · Válido até ${announcement.data_expiracao}` : ''}<br>
+      Este é um e-mail automático do sistema InfoPago RH. Para dúvidas, responda este e-mail.
+    </div>
+  </div>
+</div></body></html>`;
+}
+
+async function enviarComunicado(announcement, recipients, company, userId) {
+  if (!recipients?.length) return { enviados: 0, falhas: 0, total: 0 };
+  const transporter = buildTransporter(company);
+  const fromName = company.email_nome_remetente || 'RH';
+  const fromAddr = company.smtp_user || process.env.GMAIL_USER;
+  const html = buildComunicadoHTML(announcement, company);
+  const subject = `${announcement.importante ? '[Importante] ' : ''}${announcement.titulo}`;
+
+  let enviados = 0, falhas = 0;
+  const logs = [];
+  for (const r of recipients) {
+    if (!r.email) { falhas++; logs.push({ employee_id: r.id, success: false, error: 'sem e-mail cadastrado' }); continue; }
+    try {
+      await transporter.sendMail({
+        from: `"${fromName}" <${fromAddr}>`,
+        to: r.email,
+        subject,
+        html,
+      });
+      enviados++;
+      logs.push({ employee_id: r.id, email: r.email, success: true });
+    } catch (e) {
+      falhas++;
+      logs.push({ employee_id: r.id, email: r.email, success: false, error: e.message });
+    }
+  }
+  return { enviados, falhas, total: recipients.length, logs };
+}
+
+module.exports = { enviarHolerite, enviarEmLote, enviarComunicado };

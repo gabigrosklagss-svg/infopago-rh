@@ -128,6 +128,7 @@
           <button class="btn btn-sm btn-primary" onclick="abrirFormEvento()">+ Novo evento</button>
         </div>
       </div>
+      <div id="alertas-ferias"></div>
       <div id="cal-container"></div>
       <div style="margin-top:14px;font-size:11.5px;color:var(--ink-3);display:flex;gap:14px;flex-wrap:wrap">
         <span><span class="cat-dot" style="background:#1FAB54;display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px"></span>Evento empresa</span>
@@ -192,13 +193,20 @@
     // Carrega eventos do backend (sistema) + eventos custom da empresa
     let eventosSistema = [];
     let eventosEmpresa = [];
+    let alertasVencidas = [];
+    let alertasVencendo = [];
     try {
       const r = await api(`/help/calendar?mes=${calMes}&ano=${calAno}`);
       eventosSistema = r.eventos || [];
+      alertasVencidas = r.alertas_ferias_vencidas || [];
+      alertasVencendo = r.alertas_ferias_vencendo || [];
     } catch { /* segue sem eventos do sistema */ }
     try {
       eventosEmpresa = await api(`/events?mes=${calMes}&ano=${calAno}`);
     } catch { /* segue sem eventos custom */ }
+
+    // Renderiza alertas globais de férias (sempre visíveis, qualquer mês)
+    renderAlertasFerias(alertasVencidas, alertasVencendo);
 
     // Normaliza eventos custom pro mesmo shape
     const eventosCustom = eventosEmpresa.map(e => ({
@@ -250,6 +258,25 @@
     document.getElementById('cal-container').innerHTML = `<div class="cal-grid">${headers}${cellsHTML}</div>`;
 
     renderListaEventos();
+  }
+
+  function renderAlertasFerias(vencidas, vencendo) {
+    const cont = document.getElementById('alertas-ferias');
+    if (!vencidas.length && !vencendo.length) { cont.innerHTML = ''; return; }
+    const itensVencidas = vencidas.slice(0, 5).map(v =>
+      `<div class="ev-item ferias-vencendo"><span class="cat-dot" style="background:#b91c1c"></span><span class="titulo">${v.nome}</span><span class="sub">${v.departamento || ''} · venceu em ${fmt.data(v.vencimento)}</span></div>`
+    ).join('');
+    const itensVencendo = vencendo.slice(0, 5).map(v =>
+      `<div class="ev-item ferias"><span class="cat-dot" style="background:#f59e0b"></span><span class="titulo">${v.nome}</span><span class="sub">${v.departamento || ''} · vence em ${v.dias_restantes}d (${fmt.data(v.vencimento)})</span></div>`
+    ).join('');
+    cont.innerHTML = `
+      <div class="card" style="border-left:4px solid ${vencidas.length ? '#b91c1c' : '#f59e0b'};margin-bottom:14px;padding:14px 18px">
+        <h4 style="margin:0 0 8px;font-size:13px;color:${vencidas.length ? '#b91c1c' : '#a16207'}">
+          ⚠ Alertas de férias (independente do mês visualizado)
+        </h4>
+        ${vencidas.length ? `<div style="margin-bottom:8px"><strong style="font-size:11px;text-transform:uppercase;color:#b91c1c">Vencidas — risco multa em dobro (${vencidas.length})</strong>${itensVencidas}${vencidas.length > 5 ? `<small class="text-muted">+ ${vencidas.length - 5} mais</small>` : ''}</div>` : ''}
+        ${vencendo.length ? `<div><strong style="font-size:11px;text-transform:uppercase;color:#a16207">Vencendo em 30 dias (${vencendo.length})</strong>${itensVencendo}${vencendo.length > 5 ? `<small class="text-muted">+ ${vencendo.length - 5} mais</small>` : ''}</div>` : ''}
+      </div>`;
   }
 
   function renderListaEventos() {
@@ -391,6 +418,7 @@
           <div class="flex gap-2">
             <span class="badge ${a.importante ? 'inativo' : 'ativo'}">${CAT_ANN[a.categoria] || a.categoria}</span>
             <button class="btn btn-sm" onclick='abrirFormAnn(${JSON.stringify(a).replace(/'/g, "&#39;")})'>Editar</button>
+            <button class="btn btn-sm btn-success" onclick="enviarEmailAnn('${a.id}')">Enviar e-mail</button>
             <button class="btn btn-sm btn-danger" onclick="removerAnn('${a.id}')">×</button>
           </div>
         </div>
@@ -400,8 +428,19 @@
     `).join('');
   }
 
-  function abrirFormAnn(a = null) {
+  async function abrirFormAnn(a = null) {
     const opts = Object.entries(CAT_ANN).map(([k, v]) => `<option value="${k}" ${k === a?.categoria ? 'selected' : ''}>${v}</option>`).join('');
+    const [deps, empsRes] = await Promise.all([
+      api('/departments?active=true').catch(() => []),
+      api('/employees?status=ativo&limit=500').catch(() => ({ data: [] })),
+    ]);
+    const emps = empsRes.data || empsRes || [];
+    const depIds = new Set(a?.target_dept_ids || []);
+    const empIds = new Set(a?.target_employee_ids || []);
+    const depChips = deps.map(d => `<label style="display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border:1px solid var(--border);border-radius:99px;font-size:12px;cursor:pointer;margin:2px"><input type="checkbox" name="dep_${d.id}" ${depIds.has(d.id)?'checked':''}> ${d.nome}</label>`).join('');
+    const empOpts = emps.map(e => `<option value="${e.id}" ${empIds.has(e.id)?'selected':''}>${e.matricula || '—'} · ${e.nome_completo}</option>`).join('');
+    const scope = a?.target_scope || 'empresa';
+
     const html = `<form id="annForm">
       <div class="form-grid">
         <div class="field" style="grid-column:span 2"><label>Título<span class="req">*</span></label><input name="titulo" required value="${a?.titulo || ''}"></div>
@@ -410,10 +449,30 @@
       </div>
       <div class="field mt-3"><label>Conteúdo<span class="req">*</span></label>
         <textarea name="conteudo" required rows="6">${a?.conteudo || ''}</textarea></div>
-      <div class="flex gap-4 mt-3">
+
+      <h3 class="card-title" style="margin:18px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-4)">Destinatários do e-mail</h3>
+      <div class="field"><label>Escopo</label>
+        <select name="target_scope" onchange="document.getElementById('alvo-deps').style.display=this.value==='departamentos'?'block':'none';document.getElementById('alvo-emps').style.display=this.value==='funcionarios'?'block':'none'">
+          <option value="empresa" ${scope==='empresa'?'selected':''}>Toda a empresa (funcionários ativos)</option>
+          <option value="departamentos" ${scope==='departamentos'?'selected':''}>Departamentos específicos</option>
+          <option value="funcionarios" ${scope==='funcionarios'?'selected':''}>Funcionários específicos</option>
+        </select>
+      </div>
+      <div id="alvo-deps" class="mt-2" style="display:${scope==='departamentos'?'block':'none'}">
+        <label class="text-sm text-muted">Selecione os departamentos:</label>
+        <div>${depChips || '<small class="text-muted">Nenhum departamento cadastrado.</small>'}</div>
+      </div>
+      <div id="alvo-emps" class="mt-2" style="display:${scope==='funcionarios'?'block':'none'}">
+        <label class="text-sm text-muted">Selecione os funcionários:</label>
+        <select name="target_employee_ids" multiple size="8" style="width:100%">${empOpts}</select>
+      </div>
+
+      <div class="flex gap-4 mt-3" style="flex-wrap:wrap">
         <label><input type="checkbox" name="importante" ${a?.importante ? 'checked' : ''}> Marcar como importante</label>
         <label><input type="checkbox" name="fixado" ${a?.fixado ? 'checked' : ''}> Fixar no topo</label>
+        <label><input type="checkbox" name="enviar_email" id="chk-enviar" ${a?.enviar_email ? 'checked' : ''}> Enviar por e-mail ao salvar</label>
       </div>
+      ${a?.enviado_em ? `<div class="mt-3 text-sm" style="color:var(--ink-3)">Último envio: <strong>${fmt.dataHora(a.enviado_em)}</strong> · ${a.total_enviados || 0}/${a.total_destinatarios || 0} entregues${a.total_falhas ? ` · ${a.total_falhas} falha(s)` : ''}</div>` : ''}
     </form>`;
     showFormModal(a ? 'Editar comunicado' : 'Novo comunicado', html, async () => {
       const f = document.getElementById('annForm');
@@ -421,14 +480,46 @@
       const d = formToObject(f);
       d.importante = !!d.importante;
       d.fixado = !!d.fixado;
+      d.enviar_email = !!d.enviar_email;
+      // Coleta departamentos selecionados
+      d.target_dept_ids = [...f.querySelectorAll('input[name^="dep_"]:checked')].map(c => c.name.replace('dep_',''));
+      Object.keys(d).forEach(k => { if (k.startsWith('dep_')) delete d[k]; });
+      // Funcionários selecionados (multi-select)
+      const selEmps = f.querySelector('select[name="target_employee_ids"]');
+      d.target_employee_ids = selEmps ? [...selEmps.selectedOptions].map(o => o.value) : [];
+      if (d.target_scope === 'empresa') { d.target_dept_ids = []; d.target_employee_ids = []; }
+      if (d.target_scope === 'departamentos') d.target_employee_ids = [];
+      if (d.target_scope === 'funcionarios') d.target_dept_ids = [];
+
       try {
-        if (a?.id) await api(`/help/announcements/${a.id}`, { method: 'PUT', body: d });
-        else await api('/help/announcements', { method: 'POST', body: d });
+        const saved = a?.id
+          ? await api(`/help/announcements/${a.id}`, { method: 'PUT', body: d })
+          : await api('/help/announcements', { method: 'POST', body: d });
         toast('Comunicado salvo!', 'success');
+        // Se marcou pra enviar e-mail, dispara
+        if (d.enviar_email) {
+          showLoading();
+          try {
+            const r = await api(`/help/announcements/${saved.id}/enviar-email`, { method: 'POST' });
+            toast(`E-mail enviado: ${r.enviados}/${r.total} entregue(s)${r.falhas ? ` · ${r.falhas} falha(s)` : ''}`, 'success');
+          } catch (err) { toast('Comunicado salvo, mas falha no envio: ' + err.message, 'warning'); }
+          finally { hideLoading(); }
+        }
         closeFormModal();
         carregarAnnouncements();
       } catch (err) { toast(err.message, 'error'); }
     });
+  }
+
+  async function enviarEmailAnn(id) {
+    if (!confirm('Enviar este comunicado por e-mail aos destinatários definidos?')) return;
+    showLoading();
+    try {
+      const r = await api(`/help/announcements/${id}/enviar-email`, { method: 'POST' });
+      toast(`Enviado: ${r.enviados}/${r.total} entregue(s)${r.falhas ? ` · ${r.falhas} falha(s)` : ''}`, 'success');
+      carregarAnnouncements();
+    } catch (err) { toast(err.message, 'error'); }
+    finally { hideLoading(); }
   }
 
   async function removerAnn(id) {

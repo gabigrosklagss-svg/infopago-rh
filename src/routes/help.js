@@ -90,6 +90,40 @@ router.delete('/announcements/:id', requireAuth, requireRole('admin', 'rh'), asy
   res.json({ success: true });
 });
 
+/* Envia o comunicado por e-mail aos destinatários definidos */
+router.post('/announcements/:id/enviar-email', requireAuth, requireRole('admin', 'rh'), async (req, res) => {
+  const { enviarComunicado } = require('../services/emailService');
+  const { data: ann } = await supabase.from('announcements').select('*').eq('id', req.params.id).single();
+  if (!ann) return res.status(404).json({ error: 'Comunicado não encontrado.' });
+
+  // Resolve destinatários conforme escopo
+  let q = supabase.from('employees').select('id, nome_completo, email_corporativo, email_pessoal').eq('status', 'ativo');
+  if (ann.target_scope === 'departamentos' && ann.target_dept_ids?.length) {
+    q = q.in('department_id', ann.target_dept_ids);
+  } else if (ann.target_scope === 'funcionarios' && ann.target_employee_ids?.length) {
+    q = q.in('id', ann.target_employee_ids);
+  }
+  const { data: emps } = await q;
+  const recipients = (emps || []).map(e => ({
+    id: e.id, nome: e.nome_completo,
+    email: e.email_corporativo || e.email_pessoal,
+  }));
+
+  const { data: company } = await supabase.from('company_settings').select('*').eq('id', 1).single();
+  try {
+    const r = await enviarComunicado(ann, recipients, company || {}, req.user.id);
+    await supabase.from('announcements').update({
+      enviado_em: new Date().toISOString(),
+      total_destinatarios: r.total,
+      total_enviados: r.enviados,
+      total_falhas: r.falhas,
+    }).eq('id', req.params.id);
+    res.json(r);
+  } catch (e) {
+    res.status(500).json({ error: 'Falha ao enviar: ' + e.message });
+  }
+});
+
 /* ──────────────────────────────────────────────────────
    DOCUMENTOS DA EMPRESA
    ────────────────────────────────────────────────────── */
@@ -213,7 +247,7 @@ router.get('/calendar', requireAuth, async (req, res) => {
     icone: '',
   }));
 
-  // Períodos aquisitivos vencendo no mês
+  // Períodos aquisitivos vencendo NO MÊS visualizado (entram no grid)
   const { data: vacAVencer } = await supabase.from('vacations')
     .select('*, employees(nome_completo, matricula)')
     .gte('periodo_aquisitivo_fim', inicioMes).lte('periodo_aquisitivo_fim', fimMes)
@@ -222,11 +256,26 @@ router.get('/calendar', requireAuth, async (req, res) => {
   const eventosVencimento = (vacAVencer || []).map(v => ({
     data: v.periodo_aquisitivo_fim,
     tipo: 'ferias_vencendo',
-    titulo: ` Férias vencendo: ${v.employees?.nome_completo}`,
+    titulo: `Férias vencendo: ${v.employees?.nome_completo}`,
     subtitulo: `Período ${v.periodo_aquisitivo_inicio} até ${v.periodo_aquisitivo_fim}`,
     cor: '#B0282A',
     icone: '',
   }));
+
+  // ALERTAS GLOBAIS de férias (independente do mês visualizado)
+  const hoje = new Date().toISOString().split('T')[0];
+  const em30 = new Date(); em30.setDate(em30.getDate() + 30);
+  const em30Iso = em30.toISOString().split('T')[0];
+
+  const { data: vacVencidasGlobal } = await supabase.from('vacations')
+    .select('*, employees(nome_completo, matricula, departments(nome))')
+    .lt('periodo_aquisitivo_fim', hoje)
+    .neq('status', 'concluido');
+
+  const { data: vacVencendoGlobal } = await supabase.from('vacations')
+    .select('*, employees(nome_completo, matricula, departments(nome))')
+    .gte('periodo_aquisitivo_fim', hoje).lte('periodo_aquisitivo_fim', em30Iso)
+    .neq('status', 'concluido');
 
   // Documentos vencendo no mês
   const { data: docs } = await supabase.from('employee_documents')
@@ -245,7 +294,21 @@ router.get('/calendar', requireAuth, async (req, res) => {
   const todos = [...feriados, ...aniversariantes, ...aniversarioEmpresa, ...eventosFerias, ...eventosVencimento, ...eventosDocs]
     .sort((a, b) => a.data.localeCompare(b.data));
 
-  res.json({ mes, ano, eventos: todos });
+  res.json({
+    mes, ano,
+    eventos: todos,
+    alertas_ferias_vencidas: (vacVencidasGlobal || []).map(v => ({
+      nome: v.employees?.nome_completo,
+      departamento: v.employees?.departments?.nome,
+      vencimento: v.periodo_aquisitivo_fim,
+    })),
+    alertas_ferias_vencendo: (vacVencendoGlobal || []).map(v => ({
+      nome: v.employees?.nome_completo,
+      departamento: v.employees?.departments?.nome,
+      vencimento: v.periodo_aquisitivo_fim,
+      dias_restantes: Math.ceil((new Date(v.periodo_aquisitivo_fim) - new Date()) / 86400000),
+    })),
+  });
 });
 
 module.exports = router;

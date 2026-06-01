@@ -501,8 +501,8 @@ function renderTopbar() {
         <span class="moon">${ICONS.moon}</span>
       </button>
       <a href="/help.html" class="topbar-btn" title="FAQ &amp; Ajuda" style="text-decoration:none">${ICONS.help}</a>
-      <button class="topbar-btn" title="Notificações" onclick="abrirNotificacoes()">
-        ${ICONS.bell}<span class="dot"></span>
+      <button class="topbar-btn" title="Notificações" onclick="abrirNotificacoes(event)">
+        ${ICONS.bell}<span class="dot" id="notif-dot" style="display:none"></span>
       </button>
     </div>
   </header>`;
@@ -574,8 +574,82 @@ function mountShell(activeNav) {
 function abrirAjuda() {
   toast('Central de ajuda em breve. Consulte SETUP.md por enquanto.', 'info', 'Ajuda');
 }
-function abrirNotificacoes() {
-  toast('Sem notificações novas.', 'info', 'Notificações');
+/* ── Notificações inteligentes ────────────────────────── */
+async function _carregarAlertas() {
+  if (!getToken()) return { itens: [] };
+  const itens = [];
+  try {
+    const hoje = new Date();
+    const em7 = new Date(hoje); em7.setDate(em7.getDate() + 7);
+    const isoHoje = hoje.toISOString().slice(0,10);
+    const isoEm7  = em7.toISOString().slice(0,10);
+
+    const [fer, dat, ev] = await Promise.all([
+      api('/reports/vacation-alerts').catch(() => ({ vencidas:[], vence_30dias:[] })),
+      api('/reports/key-dates').catch(() => ({ aniversariantes_mes:[], contratos_experiencia:[] })),
+      api(`/events?from=${isoHoje}&to=${isoEm7}`).catch(() => []),
+    ]);
+
+    (fer.vencidas || []).slice(0,3).forEach(f => itens.push({
+      tipo:'danger', titulo:`Férias vencidas: ${f.nome}`,
+      sub:'Risco de multa em dobro. Agende imediatamente.', href:'/vacations.html',
+    }));
+    (fer.vence_30dias || []).slice(0,3).forEach(f => itens.push({
+      tipo:'warn', titulo:`Férias vencem em ${f.dias_ate_vencimento}d: ${f.nome}`,
+      sub:'Próximo do limite. Agende o gozo.', href:'/vacations.html',
+    }));
+    (dat.contratos_experiencia || []).slice(0,3).forEach(c => itens.push({
+      tipo:'warn', titulo:`Experiência: ${c.nome_completo}`,
+      sub:`${c.etapa} em ${fmt.data(c.data_evento)}.`, href:'/employees.html',
+    }));
+    const diaAtual = hoje.getDate();
+    (dat.aniversariantes_mes || []).filter(a => a.dia === diaAtual).forEach(a => itens.push({
+      tipo:'info', titulo:`🎂 Aniversário hoje: ${a.nome_completo}`,
+      sub:`${a.idade} anos. Lembre o time!`,
+    }));
+    (ev || []).slice(0,8).forEach(e => {
+      const dias = Math.ceil((new Date(e.data_inicio) - hoje) / 86400000);
+      const quando = dias <= 0 ? 'hoje' : dias === 1 ? 'amanhã' : `em ${dias}d`;
+      itens.push({
+        tipo: dias <= 1 ? 'warn' : 'info',
+        titulo: `📅 ${e.titulo} (${quando})`,
+        sub: `${fmt.data(e.data_inicio)}${e.hora_inicio ? ' às ' + e.hora_inicio.slice(0,5) : ''}${e.local ? ' · ' + e.local : ''}`,
+        href: '/calendar.html',
+      });
+    });
+  } catch {}
+  window._notifs = itens;
+  const dot = document.getElementById('notif-dot');
+  if (dot) dot.style.display = itens.length ? 'block' : 'none';
+  return { itens };
+}
+setTimeout(() => _carregarAlertas(), 1500);
+
+function abrirNotificacoes(ev) {
+  ev?.stopPropagation();
+  const old = document.getElementById('notif-panel');
+  if (old) { old.remove(); return; }
+  const itens = window._notifs || [];
+  const html = `<div class="notif-panel" id="notif-panel" style="position:fixed;top:54px;right:16px;width:360px;max-height:70vh;background:var(--paper);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--sh-3);overflow:hidden;display:flex;flex-direction:column;z-index:1000">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+      <strong style="font-size:14px">Notificações</strong>
+      <small style="color:var(--ink-4)">${itens.length} ativa(s)</small>
+    </div>
+    <div style="overflow-y:auto;flex:1">
+      ${itens.length ? itens.map(n => `<div onclick="${n.href ? `location.href='${n.href}'` : ''}" style="padding:12px 16px;border-bottom:1px solid var(--border);${n.href ? 'cursor:pointer' : ''}">
+        <strong style="display:block;font-size:13px;color:var(--ink)">${n.titulo}</strong>
+        <small style="color:var(--ink-3);font-size:12px">${n.sub}</small>
+      </div>`).join('') : '<div style="padding:40px 24px;text-align:center;color:var(--ink-4)">Tudo em ordem. Sem alertas no momento.</div>'}
+    </div>
+  </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+  setTimeout(() => document.addEventListener('click', _closeNotifOnce), 50);
+}
+function _closeNotifOnce(e) {
+  if (!e.target.closest('#notif-panel') && !e.target.closest('.topbar-btn')) {
+    document.getElementById('notif-panel')?.remove();
+    document.removeEventListener('click', _closeNotifOnce);
+  }
 }
 function abrirMenuUsuario(ev) {
   ev?.stopPropagation();

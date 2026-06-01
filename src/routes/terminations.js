@@ -69,6 +69,24 @@ router.post('/', requireAuth, requireRole('admin', 'rh'), async (req, res) => {
 
     const { data, error: e2 } = await supabase.from('terminations').insert(payload).select().single();
     if (e2) return res.status(400).json({ error: e2.message });
+
+    // Move funcionário pra status demitido e desfaz vínculos operacionais (mantém histórico)
+    await supabase.from('employees').update({
+      status: 'demitido',
+      data_demissao: params.data_demissao,
+      motivo_demissao: params.motivo || params.tipo_rescisao,
+      updated_by: req.user.id,
+    }).eq('id', employee_id);
+
+    // Se ele era gestor de outros funcionários, libera essa referência
+    await supabase.from('employees').update({ gestor_id: null }).eq('gestor_id', employee_id);
+
+    // Encerra checklists pendentes
+    await supabase.from('checklists')
+      .update({ status: 'cancelado' })
+      .eq('employee_id', employee_id)
+      .neq('status', 'concluido');
+
     res.status(201).json(data);
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
