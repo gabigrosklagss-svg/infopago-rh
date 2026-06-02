@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Segurança da conta — InfoPago RH</title>
+<link rel="stylesheet" href="/css/main.css">
+<style>
+  .step { padding: 18px 22px; border: 1px solid var(--border); border-radius: var(--r); margin-bottom: 14px; }
+  .step h4 { margin: 0 0 6px; font-size: 14px; }
+  .step .step-num { display: inline-block; width: 24px; height: 24px; border-radius: 50%; background: var(--brand-500); color: #fff; text-align: center; line-height: 24px; font-weight: 700; font-size: 12px; margin-right: 10px; }
+  .qr-wrap { text-align: center; padding: 14px; background: #fff; border-radius: var(--r-sm); display: inline-block; }
+  .qr-wrap img { max-width: 220px; height: auto; }
+  .secret-box { background: var(--paper-3); padding: 12px 16px; border-radius: var(--r-sm); font-family: 'JetBrains Mono', monospace; font-size: 14px; letter-spacing: .08em; word-break: break-all; user-select: all; }
+  .backup-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 12px; }
+  .backup-grid code { background: var(--paper-3); padding: 8px 12px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 13px; text-align: center; user-select: all; }
+  .status-card { padding: 18px 22px; border-radius: var(--r); margin-bottom: 14px; }
+  .status-card.on { background: var(--success-bg); border: 1px solid var(--success); }
+  .status-card.off { background: var(--warn-bg); border: 1px solid var(--warn); }
+</style>
+</head>
+<body>
+<div class="app">
+  <div id="sidebar"></div>
+  <main class="main">
+    <div class="breadcrumb">
+      <a href="/dashboard.html">Painel</a>
+      <span class="sep">›</span>
+      <span>Segurança da conta</span>
+    </div>
+
+    <div class="page-header">
+      <div>
+        <h1>Segurança da conta</h1>
+        <p class="subtitle">Autenticação em 2 fatores e gerenciamento de senha</p>
+      </div>
+    </div>
+
+    <div id="status"></div>
+
+    <div class="card">
+      <h3 class="card-title">Verificação em 2 etapas (2FA)</h3>
+      <p class="text-muted text-sm">
+        Adiciona uma camada extra de segurança à sua conta. Após digitar sua senha, você precisará
+        informar um código de 6 dígitos gerado por um app autenticador no seu celular.
+      </p>
+
+      <div id="setup-area" style="display:none">
+        <div class="step">
+          <h4><span class="step-num">1</span>Instale um app autenticador</h4>
+          <p class="text-sm" style="margin:0 0 6px">No seu celular, baixe um destes apps gratuitos:</p>
+          <ul class="text-sm text-muted" style="margin:6px 0 0;padding-left:22px">
+            <li><strong>Google Authenticator</strong> (Android / iOS)</li>
+            <li><strong>Microsoft Authenticator</strong> (Android / iOS)</li>
+            <li><strong>Authy</strong> (multiplataforma)</li>
+            <li><strong>1Password</strong> (se já usa)</li>
+          </ul>
+        </div>
+
+        <div class="step">
+          <h4><span class="step-num">2</span>Escaneie o QR code</h4>
+          <p class="text-sm">Abra o app e use "Adicionar conta" → "Escanear QR code":</p>
+          <div class="flex gap-4 items-center mt-3" style="flex-wrap:wrap">
+            <div class="qr-wrap"><img id="qr-img" alt="QR code 2FA"></div>
+            <div style="flex:1;min-width:220px">
+              <p class="text-sm text-muted">Não consegue escanear? Digite este código manualmente no app:</p>
+              <div class="secret-box mt-2" id="secret-text"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <h4><span class="step-num">3</span>Confirme o código</h4>
+          <p class="text-sm">Digite o código de 6 dígitos que o app está mostrando agora:</p>
+          <div class="flex gap-2 mt-2">
+            <input id="codigo-confirma" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
+              placeholder="000000" style="font-family:'JetBrains Mono',monospace;font-size:18px;text-align:center;letter-spacing:.4em;max-width:200px">
+            <button class="btn btn-primary" onclick="ativar2FA()">Ativar 2FA</button>
+            <button class="btn" onclick="cancelarSetup()">Cancelar</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="backup-codes-area" style="display:none">
+        <div class="step" style="border-left:4px solid var(--brand-500)">
+          <h4>2FA ativado com sucesso!</h4>
+          <p class="text-sm" style="color:var(--danger,#b91c1c)"><strong>Importante:</strong> guarde estes <strong>códigos de backup</strong> em local seguro (gerenciador de senhas, papel impresso). Cada um pode ser usado UMA vez se você perder acesso ao app autenticador:</p>
+          <div class="backup-grid" id="backup-codes"></div>
+          <button class="btn btn-primary mt-4" onclick="copiarBackup()">Copiar todos</button>
+          <button class="btn mt-4" onclick="concluirSetup()">Já guardei, fechar</button>
+        </div>
+      </div>
+
+      <div id="active-area" style="display:none">
+        <p class="text-sm" style="margin-bottom:10px"><strong>Status:</strong> <span style="color:var(--success,#15803d);font-weight:600">✓ Ativo</span> · ativado em <span id="ativ-data"></span></p>
+        <p class="text-sm text-muted">Toda vez que você fizer login, será solicitado um código de verificação após a senha.</p>
+        <div class="mt-3">
+          <button class="btn btn-danger" onclick="abrirDesativar()">Desativar 2FA</button>
+        </div>
+      </div>
+
+      <div id="off-area" style="display:none">
+        <p class="text-sm" style="margin-bottom:10px"><strong>Status:</strong> <span style="color:var(--warn,#a16207);font-weight:600">○ Desativado</span></p>
+        <button class="btn btn-primary mt-2" onclick="iniciarSetup()">Ativar 2FA</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+  requireAuth();
+  mountShell('security');
+
+  carregarStatus();
+
+  async function carregarStatus() {
+    try {
+      const s = await api('/2fa/status');
+      if (s.enabled) {
+        document.getElementById('active-area').style.display = 'block';
+        document.getElementById('off-area').style.display = 'none';
+        document.getElementById('setup-area').style.display = 'none';
+        document.getElementById('backup-codes-area').style.display = 'none';
+        document.getElementById('ativ-data').textContent = fmt.dataHora(s.ativado_em);
+      } else {
+        document.getElementById('active-area').style.display = 'none';
+        document.getElementById('off-area').style.display = 'block';
+        document.getElementById('setup-area').style.display = 'none';
+        document.getElementById('backup-codes-area').style.display = 'none';
+      }
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function iniciarSetup() {
+    showLoading();
+    try {
+      const r = await api('/2fa/setup', { method: 'POST' });
+      document.getElementById('qr-img').src = r.qr_code;
+      document.getElementById('secret-text').textContent = r.secret;
+      document.getElementById('off-area').style.display = 'none';
+      document.getElementById('setup-area').style.display = 'block';
+    } catch (err) { toast(err.message, 'error'); }
+    finally { hideLoading(); }
+  }
+
+  function cancelarSetup() {
+    document.getElementById('setup-area').style.display = 'none';
+    document.getElementById('off-area').style.display = 'block';
+  }
+
+  async function ativar2FA() {
+    const codigo = document.getElementById('codigo-confirma').value.trim();
+    if (!/^\d{6}$/.test(codigo)) { toast('Digite os 6 dígitos do app.', 'warning'); return; }
+    showLoading();
+    try {
+      const r = await api('/2fa/verify-setup', { method: 'POST', body: { codigo } });
+      // Mostra os backup codes
+      document.getElementById('setup-area').style.display = 'none';
+      document.getElementById('backup-codes-area').style.display = 'block';
+      document.getElementById('backup-codes').innerHTML = r.backup_codes.map(c => `<code>${c}</code>`).join('');
+      window._backupCodes = r.backup_codes;
+      toast('2FA ativado!', 'success');
+    } catch (err) { toast(err.message, 'error'); }
+    finally { hideLoading(); }
+  }
+
+  function copiarBackup() {
+    const txt = (window._backupCodes || []).join('\n');
+    navigator.clipboard.writeText(txt).then(() => toast('Códigos copiados!', 'success'));
+  }
+
+  function concluirSetup() {
+    carregarStatus();
+  }
+
+  function abrirDesativar() {
+    const codigo = prompt('Para desativar, confirme com o código atual do app (6 dígitos):');
+    if (!codigo) return;
+    desativar(codigo);
+  }
+
+  async function desativar(codigo) {
+    showLoading();
+    try {
+      await api('/2fa/disable', { method: 'POST', body: { codigo } });
+      toast('2FA desativado.', 'success');
+      carregarStatus();
+    } catch (err) { toast(err.message, 'error'); }
+    finally { hideLoading(); }
+  }
+</script>
+</body>
+</html>

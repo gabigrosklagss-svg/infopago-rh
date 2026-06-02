@@ -1,9 +1,0 @@
-[TypeError: fetch failed] {
-  [cause]: Error: getaddrinfo ENOTFOUND rroxhjinwvrmhklehjwq.supabase.co
-      at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26) {
-    errno: -3008,
-    code: 'ENOTFOUND',
-    syscall: 'getaddrinfo',
-    hostname: 'rroxhjinwvrmhklehjwq.supabase.co'
-  }
-}

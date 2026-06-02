@@ -19,12 +19,45 @@ const PHOTOS_BUCKET = 'employee-photos';
 const SUPABASE_URL = process.env.SUPABASE_URL;
 
 /* ── LOGIN ──────────────────────────────────────────── */
+const crypto = require('crypto');
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'E-mail e senha são obrigatórios.' });
 
   const { data, error } = await supabasePublic.auth.signInWithPassword({ email, password });
   if (error) return res.status(401).json({ error: 'E-mail ou senha incorretos.', code: 'INVALID_CREDENTIALS' });
+
+  // Checa se usuário tem 2FA ativo
+  const { data: cfg2fa } = await supabase.from('auth_2fa')
+    .select('ativado').eq('user_id', data.user.id).maybeSingle();
+
+  if (cfg2fa?.ativado) {
+    // Cria pending token + guarda sessão real até validação do código
+    const pendingToken = crypto.randomBytes(32).toString('hex');
+    const expira = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 min
+    await supabase.from('auth_2fa_pending').insert({
+      token: pendingToken, user_id: data.user.id, expires_at: expira,
+    });
+
+    // Carrega perfil + roles pra guardar com a sessão pending
+    const { data: profile } = await supabase.from('user_profiles')
+      .select('id, full_name, role, avatar_url, active, department').eq('id', data.user.id).maybeSingle();
+    const { data: ups } = await supabase.from('v_user_permissions')
+      .select('role_slug, permission_slug, nivel').eq('user_id', data.user.id);
+    const roles = [...new Set((ups || []).map(r => r.role_slug))];
+    const permissions = [...new Set((ups || []).map(r => r.permission_slug))];
+    const nivel = (ups || []).reduce((m, r) => Math.max(m, r.nivel || 0), 0);
+
+    await supabase.from('auth_2fa_pending_session').insert({
+      pending_token: pendingToken,
+      access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
+      expires_at: data.session.expires_at,
+      user_data: { id: data.user.id, email: data.user.email, ...profile, roles, permissions, nivel },
+    });
+
+    return res.json({ requires_2fa: true, pending_token: pendingToken });
+  }
 
   // Carrega perfil
   let { data: profile } = await supabase

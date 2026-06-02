@@ -492,6 +492,9 @@ function renderSidebar(active) {
 /* ── Top Navbar (busca + tema + notif) ────────────────── */
 function renderTopbar() {
   return `<header class="topbar">
+    <button class="btn-hamburguer" onclick="toggleSidebarMobile()" aria-label="Abrir menu">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
     <div class="topbar-search">
       <input id="globalSearch" placeholder="Buscar funcionário, CPF, matrícula, holerite…" autocomplete="off">
       <span class="kbd">⌘K</span>
@@ -528,11 +531,36 @@ function buildId() {
   return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
 }
 
+/* ── Sidebar mobile toggle ──────────────────────── */
+function toggleSidebarMobile() {
+  const sb = document.querySelector('.sidebar');
+  if (!sb) return;
+  sb.classList.toggle('open');
+  let bd = document.querySelector('.sidebar-backdrop');
+  if (!bd) {
+    bd = document.createElement('div');
+    bd.className = 'sidebar-backdrop';
+    bd.onclick = () => toggleSidebarMobile();
+    document.body.appendChild(bd);
+  }
+  bd.classList.toggle('open', sb.classList.contains('open'));
+  document.body.style.overflow = sb.classList.contains('open') ? 'hidden' : '';
+}
+
 /* ── Mount shell — injeta sidebar + topbar + footer ──── */
 function mountShell(activeNav) {
   // 1) Sidebar
   const sb = document.getElementById('sidebar');
   if (sb) sb.outerHTML = renderSidebar(activeNav);
+
+  // Fecha sidebar mobile ao clicar em algum link da nav
+  document.querySelectorAll('.sidebar nav a').forEach(a => a.addEventListener('click', () => {
+    if (window.innerWidth <= 1024) {
+      document.querySelector('.sidebar')?.classList.remove('open');
+      document.querySelector('.sidebar-backdrop')?.classList.remove('open');
+      document.body.style.overflow = '';
+    }
+  }));
 
   // 2) Wrap .main em .app-main (se ainda não tiver) + topbar + footer
   const main = document.querySelector('.main');
@@ -784,6 +812,7 @@ function abrirPerfilUsuario() {
       </div>
       <div class="modal-footer">
         <button class="btn" onclick="document.getElementById('user-profile-modal').remove()">Fechar</button>
+        <a class="btn" href="/security.html" style="text-decoration:none">🔐 Segurança &amp; 2FA</a>
         <button class="btn btn-primary" onclick="salvarPerfilUsuario()">Salvar alterações</button>
       </div>
     </div>
