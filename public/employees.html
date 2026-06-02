@@ -420,6 +420,10 @@
         <div class="field"><label>CRM</label><input name="medico_crm"></div>
       </div>
       <div class="field mt-4"><label>Observações</label><textarea name="observacoes"></textarea></div>
+      <div class="field mt-4"><label>Anexar atestado / comprovante (imagem ou PDF)</label>
+        <input type="file" id="abs-arquivo" accept="image/*,application/pdf,.doc,.docx">
+        <small class="text-muted text-sm" style="display:block;margin-top:4px">Aceita: JPG, PNG, PDF, DOC, DOCX · máx 10 MB</small>
+      </div>
       <label class="toggle mt-4"><input type="checkbox" name="justificado"><span class="slider"></span> Justificado</label>
       <label class="toggle"><input type="checkbox" name="descontar_salario" checked><span class="slider"></span> Descontar do salário</label>
     </form>`;
@@ -431,8 +435,22 @@
       data.justificado = !!data.justificado;
       data.descontar_salario = !!data.descontar_salario;
       try {
-        await api('/absences', { method: 'POST', body: data });
-        toast('Registro criado!', 'success');
+        const created = await api('/absences', { method: 'POST', body: data });
+        // Upload do anexo, se houver
+        const arquivo = document.getElementById('abs-arquivo')?.files?.[0];
+        if (arquivo && created?.id) {
+          const fd = new FormData();
+          fd.append('arquivo', arquivo);
+          const r = await fetch(`/api/absences/${created.id}/anexo`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${getToken()}` },
+            body: fd,
+          });
+          if (!r.ok) toast('Registro criado, mas o anexo falhou.', 'warning');
+          else toast('Registro + anexo salvos!', 'success');
+        } else {
+          toast('Registro criado!', 'success');
+        }
         closeFormModal();
         openFicha(empId);
       } catch (err) { toast(err.message, 'error'); }

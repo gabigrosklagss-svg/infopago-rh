@@ -176,11 +176,12 @@ router.delete('/:id', requireAuth, requireRole('admin', 'rh'), async (req, res) 
   res.json({ success: true });
 });
 
-/* GET /api/time/banco-horas — saldo de todos os funcionários */
+/* GET /api/time/banco-horas — saldo de todos os funcionários ATIVOS */
 router.get('/banco-horas', requireAuth, async (req, res) => {
   const { data, error } = await supabase
     .from('time_bank_balance')
-    .select('*, employees(nome_completo, matricula, departments(nome))')
+    .select('*, employees!inner(nome_completo, matricula, status, departments(nome))')
+    .eq('employees.status', 'ativo')
     .order('saldo_horas', { ascending: false });
   if (error) return res.status(400).json({ error: error.message });
   res.json(data || []);
