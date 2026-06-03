@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Assinaturas Digitais — InfoPago RH</title>
+<link rel="stylesheet" href="/css/main.css">
+<style>
+  .sig-card {
+    background: var(--paper);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 16px 18px;
+    margin-bottom: 10px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 14px;
+    align-items: center;
+  }
+  .sig-card .info h4 { margin: 0 0 4px; font-size: 14px; }
+  .sig-card .info .meta { font-size: 12px; color: var(--ink-3); }
+  .sig-card .info .meta strong { color: var(--ink-2); }
+  .sig-card.assinada { border-left: 3px solid var(--brand-500); }
+  .sig-card.pendente { border-left: 3px solid var(--warn, #a16207); }
+  .sig-card.recusada,
+  .sig-card.expirada,
+  .sig-card.cancelada { border-left: 3px solid var(--danger, #b91c1c); opacity: .8; }
+  .sig-preview {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    padding: 8px;
+    max-width: 220px;
+  }
+  .sig-preview img { display: block; max-width: 100%; height: auto; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div id="sidebar"></div>
+  <main class="main">
+    <div class="breadcrumb">
+      <a href="/dashboard.html">Painel</a>
+      <span class="sep">›</span>
+      <span>Assinaturas Digitais</span>
+    </div>
+
+    <div class="page-header">
+      <div>
+        <h1>Assinaturas Digitais</h1>
+        <p class="subtitle">Solicitações de assinatura eletrônica · contratos, advertências, rescisões</p>
+      </div>
+      <button class="btn btn-primary" onclick="novaSolicitacao()">+ Nova solicitação</button>
+    </div>
+
+    <div class="filter-bar">
+      <div class="field">
+        <label>Status</label>
+        <select id="f-status" onchange="carregar()">
+          <option value="">Todos</option>
+          <option value="pendente" selected>Pendente</option>
+          <option value="assinada">Assinada</option>
+          <option value="recusada">Recusada</option>
+          <option value="expirada">Expirada</option>
+          <option value="cancelada">Cancelada</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Tipo de documento</label>
+        <select id="f-tipo" onchange="carregar()">
+          <option value="">Todos</option>
+          <option value="rescisao">Rescisão (TRCT)</option>
+          <option value="advertencia">Advertência</option>
+          <option value="contrato">Contrato</option>
+          <option value="comunicado">Comunicado</option>
+          <option value="custom">Documento avulso</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="list-area"></div>
+  </main>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+  requireAuth();
+  mountShell('signatures');
+
+  carregar();
+
+  async function carregar() {
+    const status = document.getElementById('f-status').value;
+    const tipo = document.getElementById('f-tipo').value;
+    const params = new URLSearchParams();
+    if (status) params.set('status', status);
+    if (tipo) params.set('doc_type', tipo);
+    showLoading();
+    try {
+      const list = await api('/signatures?' + params);
+      const cont = document.getElementById('list-area');
+      if (!list.length) {
+        cont.innerHTML = '<div class="card text-muted text-center" style="padding:40px">Nenhuma solicitação encontrada.</div>';
+        return;
+      }
+      cont.innerHTML = list.map(s => `
+        <div class="sig-card ${s.status}">
+          <div class="info">
+            <h4>${s.doc_titulo}</h4>
+            <div class="meta">
+              <strong>${s.doc_type}</strong> · ${s.signer_name}
+              ${s.signer_email ? ` · ${s.signer_email}` : ''}
+              · <span class="badge ${s.status === 'assinada' ? 'ativo' : s.status === 'pendente' ? 'pendente' : 'inativo'}">${s.status}</span>
+            </div>
+            <div class="meta mt-2">
+              Criado: ${fmt.dataHora(s.created_at)} · Expira: ${fmt.data(s.expires_at)}
+              ${s.signed_at ? ` · ✓ Assinado em ${fmt.dataHora(s.signed_at)}` : ''}
+              ${s.motivo_recusa ? `<br>Recusa: ${s.motivo_recusa}` : ''}
+            </div>
+            <div class="meta mt-2" style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-sm" onclick="copiarLink('${s.token}')">📋 Copiar link</button>
+              ${s.status === 'pendente' ? `<button class="btn btn-sm" onclick="abrirAssinatura('${s.token}')">Abrir página</button>` : ''}
+              ${s.status === 'assinada' ? `<button class="btn btn-sm" onclick="verAssinatura('${s.id}')">Ver assinatura</button>` : ''}
+              ${s.status === 'pendente' ? `<button class="btn btn-sm btn-danger" onclick="cancelar('${s.id}')">Cancelar</button>` : ''}
+              <button class="btn btn-sm btn-danger" onclick="excluir('${s.id}')">×</button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    } catch (err) { toast(err.message, 'error'); }
+    finally { hideLoading(); }
+  }
+
+  async function novaSolicitacao() {
+    const emps = await api('/employees?status=ativo&limit=500');
+    const opts = '<option value="">Selecione um funcionário...</option>' +
+      (emps.data || []).map(e => `<option value="${e.id}">${fmt.matricula(e.matricula)} · ${e.nome_completo}</option>`).join('');
+    const html = `<form id="sigForm">
+      <div class="form-grid">
+        <div class="field"><label>Tipo de documento<span class="req">*</span></label>
+          <select name="doc_type" required>
+            <option value="contrato">Contrato</option>
+            <option value="advertencia">Advertência</option>
+            <option value="rescisao">Rescisão (TRCT)</option>
+            <option value="comunicado">Comunicado</option>
+            <option value="custom">Documento avulso</option>
+          </select>
+        </div>
+        <div class="field"><label>Expira em (dias)</label>
+          <input type="number" name="expires_in_days" value="30" min="1" max="365">
+        </div>
+      </div>
+      <div class="field mt-3"><label>Título do documento<span class="req">*</span></label>
+        <input name="doc_titulo" required placeholder="Ex: Contrato de Trabalho">
+      </div>
+      <div class="field mt-3"><label>Funcionário (signatário)<span class="req">*</span></label>
+        <select name="signer_employee_id" required>${opts}</select>
+      </div>
+      <div class="field mt-3"><label>Descrição / conteúdo do documento</label>
+        <textarea name="doc_descricao" rows="6" placeholder="Cole aqui o texto do documento que o funcionário vai ler e assinar..."></textarea>
+      </div>
+      <div class="field mt-3"><label>Link do PDF anexo (opcional)</label>
+        <input name="doc_pdf_path" placeholder="https://...">
+      </div>
+    </form>`;
+    showFormModal('Nova solicitação de assinatura', html, async () => {
+      const f = document.getElementById('sigForm');
+      if (!validateForm(f)) return;
+      const d = formToObject(f);
+      d.expires_in_days = parseInt(d.expires_in_days) || 30;
+      try {
+        const r = await api('/signatures', { method: 'POST', body: d });
+        closeFormModal();
+        toast('Solicitação criada! Link copiado.', 'success');
+        try { await navigator.clipboard.writeText(r.public_link); } catch {}
+        carregar();
+      } catch (err) { toast(err.message, 'error'); }
+    });
+  }
+
+  async function copiarLink(token) {
+    const url = `${location.origin}/sign.html?token=${token}`;
+    try { await navigator.clipboard.writeText(url); toast('Link copiado!', 'success'); }
+    catch { prompt('Copie este link:', url); }
+  }
+  function abrirAssinatura(token) { window.open(`/sign.html?token=${token}`, '_blank'); }
+
+  async function verAssinatura(id) {
+    const s = await api(`/signatures/${id}`);
+    const html = `
+      <div class="text-sm text-muted">Assinado em <strong>${fmt.dataHora(s.signed_at)}</strong>
+      <br>IP: <code>${s.signed_ip || '—'}</code>
+      <br>Dispositivo: <small>${s.signed_ua || '—'}</small></div>
+      ${s.signature_data ? `<div class="mt-3 text-center"><img src="${s.signature_data}" alt="Assinatura" style="max-width:100%;border:1px solid var(--border);border-radius:8px;background:#fff;padding:10px"></div>` : ''}
+      <h4 class="mt-4" style="font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-4);margin:18px 0 6px">Trilha de auditoria</h4>
+      <div style="max-height:240px;overflow-y:auto;background:var(--paper-3);padding:10px 14px;border-radius:6px">
+        ${(s.audit_trail || []).map(t => `<div class="text-sm" style="padding:4px 0;border-bottom:1px dashed var(--border)"><strong>${t.event}</strong> · ${fmt.dataHora(t.at)} · IP: ${t.ip || '—'}</div>`).join('')}
+      </div>`;
+    showFormModal(s.doc_titulo, html, () => closeFormModal());
+    document.getElementById('form-save').textContent = 'Fechar';
+  }
+
+  async function cancelar(id) {
+    if (!confirm('Cancelar esta solicitação?')) return;
+    try { await api(`/signatures/${id}/cancel`, { method: 'POST' }); toast('Cancelada.', 'info'); carregar(); }
+    catch (err) { toast(err.message, 'error'); }
+  }
+  async function excluir(id) {
+    if (!confirm('Excluir definitivamente?')) return;
+    try { await api(`/signatures/${id}`, { method: 'DELETE' }); toast('Excluída.', 'info'); carregar(); }
+    catch (err) { toast(err.message, 'error'); }
+  }
+
+  function showFormModal(title, html, onSave) {
+    let m = document.getElementById('form-modal');
+    if (!m) { m = document.createElement('div'); m.id = 'form-modal'; m.className = 'modal-overlay'; m.onclick = (e) => { if (e.target === m) closeFormModal(); }; document.body.appendChild(m); }
+    m.innerHTML = `<div class="modal" style="max-width:680px"><div class="modal-header"><h2>${title}</h2><button class="modal-close" onclick="closeFormModal()">×</button></div><div class="modal-body">${html}</div><div class="modal-footer"><button class="btn" onclick="closeFormModal()">Cancelar</button><button class="btn btn-primary" id="form-save">Salvar</button></div></div>`;
+    m.classList.remove('hidden');
+    document.getElementById('form-save').onclick = onSave;
+  }
+  function closeFormModal() { document.getElementById('form-modal')?.remove(); }
+</script>
+</body>
+</html>

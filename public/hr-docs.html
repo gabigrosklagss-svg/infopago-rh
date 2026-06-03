@@ -82,6 +82,7 @@
         <td>
           <button class="btn btn-sm" onclick="gerarPdfResc('${t.id}')">PDF</button>
           ${t.pdf_path ? `<button class="btn btn-sm" onclick="downloadAuth('/api/terminations/${t.id}/download','rescisao.pdf')">Baixar</button>` : ''}
+          <button class="btn btn-sm" style="color:var(--brand-700)" onclick="solicitarAssinaturaResc('${t.id}','${(t.employees?.nome_completo || '').replace(/'/g,"\\'")}')">✍️ Assinar</button>
           <button class="btn btn-sm btn-danger" onclick="excluirResc('${t.id}')">Excluir</button>
         </td>
       </tr>
@@ -236,6 +237,34 @@
         `;
       } catch { /* ignora erro silencioso */ }
     }, 300);
+  }
+
+  async function solicitarAssinaturaResc(id, nome) {
+    if (!confirm(`Criar pedido de assinatura digital da rescisão de ${nome}?`)) return;
+    showLoading();
+    try {
+      const t = await api(`/terminations/${id}`);
+      const r = await api('/signatures', {
+        method: 'POST',
+        body: {
+          doc_type: 'rescisao',
+          doc_id: id,
+          doc_titulo: `Rescisão de Contrato (TRCT) — ${nome}`,
+          doc_descricao: `Rescisão de contrato de trabalho de ${nome}\n\n` +
+            `Tipo: ${t.tipo_rescisao}\n` +
+            `Data de demissão: ${fmt.data(t.data_demissao)}\n` +
+            `Valor líquido a receber: ${fmt.brl(t.total_liquido)}\n` +
+            `${t.aviso_previo_dias ? `Aviso prévio: ${t.aviso_previo_dias} dias\n` : ''}` +
+            `\nPor este TRCT, declaro estar ciente dos valores apurados na presente rescisão e dou plena quitação à empresa pelos direitos rescisórios elencados.`,
+          signer_employee_id: t.employee_id,
+          expires_in_days: 30,
+        }
+      });
+      try { await navigator.clipboard.writeText(r.public_link); } catch {}
+      toast('Pedido criado! Link copiado pra área de transferência.', 'success');
+      window.open('/signatures.html', '_blank');
+    } catch (err) { toast(err.message, 'error'); }
+    finally { hideLoading(); }
   }
 
   async function gerarPdfResc(id) {
