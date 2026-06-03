@@ -2,6 +2,7 @@ const cron = require('node-cron');
 const { supabase } = require('../config/supabase');
 const { enviarEmLote } = require('../services/emailService');
 const { executarBackup } = require('../services/backup');
+const { enviarDigestRH } = require('../services/notifications');
 
 async function executarAgendamentos() {
   const hoje = new Date().toISOString().split('T')[0];
@@ -59,7 +60,22 @@ function initScheduler() {
     }
   });
 
-  console.log('   Agendador iniciado: envios 7:55/8:05 · backup diario 03:00');
+  // Digest matinal do RH — diariamente às 07:00
+  cron.schedule('0 7 * * 1-5', async () => {
+    try { await enviarDigestRH(); }
+    catch (err) { console.warn('[digest] falha:', err.message); }
+  });
+
+  // Expiração de banco de horas — 02:00 todos os dias
+  cron.schedule('0 2 * * *', async () => {
+    try {
+      const { processarExpiracoes } = require('../services/timeBank');
+      const r = await processarExpiracoes();
+      if (r.processadas > 0) console.log(`[time_bank] ${r.processadas} expiração(ões) processada(s)`);
+    } catch (err) { console.warn('[time_bank] falha:', err.message); }
+  });
+
+  console.log('   Agendador iniciado: envios 7:55/8:05 · digest 07:00 · backup 03:00');
 }
 
 module.exports = { initScheduler, executarAgendamentos };

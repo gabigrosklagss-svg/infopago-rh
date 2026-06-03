@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard Contábil — InfoPago RH</title>
+<link rel="stylesheet" href="/css/main.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  .kpi-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap:14px; margin-bottom:20px; }
+  .kpi { background:var(--paper); border:1px solid var(--border); border-radius:var(--r); padding:18px; }
+  .kpi .lbl { font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-4); margin-bottom:6px; font-weight:600; }
+  .kpi .val { font-size:26px; font-weight:700; font-family:'JetBrains Mono', monospace; letter-spacing:-.025em; }
+  .kpi .sub { font-size:12px; color:var(--ink-3); margin-top:4px; }
+  .kpi.primary { background:linear-gradient(135deg, #0F2E1E, #1FAB54); color:#fff; }
+  .kpi.primary .lbl, .kpi.primary .sub { color:rgba(255,255,255,.85); }
+  .insight {
+    background:var(--paper); border:1px solid var(--border);
+    border-left:3px solid #0369A1;
+    border-radius:var(--r-sm); padding:14px 16px; margin-bottom:10px;
+    display:flex; gap:12px;
+  }
+  .insight.warn { border-left-color:#B45309; background:rgba(180,83,9,.04); }
+  .insight.danger { border-left-color:#B42318; background:rgba(180,35,24,.04); }
+  .insight.success { border-left-color:#15803d; background:rgba(21,128,61,.04); }
+  .insight .ico { width:36px; height:36px; border-radius:50%; background:#0369A1; color:#fff; display:grid; place-items:center; flex-shrink:0; font-weight:700; }
+  .insight.warn .ico { background:#B45309; }
+  .insight.danger .ico { background:#B42318; }
+  .insight.success .ico { background:#15803d; }
+  .insight h4 { margin:0 0 4px; font-size:13.5px; font-weight:600; }
+  .insight p { margin:0; font-size:12.5px; color:var(--ink-3); line-height:1.55; }
+
+  .ia-box {
+    background:linear-gradient(135deg, #0A2540, #1FAB54);
+    color:#fff; border-radius:var(--r); padding:22px 26px; margin-bottom:20px;
+  }
+  .ia-box h3 { margin:0 0 4px; font-size:14px; text-transform:uppercase; letter-spacing:.08em; opacity:.85; font-weight:600; }
+  .ia-box .input-wrap { display:flex; gap:8px; margin-top:14px; }
+  .ia-box input { flex:1; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.22); color:#fff; padding:11px 16px; border-radius:8px; font-size:14px; }
+  .ia-box input::placeholder { color:rgba(255,255,255,.55); }
+  .ia-box .btn-ia { background:#fff; color:#0A2540; border:0; padding:11px 20px; border-radius:8px; font-weight:600; cursor:pointer; }
+  #ia-resposta { background:rgba(255,255,255,.1); border-radius:8px; padding:14px 18px; margin-top:14px; font-size:14px; line-height:1.6; white-space:pre-wrap; display:none; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div id="sidebar"></div>
+  <main class="main">
+    <div class="breadcrumb">
+      <a href="/dashboard.html">Painel</a>
+      <span class="sep">›</span>
+      <span>Dashboard Contábil</span>
+    </div>
+
+    <div class="page-header">
+      <div>
+        <h1>Dashboard Contábil</h1>
+        <p class="subtitle">Custos, encargos, provisões e análise da Ingrid</p>
+      </div>
+      <div class="flex gap-2 items-center">
+        <select id="f-mes" onchange="carregar()" style="padding:8px 12px;border:1px solid var(--border-2);border-radius:6px;font-size:13px"></select>
+        <select id="f-ano" onchange="carregar()" style="padding:8px 12px;border:1px solid var(--border-2);border-radius:6px;font-size:13px"></select>
+      </div>
+    </div>
+
+    <!-- Caixa de IA -->
+    <div class="ia-box">
+      <h3>🤖 Pergunte à Ingrid</h3>
+      <p style="margin:6px 0 0;opacity:.9;font-size:13.5px">Faça perguntas sobre os números da folha. Ex: "Por que o FGTS subiu este mês?" ou "Quanto gastamos com encargos no semestre?"</p>
+      <div class="input-wrap">
+        <input id="ia-pergunta" placeholder="Digite sua pergunta..." onkeypress="if(event.key==='Enter') perguntar()">
+        <button class="btn-ia" onclick="perguntar()">Perguntar</button>
+      </div>
+      <div id="ia-resposta"></div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpi-grid" id="kpis"></div>
+
+    <!-- Insights da IA -->
+    <h3 class="card-title">Análise da Ingrid <small id="ia-status">(carregando…)</small></h3>
+    <div id="insights-list"></div>
+
+    <!-- Gráficos -->
+    <div class="grid-2 mt-5">
+      <div class="card">
+        <h3 class="card-title">Folha bruta · últimos 12 meses</h3>
+        <canvas id="ch-historico" height="280"></canvas>
+      </div>
+      <div class="card">
+        <h3 class="card-title">Composição do custo total</h3>
+        <canvas id="ch-composicao" height="280"></canvas>
+      </div>
+    </div>
+
+    <!-- Tabela por departamento -->
+    <div class="card mt-5">
+      <h3 class="card-title">Custos por departamento</h3>
+      <table class="table">
+        <thead><tr><th>Departamento</th><th class="num">Funcionários</th><th class="num">Folha bruta</th><th class="num">INSS funcionário</th><th class="num">FGTS depositado</th></tr></thead>
+        <tbody id="tbody-deptos"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+  requireAuth();
+  mountShell('accounting');
+
+  // Selects mes/ano
+  const now = new Date();
+  const mes = now.getMonth() + 1, ano = now.getFullYear();
+  const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  document.getElementById('f-mes').innerHTML = meses.map((m, i) => `<option value="${i+1}" ${i+1 === mes ? 'selected' : ''}>${m}</option>`).join('');
+  const anos = []; for (let a = ano + 1; a >= ano - 3; a--) anos.push(a);
+  document.getElementById('f-ano').innerHTML = anos.map(a => `<option value="${a}" ${a === ano ? 'selected' : ''}>${a}</option>`).join('');
+
+  let _kpis = null, chart1, chart2;
+
+  async function carregar() {
+    showLoading();
+    try {
+      const m = document.getElementById('f-mes').value;
+      const a = document.getElementById('f-ano').value;
+      const kpis = await api(`/accounting/kpis?mes=${m}&ano=${a}`);
+      _kpis = kpis;
+      renderKPIs(kpis);
+      renderTabela(kpis);
+      renderCharts(kpis);
+      pegarInsightsIA(kpis);
+    } catch (err) { toast(err.message, 'error'); }
+    finally { hideLoading(); }
+  }
+
+  function renderKPIs(k) {
+    const variacao = k.comparativo?.variacao_folha_pct;
+    const setaVar = variacao > 0 ? '↑' : variacao < 0 ? '↓' : '→';
+    const corVar = variacao > 5 ? 'color:#B42318' : variacao < -5 ? 'color:#15803d' : 'color:var(--ink-3)';
+    document.getElementById('kpis').innerHTML = `
+      <div class="kpi primary"><div class="lbl">Custo total da empresa</div><div class="val">${fmt.brl(k.custo_total)}</div><div class="sub">${k.folha.qtd_holerites} holerites · tudo incluso</div></div>
+      <div class="kpi"><div class="lbl">Folha bruta</div><div class="val">${fmt.brl(k.folha.bruta)}</div><div class="sub" style="${corVar}">${setaVar} ${Math.abs(variacao || 0).toFixed(1)}% vs mês anterior</div></div>
+      <div class="kpi"><div class="lbl">Folha líquida</div><div class="val">${fmt.brl(k.folha.liquido)}</div><div class="sub">o que o funcionário recebe</div></div>
+      <div class="kpi"><div class="lbl">Encargos patronais</div><div class="val">${fmt.brl(k.encargos_patronais.total)}</div><div class="sub">INSS+FGTS+Sistema S+RAT</div></div>
+      <div class="kpi"><div class="lbl">INSS patronal</div><div class="val">${fmt.brl(k.encargos_patronais.inss)}</div><div class="sub">20% sobre folha bruta</div></div>
+      <div class="kpi"><div class="lbl">FGTS depositado</div><div class="val">${fmt.brl(k.encargos_patronais.fgts)}</div><div class="sub">8% mensal</div></div>
+      <div class="kpi"><div class="lbl">Provisão 13º</div><div class="val">${fmt.brl(k.provisoes.decimo_terceiro)}</div><div class="sub">1/12 mensal</div></div>
+      <div class="kpi"><div class="lbl">Provisão Férias + 1/3</div><div class="val">${fmt.brl(k.provisoes.ferias)}</div><div class="sub">1,3333/12 mensal</div></div>
+      <div class="kpi"><div class="lbl">Retido na fonte (IRRF)</div><div class="val">${fmt.brl(k.impostos_funcionario.irrf)}</div><div class="sub">a recolher até 20 do mês seguinte</div></div>
+      <div class="kpi"><div class="lbl">INSS retido (funcionários)</div><div class="val">${fmt.brl(k.impostos_funcionario.inss)}</div><div class="sub">a recolher na guia GPS</div></div>
+    `;
+  }
+
+  function renderTabela(k) {
+    const linhas = Object.entries(k.por_departamento || {}).sort((a,b) => b[1].bruta - a[1].bruta);
+    document.getElementById('tbody-deptos').innerHTML = linhas.length
+      ? linhas.map(([dep, v]) => `<tr>
+          <td><strong>${dep}</strong></td>
+          <td class="num">${v.qtd}</td>
+          <td class="num">${fmt.brl(v.bruta)}</td>
+          <td class="num">${fmt.brl(v.inss)}</td>
+          <td class="num">${fmt.brl(v.fgts)}</td>
+        </tr>`).join('')
+      : '<tr><td colspan="5" class="table-empty">Sem dados.</td></tr>';
+  }
+
+  function renderCharts(k) {
+    chart1?.destroy(); chart2?.destroy();
+    const ctx1 = document.getElementById('ch-historico');
+    chart1 = new Chart(ctx1, {
+      type: 'bar',
+      data: {
+        labels: k.historico_12m.map(h => h.label),
+        datasets: [
+          { label: 'Folha bruta', data: k.historico_12m.map(h => h.bruta), backgroundColor: '#1FAB54', borderRadius: 4 },
+          { label: 'FGTS depositado', data: k.historico_12m.map(h => h.fgts), backgroundColor: '#0F2E1E', borderRadius: 4 },
+        ]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+    });
+
+    const ctx2 = document.getElementById('ch-composicao');
+    chart2 = new Chart(ctx2, {
+      type: 'doughnut',
+      data: {
+        labels: ['Salários líquidos','INSS funcionário','IRRF','INSS patronal','FGTS','Sistema S','RAT','13º (provisão)','Férias (provisão)'],
+        datasets: [{ data: [
+          k.folha.liquido,
+          k.impostos_funcionario.inss,
+          k.impostos_funcionario.irrf,
+          k.encargos_patronais.inss,
+          k.encargos_patronais.fgts,
+          k.encargos_patronais.sistema_s,
+          k.encargos_patronais.rat,
+          k.provisoes.decimo_terceiro,
+          k.provisoes.ferias,
+        ], backgroundColor: ['#1FAB54','#0369A1','#7C3AED','#0F2E1E','#39E175','#0891B2','#D946EF','#F59E0B','#B45309'] }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 11 } } } } }
+    });
+  }
+
+  async function pegarInsightsIA(k) {
+    document.getElementById('ia-status').textContent = '(consultando Ingrid…)';
+    try {
+      const r = await api('/accounting/insights', { method: 'POST', body: { kpis: k } });
+      document.getElementById('ia-status').textContent = `(${r.insights.length} insights)`;
+      document.getElementById('insights-list').innerHTML = r.insights.map(i => `
+        <div class="insight ${i.tipo || 'info'}">
+          <div class="ico">${i.tipo === 'danger' ? '!' : i.tipo === 'warn' ? '⚠' : i.tipo === 'success' ? '✓' : 'i'}</div>
+          <div><h4>${i.titulo}</h4><p>${i.texto}</p></div>
+        </div>`).join('');
+    } catch (err) {
+      document.getElementById('ia-status').textContent = '(falhou)';
+      document.getElementById('insights-list').innerHTML = `<div class="insight"><div class="ico">!</div><div><h4>Análise indisponível</h4><p>${err.message}</p></div></div>`;
+    }
+  }
+
+  async function perguntar() {
+    const p = document.getElementById('ia-pergunta').value.trim();
+    if (!p) return;
+    const box = document.getElementById('ia-resposta');
+    box.style.display = 'block';
+    box.innerHTML = '<em>Pensando...</em>';
+    try {
+      const r = await api('/accounting/ask', { method: 'POST', body: { pergunta: p, contexto: _kpis } });
+      box.textContent = r.resposta;
+    } catch (err) { box.textContent = 'Erro: ' + err.message; }
+  }
+
+  carregar();
+</script>
+</body>
+</html>

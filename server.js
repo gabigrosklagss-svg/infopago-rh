@@ -115,8 +115,10 @@ app.use('/api/collective-vacations', require('./src/routes/collectiveVacations')
 app.use('/api/permissions', require('./src/routes/permissions'));
 app.use('/api/cv-pool', require('./src/routes/cvPool'));
 app.use('/api/events',  require('./src/routes/companyEvents'));
-app.use('/api/2fa',         require('./src/routes/twofa'));
-app.use('/api/signatures',  require('./src/routes/signatures'));
+app.use('/api/2fa',           require('./src/routes/twofa'));
+app.use('/api/signatures',    require('./src/routes/signatures'));
+app.use('/api/notifications', require('./src/routes/notifications'));
+app.use('/api/accounting',    require('./src/routes/accounting'));
 
 // Endpoint público para confirmação de recebimento de holerite
 app.get('/confirmar/:token', async (req, res) => {

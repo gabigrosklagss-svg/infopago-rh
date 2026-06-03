@@ -176,6 +176,56 @@ router.delete('/:id', requireAuth, requireRole('admin', 'rh'), async (req, res) 
   res.json({ success: true });
 });
 
+/* GET /api/time/bank/rules — regras vigentes */
+router.get('/bank/rules', requireAuth, async (req, res) => {
+  const { getRegras } = require('../services/timeBank');
+  res.json(await getRegras());
+});
+
+router.put('/bank/rules', requireAuth, async (req, res) => {
+  const { data: cur } = await supabase.from('time_bank_rules').select('id').limit(1).maybeSingle();
+  const payload = { ...req.body, updated_at: new Date().toISOString() };
+  if (cur) await supabase.from('time_bank_rules').update(payload).eq('id', cur.id);
+  else await supabase.from('time_bank_rules').insert(payload);
+  res.json({ success: true });
+});
+
+/* Extrato de transações de um funcionário */
+router.get('/bank/extrato/:employee_id', requireAuth, async (req, res) => {
+  const { extrato } = require('../services/timeBank');
+  res.json(await extrato(req.params.employee_id, parseInt(req.query.limit) || 100));
+});
+
+/* POST /api/time/bank/compensar — folga compensatória */
+router.post('/bank/compensar', requireAuth, async (req, res) => {
+  const { compensarFolga } = require('../services/timeBank');
+  try {
+    const r = await compensarFolga({
+      employee_id: req.body.employee_id,
+      data_folga: req.body.data_folga,
+      horas: parseFloat(req.body.horas),
+      descricao: req.body.descricao,
+      created_by: req.user.id,
+    });
+    res.json(r);
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+/* POST /api/time/bank/ajuste — ajuste manual (RH) */
+router.post('/bank/ajuste', requireAuth, async (req, res) => {
+  const { lancar } = require('../services/timeBank');
+  try {
+    const r = await lancar({
+      employee_id: req.body.employee_id,
+      tipo: 'ajuste_manual',
+      horas: parseFloat(req.body.horas),
+      descricao: req.body.descricao || 'Ajuste manual pelo RH',
+      created_by: req.user.id,
+    });
+    res.json(r);
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
 /* GET /api/time/banco-horas — saldo de todos os funcionários ATIVOS */
 router.get('/banco-horas', requireAuth, async (req, res) => {
   const { data, error } = await supabase

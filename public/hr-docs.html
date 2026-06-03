@@ -82,7 +82,6 @@
         <td>
           <button class="btn btn-sm" onclick="gerarPdfResc('${t.id}')">PDF</button>
           ${t.pdf_path ? `<button class="btn btn-sm" onclick="downloadAuth('/api/terminations/${t.id}/download','rescisao.pdf')">Baixar</button>` : ''}
-          <button class="btn btn-sm" style="color:var(--brand-700)" onclick="solicitarAssinaturaResc('${t.id}','${(t.employees?.nome_completo || '').replace(/'/g,"\\'")}')">✍️ Assinar</button>
           <button class="btn btn-sm btn-danger" onclick="excluirResc('${t.id}')">Excluir</button>
         </td>
       </tr>
