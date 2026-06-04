@@ -89,7 +89,7 @@ router.get('/kpis', requireAuth, authorize.any('reports.financial', 'reports.vie
   });
 });
 
-/* Insights da Ingrid sobre os KPIs */
+/* Insights da Ingrid sobre os KPIs (com cache diário pra economizar custo) */
 router.post('/insights', requireAuth, authorize.any('reports.financial', 'reports.view'), async (req, res) => {
   if (!process.env.ANTHROPIC_API_KEY) {
     return res.json({
@@ -101,6 +101,26 @@ router.post('/insights', requireAuth, authorize.any('reports.financial', 'report
 
   const kpis = req.body.kpis;
   if (!kpis) return res.status(400).json({ error: 'KPIs obrigatórios.' });
+
+  const force = req.body.force === true;
+  const mes = kpis.competencia?.mes;
+  const ano = kpis.competencia?.ano;
+  const hojeIso = new Date().toISOString().slice(0, 10);
+  const cacheKey = `insights_${ano}_${mes}_${hojeIso}`;
+
+  // Verifica cache do dia (se não for forçado)
+  if (!force) {
+    const { data: cached } = await supabase.from('ia_cache')
+      .select('resposta, created_at').eq('cache_key', cacheKey).maybeSingle();
+    if (cached) {
+      return res.json({
+        insights: cached.resposta,
+        cached: true,
+        cached_at: cached.created_at,
+        model: 'claude-sonnet-4-5',
+      });
+    }
+  }
 
   const prompt = `Você é a Ingrid, analista contábil/RH especialista da empresa.
 Analise os indicadores contábeis abaixo e gere 4-6 INSIGHTS curtos e ACIONÁVEIS em português brasileiro.
@@ -148,7 +168,13 @@ Retorne APENAS o array JSON, nada mais.`;
     const txt = r.content?.[0]?.text || '[]';
     const json = txt.match(/\[[\s\S]*\]/)?.[0] || '[]';
     const insights = JSON.parse(json);
-    res.json({ insights, model: 'claude-sonnet-4-5' });
+    // Salva no cache pra reuso no mesmo dia
+    await supabase.from('ia_cache').upsert({
+      cache_key: cacheKey,
+      resposta: insights,
+      created_at: new Date().toISOString(),
+    }, { onConflict: 'cache_key' }).catch(() => {});
+    res.json({ insights, cached: false, model: 'claude-sonnet-4-5' });
   } catch (e) {
     console.warn('[accounting/insights] erro IA:', e.message);
     res.json({

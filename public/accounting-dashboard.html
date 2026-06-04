@@ -78,7 +78,10 @@
     <div class="kpi-grid" id="kpis"></div>
 
     <!-- Insights da IA -->
-    <h3 class="card-title">Análise da Ingrid <small id="ia-status">(carregando…)</small></h3>
+    <div class="flex items-center justify-between" style="margin:24px 0 10px">
+      <h3 class="card-title" style="margin:0">🤖 Análise da Ingrid <small id="ia-status">(carregando…)</small></h3>
+      <button class="btn btn-sm" onclick="pegarInsightsIA(_kpis, true)" title="Força nova análise (consome créditos)">Atualizar análise</button>
+    </div>
     <div id="insights-list"></div>
 
     <!-- Gráficos compactos -->
@@ -257,11 +260,14 @@
     });
   }
 
-  async function pegarInsightsIA(k) {
+  async function pegarInsightsIA(k, force = false) {
     document.getElementById('ia-status').textContent = '(consultando Ingrid…)';
     try {
-      const r = await api('/accounting/insights', { method: 'POST', body: { kpis: k } });
-      document.getElementById('ia-status').textContent = `(${r.insights.length} insights)`;
+      const r = await api('/accounting/insights', { method: 'POST', body: { kpis: k, force } });
+      const fonte = r.cached
+        ? `(cache de hoje${r.cached_at ? ` · ${new Date(r.cached_at).toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'})}` : ''})`
+        : '(análise nova)';
+      document.getElementById('ia-status').textContent = `· ${r.insights.length} insights ${fonte}`;
       document.getElementById('insights-list').innerHTML = r.insights.map(i => `
         <div class="insight ${i.tipo || 'info'}">
           <div class="ico">${i.tipo === 'danger' ? '!' : i.tipo === 'warn' ? '⚠' : i.tipo === 'success' ? '✓' : 'i'}</div>

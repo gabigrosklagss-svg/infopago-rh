@@ -427,9 +427,21 @@
       showLoading();
       try {
         const r = await api('/payslips/lote', { method: 'POST', body: payload });
-        toast(`${r.criados} holerite(s) gerado(s) (${r.erros} erro(s))`, r.erros ? 'warning' : 'success');
         closeFormModal();
-        carregar();
+        // Sincroniza os filtros com o que foi gerado para os holerites aparecerem
+        document.getElementById('f-mes').value = payload.competencia_mes;
+        document.getElementById('f-ano').value = payload.competencia_ano;
+        document.getElementById('f-status').value = '';
+        toast(`${r.criados} holerite(s) gerado(s) · ${r.erros} erro(s)`, r.erros ? 'warning' : 'success');
+        // Se houver erros, mostra detalhes
+        if (r.erros && r.erros > 0) {
+          const fails = (r.resultados || []).filter(x => !x.success);
+          if (fails.length) {
+            console.warn('[lote] falhas:', fails);
+            setTimeout(() => toast(`Falhou: ${fails.map(f => f.nome + ' (' + f.error + ')').join(' · ')}`, 'error'), 600);
+          }
+        }
+        await carregar();
       } catch (err) { toast(err.message, 'error'); }
       finally { hideLoading(); }
     });
