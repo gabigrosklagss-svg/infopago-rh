@@ -158,12 +158,16 @@ Tendência 12 meses (folha bruta): ${(kpis.historico_12m || []).slice(-4).map(h 
 Retorne APENAS o array JSON, nada mais.`;
 
   let rawResponse = null, tokensIn = 0, tokensOut = 0;
+  console.log(`[Ingrid] iniciando análise mes=${mes}/${ano} force=${force} user=${req.user?.email}`);
   try {
     const Anthropic = require('@anthropic-ai/sdk');
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const client = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY,
+      timeout: 25 * 1000, // 25s
+    });
     const r = await client.messages.create({
       model: 'claude-sonnet-4-5',
-      max_tokens: 2000,
+      max_tokens: 1500,
       messages: [{ role: 'user', content: prompt }],
     });
     rawResponse = r.content?.[0]?.text || '';

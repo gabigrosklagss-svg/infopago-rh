@@ -261,9 +261,20 @@
   }
 
   async function pegarInsightsIA(k, force = false) {
-    document.getElementById('ia-status').textContent = '(consultando Ingrid…)';
+    document.getElementById('ia-status').textContent = '(consultando Ingrid… aguarde até 20s)';
     try {
-      const r = await api('/accounting/insights', { method: 'POST', body: { kpis: k, force } });
+      // Chamada manual com timeout maior (Claude pode levar 10-15s)
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 30000); // 30s
+      const resp = await fetch('/api/accounting/insights', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+        body: JSON.stringify({ kpis: k, force }),
+        signal: ctrl.signal,
+      });
+      clearTimeout(tid);
+      if (!resp.ok) throw new Error((await resp.json()).error || `Erro ${resp.status}`);
+      const r = await resp.json();
       const fonte = r.cached
         ? `(cache de hoje${r.cached_at ? ` · ${new Date(r.cached_at).toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'})}` : ''})`
         : '(análise nova)';
