@@ -106,6 +106,9 @@ router.post('/', requireAuth, requireRole('admin', 'rh'), async (req, res) => {
       .eq('employee_id', employee_id)
       .neq('status', 'concluido');
 
+    // Limpa saldo de banco de horas (vira evento na rescisão)
+    await supabase.from('time_bank_balance').delete().eq('employee_id', employee_id);
+
     res.status(201).json(data);
   } catch (err) { res.status(400).json({ error: err.message }); }
 });

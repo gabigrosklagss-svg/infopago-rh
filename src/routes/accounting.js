@@ -157,6 +157,7 @@ Tendência 12 meses (folha bruta): ${(kpis.historico_12m || []).slice(-4).map(h 
 
 Retorne APENAS o array JSON, nada mais.`;
 
+  let rawResponse = null, tokensIn = 0, tokensOut = 0;
   try {
     const Anthropic = require('@anthropic-ai/sdk');
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -165,23 +166,47 @@ Retorne APENAS o array JSON, nada mais.`;
       max_tokens: 2000,
       messages: [{ role: 'user', content: prompt }],
     });
-    const txt = r.content?.[0]?.text || '[]';
-    const json = txt.match(/\[[\s\S]*\]/)?.[0] || '[]';
-    const insights = JSON.parse(json);
+    rawResponse = r.content?.[0]?.text || '';
+    tokensIn = r.usage?.input_tokens || 0;
+    tokensOut = r.usage?.output_tokens || 0;
+    console.log(`[Ingrid] tokens in=${tokensIn} out=${tokensOut} custo≈US$ ${((tokensIn*3 + tokensOut*15)/1e6).toFixed(4)}`);
+
+    // Parser robusto: remove code blocks ```json...``` e blocos de explicação
+    let txt = rawResponse.trim();
+    // Remove fences
+    txt = txt.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '');
+    // Pega do primeiro [ até o último ]
+    const inicio = txt.indexOf('[');
+    const fim = txt.lastIndexOf(']');
+    if (inicio === -1 || fim === -1) throw new Error('Resposta sem JSON válido');
+    const jsonStr = txt.slice(inicio, fim + 1);
+    const insights = JSON.parse(jsonStr);
+    if (!Array.isArray(insights)) throw new Error('Resposta não é array');
+
     // Salva no cache pra reuso no mesmo dia
     await supabase.from('ia_cache').upsert({
       cache_key: cacheKey,
       resposta: insights,
       created_at: new Date().toISOString(),
     }, { onConflict: 'cache_key' }).catch(() => {});
-    res.json({ insights, cached: false, model: 'claude-sonnet-4-5' });
+    res.json({ insights, cached: false, model: 'claude-sonnet-4-5', tokens: { in: tokensIn, out: tokensOut } });
   } catch (e) {
     console.warn('[accounting/insights] erro IA:', e.message);
-    res.json({
-      insights: [
-        { tipo: 'info', titulo: 'Análise indisponível', texto: 'A IA não conseguiu processar os dados agora. Tente novamente em alguns minutos.' }
-      ]
-    });
+    console.warn('[accounting/insights] resposta raw:', rawResponse?.slice(0, 500));
+
+    // IMPORTANTE: salva no cache MESMO COM ERRO pra não consumir tokens novamente no mesmo dia
+    const fallback = [
+      { tipo: 'info', titulo: 'Análise indisponível neste momento', texto: `A IA respondeu mas o conteúdo não pôde ser processado (${e.message}). Use o botão "Atualizar análise" pra tentar novamente.` }
+    ];
+    if (tokensIn > 0 || tokensOut > 0) {
+      // Tokens foram consumidos — cacheia até forçar
+      await supabase.from('ia_cache').upsert({
+        cache_key: cacheKey,
+        resposta: fallback,
+        created_at: new Date().toISOString(),
+      }, { onConflict: 'cache_key' }).catch(() => {});
+    }
+    res.json({ insights: fallback, error_debug: e.message, raw_preview: rawResponse?.slice(0, 200) });
   }
 });
 
