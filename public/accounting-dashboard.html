@@ -81,25 +81,42 @@
     <h3 class="card-title">Análise da Ingrid <small id="ia-status">(carregando…)</small></h3>
     <div id="insights-list"></div>
 
-    <!-- Gráficos -->
+    <!-- Gráficos compactos -->
     <div class="grid-2 mt-5">
       <div class="card">
         <h3 class="card-title">Folha bruta · últimos 12 meses</h3>
-        <canvas id="ch-historico" height="280"></canvas>
+        <div style="height:200px;position:relative"><canvas id="ch-historico"></canvas></div>
       </div>
       <div class="card">
         <h3 class="card-title">Composição do custo total</h3>
-        <canvas id="ch-composicao" height="280"></canvas>
+        <div style="height:200px;position:relative"><canvas id="ch-composicao"></canvas></div>
       </div>
     </div>
 
-    <!-- Tabela por departamento -->
-    <div class="card mt-5">
-      <h3 class="card-title">Custos por departamento</h3>
-      <table class="table">
-        <thead><tr><th>Departamento</th><th class="num">Funcionários</th><th class="num">Folha bruta</th><th class="num">INSS funcionário</th><th class="num">FGTS depositado</th></tr></thead>
-        <tbody id="tbody-deptos"></tbody>
-      </table>
+    <!-- Visão executiva (incorporada do antigo painel) -->
+    <div class="grid-2 mt-5">
+      <div class="card">
+        <h3 class="card-title">Encargos do mês <small>INSS · IRRF · FGTS</small></h3>
+        <div id="encargos-list"></div>
+      </div>
+      <div class="card">
+        <h3 class="card-title">Aniversariantes do mês <small>celebre o time</small></h3>
+        <div id="aniversariantes-list"></div>
+      </div>
+    </div>
+
+    <div class="grid-2 mt-5">
+      <div class="card">
+        <h3 class="card-title">Férias a vencer <small>evite multa em dobro</small></h3>
+        <div id="ferias-list"></div>
+      </div>
+      <div class="card">
+        <h3 class="card-title">Custos por departamento</h3>
+        <table class="table" style="font-size:12.5px">
+          <thead><tr><th>Departamento</th><th class="num">Pessoas</th><th class="num">Bruta</th><th class="num">FGTS</th></tr></thead>
+          <tbody id="tbody-deptos"></tbody>
+        </table>
+      </div>
     </div>
   </main>
 </div>
@@ -124,22 +141,56 @@
     try {
       const m = document.getElementById('f-mes').value;
       const a = document.getElementById('f-ano').value;
-      const kpis = await api(`/accounting/kpis?mes=${m}&ano=${a}`);
+      const [kpis, painel] = await Promise.all([
+        api(`/accounting/kpis?mes=${m}&ano=${a}`),
+        api(`/reports/dashboard?mes=${m}&ano=${a}`),
+      ]);
       _kpis = kpis;
-      renderKPIs(kpis);
+      renderKPIs(kpis, painel);
       renderTabela(kpis);
       renderCharts(kpis);
+      renderPainelExec(painel);
       pegarInsightsIA(kpis);
     } catch (err) { toast(err.message, 'error'); }
     finally { hideLoading(); }
   }
 
-  function renderKPIs(k) {
+  function renderPainelExec(d) {
+    // Encargos
+    const k = d.folha_do_mes;
+    document.getElementById('encargos-list').innerHTML = `
+      <div style="font-size:13px;line-height:1.9">
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)"><span>INSS (folha)</span><strong>${fmt.brl(k.inss)}</strong></div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)"><span>IRRF retido</span><strong>${fmt.brl(k.irrf)}</strong></div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)"><span>FGTS (depósito)</span><strong>${fmt.brl(k.fgts)}</strong></div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)"><span>Proventos totais</span><strong>${fmt.brl(k.total_proventos)}</strong></div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0"><span>Descontos totais</span><strong>${fmt.brl(k.total_descontos)}</strong></div>
+      </div>`;
+
+    // Aniversariantes
+    const ani = d.aniversariantes || [];
+    document.getElementById('aniversariantes-list').innerHTML = ani.length
+      ? ani.map(a => `<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px"><strong>Dia ${String(a.dia).padStart(2,'0')}</strong> · ${a.nome_completo} <small style="color:var(--ink-4)">${fmt.matricula(a.matricula)}</small></div>`).join('')
+      : '<p class="text-muted text-sm">Nenhum aniversariante este mês.</p>';
+
+    // Férias
+    const fer = d.ferias_a_vencer || [];
+    document.getElementById('ferias-list').innerHTML = fer.length
+      ? fer.slice(0, 6).map(f => `<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px"><strong style="color:var(--warn,#a16207)">Vence ${fmt.data(f.periodo_aquisitivo_fim)}</strong><br>${f.employees?.nome_completo || ''} <small style="color:var(--ink-4)">${fmt.matricula(f.employees?.matricula)}</small></div>`).join('')
+      : '<p class="text-muted text-sm">Nenhuma férias a vencer nos próximos 60 dias.</p>';
+  }
+
+  function renderKPIs(k, painel) {
     const variacao = k.comparativo?.variacao_folha_pct;
     const setaVar = variacao > 0 ? '↑' : variacao < 0 ? '↓' : '→';
     const corVar = variacao > 5 ? 'color:#B42318' : variacao < -5 ? 'color:#15803d' : 'color:var(--ink-3)';
+    const ativos = painel?.funcionarios_ativos || 0;
+    const enviados = painel?.holerites_enviados || 0;
+    const qtdGerados = k.folha.qtd_holerites;
     document.getElementById('kpis').innerHTML = `
-      <div class="kpi primary"><div class="lbl">Custo total da empresa</div><div class="val">${fmt.brl(k.custo_total)}</div><div class="sub">${k.folha.qtd_holerites} holerites · tudo incluso</div></div>
+      <div class="kpi primary"><div class="lbl">Custo total da empresa</div><div class="val">${fmt.brl(k.custo_total)}</div><div class="sub">${qtdGerados} holerites · tudo incluso</div></div>
+      <div class="kpi"><div class="lbl">Funcionários ativos</div><div class="val">${ativos}</div><div class="sub">cadastrados no sistema</div></div>
+      <div class="kpi"><div class="lbl">Holerites enviados</div><div class="val">${enviados}</div><div class="sub">de ${qtdGerados} gerados este mês</div></div>
       <div class="kpi"><div class="lbl">Folha bruta</div><div class="val">${fmt.brl(k.folha.bruta)}</div><div class="sub" style="${corVar}">${setaVar} ${Math.abs(variacao || 0).toFixed(1)}% vs mês anterior</div></div>
       <div class="kpi"><div class="lbl">Folha líquida</div><div class="val">${fmt.brl(k.folha.liquido)}</div><div class="sub">o que o funcionário recebe</div></div>
       <div class="kpi"><div class="lbl">Encargos patronais</div><div class="val">${fmt.brl(k.encargos_patronais.total)}</div><div class="sub">INSS+FGTS+Sistema S+RAT</div></div>
@@ -177,7 +228,12 @@
           { label: 'FGTS depositado', data: k.historico_12m.map(h => h.fgts), backgroundColor: '#0F2E1E', borderRadius: 4 },
         ]
       },
-      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 10 } } },
+        scales: { y: { ticks: { font: { size: 10 }, callback: v => 'R$ ' + (v/1000).toFixed(0) + 'k' } }, x: { ticks: { font: { size: 10 } } } }
+      }
     });
 
     const ctx2 = document.getElementById('ch-composicao');
@@ -197,7 +253,7 @@
           k.provisoes.ferias,
         ], backgroundColor: ['#1FAB54','#0369A1','#7C3AED','#0F2E1E','#39E175','#0891B2','#D946EF','#F59E0B','#B45309'] }]
       },
-      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 11 } } } } }
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 10 }, boxWidth: 10 } } } }
     });
   }
 

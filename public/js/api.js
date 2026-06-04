@@ -405,9 +405,8 @@ function renderSidebar(active) {
     <div class="nav-group">
       <div class="nav-label">Análise</div>
       <nav>
-        ${item('dashboard',  '/dashboard.html', 'Painel executivo')}
-        ${item('reports',    '/analytics.html', 'Relatórios analíticos')}
         ${item('accounting', '/accounting-dashboard.html', 'Dashboard contábil + IA')}
+        ${item('reports',    '/analytics.html',            'Relatórios analíticos')}
       </nav>
     </div>
 
