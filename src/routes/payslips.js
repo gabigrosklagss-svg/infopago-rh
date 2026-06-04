@@ -127,7 +127,7 @@ router.post('/lote', requireAuth, requireRole('admin', 'rh'), async (req, res) =
         ...stripDB(calc),
         pdf_path: null,           // invalida PDF antigo - força regeração
         pdf_generated_at: null,
-        status: 'pendente',       // volta pra pendente até gerar PDF novo
+        status: 'rascunho',       // volta pra rascunho até gerar PDF novo
         created_by: req.user.id,
       };
       const { data: ps } = await supabase.from('payslips')
