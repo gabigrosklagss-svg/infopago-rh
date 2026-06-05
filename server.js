@@ -35,7 +35,7 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
       imgSrc: ["'self'", "data:", "blob:", "https:"],
-      connectSrc: ["'self'", "https://*.supabase.co", "https://viacep.com.br"],
+      connectSrc: ["'self'", "https://*.supabase.co", "https://viacep.com.br", "https://cdn.jsdelivr.net"],
       frameAncestors: ["'none'"],
       objectSrc: ["'none'"],
     },

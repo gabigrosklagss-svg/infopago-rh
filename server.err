@@ -1,0 +1,60 @@
+[accounting/insights] erro IA: supabase.from(...).upsert(...).catch is not a function
+[accounting/insights] resposta raw: ```json
+[
+  {
+    "tipo": "danger",
+    "titulo": "Queda crítica de 74,72% na folha",
+    "texto": "A folha bruta despencou de R$ 41k em maio para R$ 10k em junho. Essa redução drástica indica possível desligamento em massa ou erro no processamento da folha que precisa ser investigado imediatamente."
+  },
+  {
+    "tipo": "warn",
+    "titulo": "Apenas 2 colaboradores ativos",
+    "texto": "A empresa possui somente 2 funcionários registrados (Financeiro e RH), o que pode comprometer a operação. Av
+[CRASH:unhandledRejection] TypeError: supabase.from(...).upsert(...).catch is not a function
+    at C:\Users\gabig\Downloads\Sistema RH\src\routes\accounting.js:211:44
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+[accounting/insights] erro IA: supabase.from(...).upsert(...).catch is not a function
+[accounting/insights] resposta raw: ```json
+[
+  {
+    "tipo": "danger",
+    "titulo": "Queda crítica de 74,72% na folha",
+    "texto": "A folha caiu de R$ 41k em maio para R$ 10k em junho, redução drástica que pode indicar demissões em massa ou erro no processamento. Urgente: verificar se houve desligamentos não planejados."
+  },
+  {
+    "tipo": "warn",
+    "titulo": "Apenas 2 colaboradores ativos",
+    "texto": "Empresa operando com quadro mínimo (1 no Financeiro e 1 no RH). Avaliar se a capacidade operacional está adequada para 
+[CRASH:unhandledRejection] TypeError: supabase.from(...).upsert(...).catch is not a function
+    at C:\Users\gabig\Downloads\Sistema RH\src\routes\accounting.js:211:44
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+[accounting/insights] erro IA: supabase.from(...).upsert(...).catch is not a function
+[accounting/insights] resposta raw: ```json
+[
+  {
+    "tipo": "danger",
+    "titulo": "Queda crítica de 74,72% na folha",
+    "texto": "A folha bruta despencou de R$ 41k em maio para R$ 10k em junho. Isso indica demissões significativas ou pagamentos não processados que precisam de verificação urgente."
+  },
+  {
+    "tipo": "warn",
+    "titulo": "Apenas 2 colaboradores ativos",
+    "texto": "A empresa está operando com quadro reduzidíssimo (Financeiro e RH com 1 pessoa cada). Avalie se há sobrecarga de trabalho e riscos operaciona
+[CRASH:unhandledRejection] TypeError: supabase.from(...).upsert(...).catch is not a function
+    at C:\Users\gabig\Downloads\Sistema RH\src\routes\accounting.js:211:44
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+[accounting/insights] erro IA: supabase.from(...).upsert(...).catch is not a function
+[accounting/insights] resposta raw: ```json
+[
+  {
+    "tipo": "danger",
+    "titulo": "Queda crítica de 74,72% na folha",
+    "texto": "A folha bruta caiu de R$ 41k em maio para R$ 10k em junho, redução de 74,72%. Investigar imediatamente se houve desligamentos não planejados ou erros no processamento."
+  },
+  {
+    "tipo": "warn",
+    "titulo": "Apenas 2 funcionários ativos",
+    "texto": "A empresa está operando com quadro reduzido de apenas 2 colaboradores (Financeiro e RH). Avaliar se há necessidade de reforço para manter oper
+[CRASH:unhandledRejection] TypeError: supabase.from(...).upsert(...).catch is not a function
+    at C:\Users\gabig\Downloads\Sistema RH\src\routes\accounting.js:211:44
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
