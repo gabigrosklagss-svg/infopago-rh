@@ -152,6 +152,15 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).json({ error: err.message || 'Erro interno do servidor.' });
 });
 
+// Captura crashes globais ANTES de matar o processo
+process.on('uncaughtException', (err) => {
+  console.error('[CRASH:uncaughtException]', err);
+  console.error(err.stack);
+});
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[CRASH:unhandledRejection]', reason);
+});
+
 app.listen(PORT, () => {
   console.log(`\n  ✅ InfoPago RH rodando em http://localhost:${PORT}`);
   console.log(`  📅 ${new Date().toLocaleString('pt-BR')}\n`);
