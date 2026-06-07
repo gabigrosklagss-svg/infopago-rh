@@ -67,8 +67,9 @@
         <td>${fmt.brl(t.valor_parcela)}</td>
         <td><strong>${fmt.brl(t.valor_liquido)}</strong></td>
         <td>
-          <button class="btn btn-sm" onclick="gerarPdf13('${t.id}')">PDF</button>
-          ${t.pdf_path ? `<button class="btn btn-sm" onclick="downloadAuth('/api/thirteenth/${t.id}/download','13o.pdf')">Baixar</button>` : ''}
+          <button class="btn btn-sm" onclick="gerarPdf13('${t.id}')">${t.pdf_path ? 'Regerar PDF' : 'Gerar PDF'}</button>
+          ${t.pdf_path ? `<button class="btn btn-sm" onclick="downloadAuth('/api/thirteenth/${t.id}/download','13o_${t.ano}_p${t.parcela}.pdf')">Baixar</button>` : ''}
+          ${t.pdf_path ? `<button class="btn btn-sm btn-success" onclick="enviarEmail13('${t.id}','${(t.employees?.nome_completo || '').replace(/'/g,"\\'")}')">✉️ Enviar</button>` : ''}
           <button class="btn btn-sm btn-danger" onclick="excluir13('${t.id}')">×</button>
         </td>
       </tr>
@@ -129,6 +130,16 @@
       } catch (err) { toast(err.message, 'error'); }
       finally { hideLoading(); }
     });
+  }
+
+  async function enviarEmail13(id, nome) {
+    if (!confirm(`Enviar o PDF do 13º por e-mail para ${nome}?`)) return;
+    showLoading();
+    try {
+      const r = await api(`/thirteenth/${id}/send-email`, { method: 'POST' });
+      toast(`Enviado para ${r.to}`, 'success');
+    } catch (err) { toast(err.message, 'error'); }
+    finally { hideLoading(); }
   }
 
   async function gerarPdf13(id) {

@@ -147,21 +147,42 @@ async function enviarComunicado(announcement, recipients, company, userId) {
   const html = buildComunicadoHTML(announcement, company);
   const subject = `${announcement.importante ? '[Importante] ' : ''}${announcement.titulo}`;
 
-  // Baixa o anexo (se houver) uma única vez pra reutilizar entre destinatários
+  // Baixa o anexo via Supabase Storage (service_role tem acesso ao bucket privado)
   let attachments = [];
+  let inlineImageCid = null;
   if (announcement.anexo_url) {
     try {
-      const r = await fetch(announcement.anexo_url);
-      if (r.ok) {
-        const buf = Buffer.from(await r.arrayBuffer());
-        attachments.push({
+      // anexo_url pode ser path interno OU URL completa (legado)
+      let buf = null;
+      if (/^https?:\/\//i.test(announcement.anexo_url)) {
+        const r = await fetch(announcement.anexo_url);
+        if (r.ok) buf = Buffer.from(await r.arrayBuffer());
+      } else {
+        const { data: blob } = await supabase.storage.from('company-documents').download(announcement.anexo_url);
+        if (blob) buf = Buffer.from(await blob.arrayBuffer());
+      }
+      if (buf) {
+        const att = {
           filename: announcement.anexo_nome || 'anexo',
           content: buf,
           contentType: announcement.anexo_tipo || 'application/octet-stream',
-        });
+        };
+        // Se for imagem, usa CID pra exibir inline no HTML
+        if (/^image\//i.test(announcement.anexo_tipo || '')) {
+          att.cid = 'comunicado-anexo-' + Date.now();
+          inlineImageCid = att.cid;
+        }
+        attachments.push(att);
+      } else {
+        console.warn('[comunicado] nao conseguiu baixar anexo:', announcement.anexo_url);
       }
-    } catch { /* segue sem anexo */ }
+    } catch (e) { console.warn('[comunicado] erro ao anexar:', e.message); }
   }
+
+  // Re-gera HTML com CID inline quando aplicável
+  const htmlComCid = inlineImageCid
+    ? html.replace(announcement.anexo_url, `cid:${inlineImageCid}`)
+    : html;
 
   let enviados = 0, falhas = 0;
   const logs = [];
@@ -172,7 +193,7 @@ async function enviarComunicado(announcement, recipients, company, userId) {
         from: `"${fromName}" <${fromAddr}>`,
         to: r.email,
         subject,
-        html,
+        html: htmlComCid,
         attachments,
       });
       enviados++;

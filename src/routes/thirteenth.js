@@ -122,6 +122,66 @@ router.get('/:id/download', requireAuth, async (req, res) => {
   res.download(file, `13o_${t.ano}_p${t.parcela}_${(t.employees?.nome_completo || 'funcionario').split(' ')[0]}.pdf`);
 });
 
+/* POST /:id/send-email — envia o PDF do 13º por e-mail ao funcionário */
+router.post('/:id/send-email', requireAuth, requireRole('admin', 'rh'), async (req, res) => {
+  const fs = require('fs');
+  const path = require('path');
+  const nodemailer = require('nodemailer');
+  const { data: t } = await supabase.from('thirteenth_salary')
+    .select('*, employees(*)').eq('id', req.params.id).single();
+  if (!t) return res.status(404).json({ error: 'Registro não encontrado.' });
+  if (!t.pdf_path) return res.status(400).json({ error: 'Gere o PDF antes de enviar.' });
+
+  const file = path.join(__dirname, '../../', t.pdf_path);
+  if (!fs.existsSync(file)) return res.status(404).json({ error: 'Arquivo PDF não encontrado no disco.' });
+
+  const emp = t.employees;
+  const email = emp.email_corporativo || emp.email_pessoal;
+  if (!email) return res.status(400).json({ error: 'Funcionário sem e-mail cadastrado.' });
+
+  const { data: company } = await supabase.from('company_settings').select('*').eq('id', 1).single();
+  const c = company || {};
+  if (!c.smtp_host || !c.smtp_user) return res.status(400).json({ error: 'SMTP não configurado.' });
+
+  const parcelaTxt = t.parcela === 1 ? '1ª parcela' : '2ª parcela';
+  const valor = Number(t.valor_liquido).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+  const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"></head>
+<body style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#f5f7fb;margin:0;padding:32px">
+<div style="max-width:560px;margin:auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.08)">
+  <div style="background:linear-gradient(135deg,#0F2E1E,#1FAB54);color:#fff;padding:24px 32px">
+    <h1 style="margin:0;font-size:20px">13º Salário — ${parcelaTxt} de ${t.ano}</h1>
+    <p style="margin:8px 0 0;opacity:.9">${c.razao_social || ''}</p>
+  </div>
+  <div style="padding:28px 32px;color:#1F2D3D;font-size:14px;line-height:1.6">
+    <p>Olá ${emp.nome_completo?.split(' ')[0] || ''},</p>
+    <p>Segue em anexo o demonstrativo da <strong>${parcelaTxt} do 13º salário</strong> referente ao ano de ${t.ano}.</p>
+    <div style="background:#f5f7fb;border-left:3px solid #1FAB54;padding:14px 18px;border-radius:6px;margin:18px 0">
+      <strong>Valor líquido:</strong> ${valor}<br>
+      <strong>Data de pagamento:</strong> ${new Date(t.data_pagamento).toLocaleDateString('pt-BR')}
+    </div>
+    <p style="font-size:12px;color:#697386">Qualquer dúvida, entre em contato com o RH.</p>
+  </div>
+</div></body></html>`;
+
+  const transporter = nodemailer.createTransport({
+    host: c.smtp_host, port: parseInt(c.smtp_port) || 587, secure: false,
+    auth: { user: c.smtp_user, pass: c.smtp_pass },
+  });
+  try {
+    await transporter.sendMail({
+      from: `"${c.email_nome_remetente || 'RH'}" <${c.smtp_user}>`,
+      to: email,
+      subject: `13º Salário · ${parcelaTxt} de ${t.ano}`,
+      html,
+      attachments: [{ filename: `13o_${t.ano}_p${t.parcela}.pdf`, path: file }],
+    });
+    res.json({ success: true, to: email });
+  } catch (e) {
+    res.status(500).json({ error: 'Falha no envio: ' + e.message });
+  }
+});
+
 router.delete('/:id', requireAuth, requireRole('admin'), async (req, res) => {
   const { data: t } = await supabase.from('thirteenth_salary').select('pdf_path').eq('id', req.params.id).single();
   if (t?.pdf_path) { try { fs.unlinkSync(path.join(__dirname, '../../', t.pdf_path)); } catch {} }

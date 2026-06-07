@@ -106,15 +106,23 @@ router.post('/announcements/:id/anexo', requireAuth, requireRole('admin', 'rh'),
 
   const { error: upErr } = await supabase.storage.from(BUCKET)
     .upload(storage_path, req.file.buffer, { contentType: req.file.mimetype, upsert: true });
-  if (upErr) return res.status(500).json({ error: upErr.message });
+  if (upErr) return res.status(500).json({ error: 'Falha no upload: ' + upErr.message });
 
-  const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(storage_path);
-  const anexo_url = pub.publicUrl;
+  // Salva o storage_path (não URL pública) pra poder baixar depois via service_role
   await supabase.from('announcements').update({
-    anexo_url, anexo_nome: req.file.originalname, anexo_tipo: req.file.mimetype, anexo_tamanho: req.file.size,
+    anexo_url: storage_path, // armazena o PATH interno, não URL pública
+    anexo_nome: req.file.originalname,
+    anexo_tipo: req.file.mimetype,
+    anexo_tamanho: req.file.size,
   }).eq('id', id);
 
-  res.json({ anexo_url, anexo_nome: req.file.originalname });
+  // Retorna URL assinada (válida 1h) pra mostrar no UI
+  const { data: signed } = await supabase.storage.from(BUCKET).createSignedUrl(storage_path, 3600);
+  res.json({
+    anexo_url: signed?.signedUrl,
+    storage_path,
+    anexo_nome: req.file.originalname,
+  });
 });
 
 router.delete('/announcements/:id/anexo', requireAuth, requireRole('admin', 'rh'), async (req, res) => {
