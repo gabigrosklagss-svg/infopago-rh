@@ -437,12 +437,16 @@ function renderSidebar(active) {
       </nav>
     </div>
 
-    <div class="nav-group">
-      <div class="nav-label">Comunicação</div>
-      <nav>
-        ${item('calendar', '/calendar.html', 'Calendário &amp; Comunicados')}
-      </nav>
-    </div>
+    ${(() => {
+      const rs = getUser()?.roles || [];
+      const podeVer = rs.includes('rh') || rs.includes('admin') || rs.includes('super_admin');
+      return podeVer ? `<div class="nav-group">
+        <div class="nav-label">Comunicação</div>
+        <nav>
+          ${item('calendar', '/calendar.html', 'Calendário &amp; Comunicados')}
+        </nav>
+      </div>` : '';
+    })()}
 
     <div class="nav-group">
       <div class="nav-label">Folha de pagamento</div>

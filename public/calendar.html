@@ -508,15 +508,29 @@
         const fileInput = document.getElementById('ann-anexo-input');
         const file = fileInput?.files?.[0];
         if (file) {
+          console.log('[anexo] tentando upload de', file.name, file.size, 'bytes');
           const fd = new FormData();
           fd.append('arquivo', file);
-          const r = await fetch(`/api/help/announcements/${saved.id}/anexo`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${getToken()}` },
-            body: fd,
-          });
-          if (!r.ok) toast('Comunicado salvo, mas o anexo falhou: ' + ((await r.json()).error || 'erro'), 'warning');
-          else { Object.assign(saved, await r.json()); }
+          try {
+            const r = await fetch(`/api/help/announcements/${saved.id}/anexo`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${getToken()}` },
+              body: fd,
+            });
+            const respText = await r.text();
+            console.log('[anexo] resposta', r.status, respText);
+            if (!r.ok) {
+              let err = 'erro';
+              try { err = JSON.parse(respText).error || err; } catch {}
+              toast('Comunicado salvo, mas o anexo FALHOU: ' + err, 'error');
+            } else {
+              try { Object.assign(saved, JSON.parse(respText)); } catch {}
+              toast('Anexo enviado!', 'success');
+            }
+          } catch (uerr) {
+            console.error('[anexo] erro de rede:', uerr);
+            toast('Falha de rede no upload do anexo: ' + uerr.message, 'error');
+          }
         }
 
         toast('Comunicado salvo!', 'success');

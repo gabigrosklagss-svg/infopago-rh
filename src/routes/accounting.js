@@ -188,11 +188,13 @@ Retorne APENAS o array JSON, nada mais.`;
     if (!Array.isArray(insights)) throw new Error('Resposta não é array');
 
     // Salva no cache pra reuso no mesmo dia
-    await supabase.from('ia_cache').upsert({
-      cache_key: cacheKey,
-      resposta: insights,
-      created_at: new Date().toISOString(),
-    }, { onConflict: 'cache_key' }).catch(() => {});
+    try {
+      await supabase.from('ia_cache').upsert({
+        cache_key: cacheKey,
+        resposta: insights,
+        created_at: new Date().toISOString(),
+      }, { onConflict: 'cache_key' });
+    } catch (e) { console.warn('[ia_cache] save:', e.message); }
     res.json({ insights, cached: false, model: 'claude-sonnet-4-5', tokens: { in: tokensIn, out: tokensOut } });
   } catch (e) {
     console.warn('[accounting/insights] erro IA:', e.message);
@@ -203,12 +205,13 @@ Retorne APENAS o array JSON, nada mais.`;
       { tipo: 'info', titulo: 'Análise indisponível neste momento', texto: `A IA respondeu mas o conteúdo não pôde ser processado (${e.message}). Use o botão "Atualizar análise" pra tentar novamente.` }
     ];
     if (tokensIn > 0 || tokensOut > 0) {
-      // Tokens foram consumidos — cacheia até forçar
-      await supabase.from('ia_cache').upsert({
-        cache_key: cacheKey,
-        resposta: fallback,
-        created_at: new Date().toISOString(),
-      }, { onConflict: 'cache_key' }).catch(() => {});
+      try {
+        await supabase.from('ia_cache').upsert({
+          cache_key: cacheKey,
+          resposta: fallback,
+          created_at: new Date().toISOString(),
+        }, { onConflict: 'cache_key' });
+      } catch (ee) { console.warn('[ia_cache] save fallback:', ee.message); }
     }
     res.json({ insights: fallback, error_debug: e.message, raw_preview: rawResponse?.slice(0, 200) });
   }

@@ -229,6 +229,8 @@
 
   async function editarUsuario(id) {
     if (!_roles.length) _roles = await api('/permissions/roles').catch(() => []);
+    // Carrega departamentos pra preencher o select
+    if (!window._depsCache) window._depsCache = await api('/departments?active=true').catch(() => []);
     const u = id ? _users.find(x => x.id === id) : { full_name:'', email:'', department:'', active:true, new_roles:[] };
     const ativos = new Set((u.new_roles || []).map(r => r.slug));
     const html = `<form id="userForm">
@@ -237,7 +239,12 @@
           <input name="full_name" value="${(u.full_name||'').replace(/"/g,'&quot;')}" required></div>
         ${!id ? `<div class="field"><label>E-mail<span class="req">*</span></label><input type="email" name="email" required></div>
         <div class="field"><label>Senha inicial<span class="req">*</span></label><input type="password" name="password" required minlength="8" placeholder="mín. 8 caracteres"></div>` : ''}
-        <div class="field"><label>Departamento</label><input name="department" value="${(u.department||'').replace(/"/g,'&quot;')}"></div>
+        <div class="field"><label>Departamento</label>
+          <select name="department">
+            <option value="">—</option>
+            ${(window._depsCache || []).map(d => `<option value="${d.nome}" ${u.department === d.nome ? 'selected' : ''}>${d.nome}</option>`).join('')}
+          </select>
+        </div>
         <div class="field"><label>Status</label>
           <select name="active">
             <option value="true" ${u.active!==false?'selected':''}>Ativo</option>
