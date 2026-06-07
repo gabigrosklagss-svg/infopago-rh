@@ -112,8 +112,31 @@ router.post('/upload', requireAuth, authorize('cvpool.manage'), upload.single('a
       const r = await mammoth.extractRawText({ buffer: buf }); texto = r.value || '';
     } else if (nome.endsWith('.txt') || req.file.mimetype === 'text/plain') {
       texto = buf.toString('utf8');
+    } else if (/^image\//.test(req.file.mimetype) || /\.(jpg|jpeg|png|webp)$/i.test(nome)) {
+      // OCR + extração via Claude Vision (multimodal)
+      if (!process.env.ANTHROPIC_API_KEY) {
+        return res.status(503).json({ error: 'IA não configurada para processar imagens. Use PDF/DOCX.' });
+      }
+      try {
+        const Anthropic = require('@anthropic-ai/sdk');
+        const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 30000 });
+        const r = await client.messages.create({
+          model: 'claude-sonnet-4-5',
+          max_tokens: 2500,
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'image', source: { type: 'base64', media_type: req.file.mimetype, data: buf.toString('base64') } },
+              { type: 'text', text: 'Extraia TODO o texto deste currículo a partir da imagem. Retorne apenas o texto bruto, preservando seções (nome, contato, formação, experiência, habilidades, etc).' }
+            ],
+          }],
+        });
+        texto = r.content?.[0]?.text || '';
+      } catch (vErr) {
+        return res.status(500).json({ error: 'Falha ao ler imagem: ' + vErr.message });
+      }
     } else {
-      return res.status(400).json({ error: 'Formato não suportado. Use PDF, DOCX ou TXT.' });
+      return res.status(400).json({ error: 'Formato não suportado. Use PDF, DOCX, TXT ou imagem (JPG/PNG/WEBP).' });
     }
     if (!texto.trim()) return res.status(400).json({ error: 'Não foi possível extrair texto do arquivo.' });
 

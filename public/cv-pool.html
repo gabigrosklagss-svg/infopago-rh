@@ -32,8 +32,8 @@
         <p class="subtitle">Currículos armazenados aguardando vaga compatível</p>
       </div>
       <div class="flex gap-2">
-        <button class="btn" onclick="document.getElementById('cv-upload').click()">Upload CV (PDF/DOCX)</button>
-        <input type="file" id="cv-upload" accept=".pdf,.docx,.doc,.txt,application/pdf" style="display:none" onchange="uploadCV(this)">
+        <button class="btn" onclick="document.getElementById('cv-upload').click()">Upload CV (PDF/DOCX/Imagem)</button>
+        <input type="file" id="cv-upload" accept=".pdf,.docx,.doc,.txt,.jpg,.jpeg,.png,.webp,application/pdf,image/*" style="display:none" onchange="uploadCV(this)">
         <button class="btn" onclick="colarTexto()">Colar texto</button>
         <button class="btn btn-primary" onclick="novoCV()">+ Cadastrar manual</button>
       </div>
