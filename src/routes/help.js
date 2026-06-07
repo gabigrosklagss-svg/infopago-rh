@@ -109,12 +109,22 @@ router.post('/announcements/:id/anexo', requireAuth, requireRole('admin', 'rh'),
   if (upErr) return res.status(500).json({ error: 'Falha no upload: ' + upErr.message });
 
   // Salva o storage_path (não URL pública) pra poder baixar depois via service_role
-  await supabase.from('announcements').update({
+  const { error: updErr } = await supabase.from('announcements').update({
     anexo_url: storage_path, // armazena o PATH interno, não URL pública
     anexo_nome: req.file.originalname,
     anexo_tipo: req.file.mimetype,
     anexo_tamanho: req.file.size,
   }).eq('id', id);
+
+  if (updErr) {
+    console.error('[anexo update] FALHA:', updErr.message, updErr.code);
+    // Limpa o arquivo do bucket pra não ficar lixo
+    await supabase.storage.from(BUCKET).remove([storage_path]).catch(() => {});
+    return res.status(500).json({
+      error: 'Falha ao salvar referência do anexo: ' + updErr.message,
+      hint: updErr.code === 'PGRST204' ? 'Rode a migration 20260602_comunicados_anexo.sql no Supabase Studio (colunas anexo_* não existem)' : undefined,
+    });
+  }
 
   // Retorna URL assinada (válida 1h) pra mostrar no UI
   const { data: signed } = await supabase.storage.from(BUCKET).createSignedUrl(storage_path, 3600);
